@@ -93,7 +93,7 @@ jobs:
           /tmp/vv/bin/pip install -q --no-cache-dir torch==2.6.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cpu
           /tmp/vv/bin/pip install -q --no-cache-dir chatterbox-tts soundfile num2words
           slug=$(python -c "import json,sys;print(json.load(open(sys.argv[1]))['slug'])" "$ROTEIRO")
-          for estilo in calma animada; do
+          for estilo in ${{ inputs.estilo || 'calma animada' }}; do
             rm -rf "saida/$slug/pt/_tmp"/b*.wav
             VOZ_ESTILO=$estilo /tmp/vv/bin/python canal/narrar_clone.py "$ROTEIRO" pt saida
             ffmpeg -loglevel error -y -f lavfi -i anullsrc=r=44100:cl=mono -t 0.7 -c:a pcm_s16le pausa.wav
