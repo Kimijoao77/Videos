@@ -13,7 +13,7 @@ on:
         required: true
         default: "canal/lince/roteiros/as-meninas.json"
       etapa:
-        description: "previa ou video"
+        description: "previa, capa ou video"
         required: true
         default: "video"
 
@@ -86,10 +86,13 @@ jobs:
           gh release view "$tag" -R "$CANAL_REPO" > /dev/null 2>&1 || gh release create "$tag" -R "$CANAL_REPO" --prerelease \
             --title "Lince Lunar: $slug" --notes "Vídeo do canal Lince Lunar (ainda não postado)."
           ls -la saida/*.jpg saida/*.mp4 2>/dev/null || true
-          for f in saida/*-previa.jpg saida/*.mp4; do
+          for f in saida/*-previa.jpg saida/*-capa.jpg saida/*.mp4; do
             [ -f "$f" ] || continue
             for i in 1 2 3; do gh release upload "$tag" -R "$CANAL_REPO" "$f" --clobber && break; sleep 5; done
           done
+      - name: Registrar no app (canal/lince/dados/canal.json)
+        if: inputs.etapa != 'previa'
+        run: python canal/lince/registrar.py "$ROTEIRO" saida
       - name: Apagar a voz e os arquivos desta máquina
         if: always()
         run: rm -rf vozes-ref saida hf
