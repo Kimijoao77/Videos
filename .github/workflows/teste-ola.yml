@@ -1,0 +1,8 @@
+name: Teste olá
+on:
+  workflow_dispatch:
+jobs:
+  ola:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo ola
