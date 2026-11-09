@@ -55,7 +55,11 @@ jobs:
           cp privado/app/www/fontes/*.woff2 _site/fontes/
           cp privado/app/www/fundo-curvas-*.svg _site/ || true
           pip install -q markdown
-          python3 site/conectar.py privado/canal/POSTAGEM.md _site/conectar.html
+          python3 site/pagina.py privado/canal/POSTAGEM.md _site/conectar.html "Conectar os canais" "Passo a passo para ligar o robô de postagem do Nexus aos canais do YouTube." voltar
+          # Página inicial, privacidade e termos: o Google pede esses links para publicar o app de postagem
+          python3 site/pagina.py site/paginas/sobre.md _site/sobre.html "Nexus Canal" "A ferramenta que publica os vídeos dos canais Aqui Há Dragões e Here Be Dragons."
+          python3 site/pagina.py site/paginas/privacidade.md _site/privacidade.html "Política de privacidade" "Que dados o Nexus Canal usa e o que faz com eles."
+          python3 site/pagina.py site/paginas/termos.md _site/termos.html "Termos de uso" "As regras de uso do Nexus Canal."
           rm -rf privado
           ls -R _site | head -40
       - uses: actions/configure-pages@v5
