@@ -13,9 +13,13 @@ on:
         required: true
         default: "canal/lince/roteiros/as-meninas.json"
       etapa:
-        description: "previa, capa, livro ou video"
+        description: "previa, capa, livro, video ou voz (amostra das primeiras falas na voz calma e na animada)"
         required: true
         default: "video"
+      estilo:
+        description: "Jeito da voz no vídeo: em branco = o do roteiro (calma se não disser); calma ou animada"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -43,7 +47,7 @@ jobs:
           persist-credentials: false
           sparse-checkout: canal
       - name: Gravação de referência da voz (ramo privado 'vozes')
-        if: inputs.etapa == 'video'
+        if: inputs.etapa == 'video' || inputs.etapa == 'voz'
         uses: actions/checkout@v4
         with:
           repository: ${{ env.CANAL_REPO }}
@@ -63,6 +67,7 @@ jobs:
         env:
           HF_HOME: ${{ github.workspace }}/hf
           REFS: ${{ github.workspace }}/vozes-ref
+          VOZ_ESTILO: ${{ inputs.estilo }}
         run: |
           pip install -q numpy num2words
           if python canal/narrar_clone.py "$ROTEIRO" pt saida --verificar; then
@@ -75,7 +80,29 @@ jobs:
             /tmp/vv/bin/python canal/narrar_clone.py "$ROTEIRO" pt saida
           fi
           python canal/narrar_clone.py "$ROTEIRO" pt saida
+      - name: Amostra da voz (calma e animada, as primeiras falas)
+        if: inputs.etapa == 'voz'
+        env:
+          HF_HOME: ${{ github.workspace }}/hf
+          REFS: ${{ github.workspace }}/vozes-ref
+          VOZ_FALAS: "5"
+        run: |
+          pip install -q numpy num2words
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          python -m venv /tmp/vv
+          /tmp/vv/bin/pip install -q --no-cache-dir torch==2.6.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cpu
+          /tmp/vv/bin/pip install -q --no-cache-dir chatterbox-tts soundfile num2words
+          slug=$(python -c "import json,sys;print(json.load(open(sys.argv[1]))['slug'])" "$ROTEIRO")
+          for estilo in calma animada; do
+            rm -rf "saida/$slug/pt/_tmp"/b*.wav
+            VOZ_ESTILO=$estilo /tmp/vv/bin/python canal/narrar_clone.py "$ROTEIRO" pt saida
+            ffmpeg -loglevel error -y -f lavfi -i anullsrc=r=44100:cl=mono -t 0.7 -c:a pcm_s16le pausa.wav
+            : > lista.txt
+            for w in $(ls "saida/$slug/pt/_tmp"/b*.wav | sort); do echo "file '$PWD/$w'" >> lista.txt; echo "file '$PWD/pausa.wav'" >> lista.txt; done
+            ffmpeg -loglevel error -y -f concat -safe 0 -i lista.txt -c:a libmp3lame -b:a 160k "saida/$slug-voz-$estilo.mp3"
+          done
       - name: Montar (${{ inputs.etapa }})
+        if: inputs.etapa != 'voz'
         run: |
           pip install -q pillow numpy numba
           python canal/lince/pintura.py "${{ inputs.etapa }}" "$ROTEIRO" saida
@@ -86,7 +113,7 @@ jobs:
           gh release view "$tag" -R "$CANAL_REPO" > /dev/null 2>&1 || gh release create "$tag" -R "$CANAL_REPO" --prerelease \
             --title "Lince Lunar: $slug" --notes "Vídeo do canal Lince Lunar (ainda não postado)."
           ls -la saida/*.jpg saida/*.mp4 2>/dev/null || true
-          for f in saida/*-previa.jpg saida/*-capa.jpg saida/*.mp4 saida/livro-*.jpg saida/livro.json; do
+          for f in saida/*-previa.jpg saida/*-capa.jpg saida/*.mp4 saida/livro-*.jpg saida/livro.json saida/*-voz-*.mp3; do
             [ -f "$f" ] || continue
             for i in 1 2 3; do gh release upload "$tag" -R "$CANAL_REPO" "$f" --clobber && break; sleep 5; done
           done
