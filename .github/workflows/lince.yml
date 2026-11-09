@@ -1,0 +1,95 @@
+# Lince Lunar (canal novo de arte): vídeo de uma pintura, com zoom pela obra em alta resolução e a voz clonada.
+# O código e o roteiro ficam no repositório privado do canal (canal/lince/); a pintura vem do Wikimedia Commons
+# (domínio público); o vídeo volta para a Release privada lince-<slug> de lá. O registro não mostra o texto das falas.
+# À mão: Actions > Lince Lunar > Run workflow. "previa" = só a folha com um quadro por batida (uns 5 min).
+name: Lince Lunar
+run-name: "Lince Lunar: ${{ inputs.roteiro }} (${{ inputs.etapa }})"
+
+on:
+  workflow_dispatch:
+    inputs:
+      roteiro:
+        description: "Roteiro no repositório do canal"
+        required: true
+        default: "canal/lince/roteiros/as-meninas.json"
+      etapa:
+        description: "previa ou video"
+        required: true
+        default: "video"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lince-${{ inputs.roteiro }}-${{ inputs.etapa }}
+  cancel-in-progress: false
+
+env:
+  CANAL_REPO: Kimijoao77/Engfy
+  GH_TOKEN: ${{ secrets.ENGFY_TOKEN }}
+  CANAL_PUBLICO: "1"
+  ROTEIRO: ${{ inputs.roteiro }}
+
+jobs:
+  fazer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - name: Código e roteiro (repositório do canal)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CANAL_REPO }}
+          token: ${{ secrets.ENGFY_TOKEN }}
+          persist-credentials: false
+          sparse-checkout: canal
+      - name: Gravação de referência da voz (ramo privado 'vozes')
+        if: inputs.etapa == 'video'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CANAL_REPO }}
+          token: ${{ secrets.ENGFY_TOKEN }}
+          persist-credentials: false
+          ref: vozes
+          path: vozes-ref
+      - name: Instalar ffmpeg e fontes
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg fonts-inter > /dev/null
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Narração com a voz clonada
+        if: inputs.etapa == 'video'
+        env:
+          HF_HOME: ${{ github.workspace }}/hf
+          REFS: ${{ github.workspace }}/vozes-ref
+        run: |
+          pip install -q numpy num2words
+          if python canal/narrar_clone.py "$ROTEIRO" pt saida --verificar; then
+            echo "todas as falas já estão guardadas"
+          else
+            sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+            python -m venv /tmp/vv
+            /tmp/vv/bin/pip install -q --no-cache-dir torch==2.6.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cpu
+            /tmp/vv/bin/pip install -q --no-cache-dir chatterbox-tts soundfile num2words
+            /tmp/vv/bin/python canal/narrar_clone.py "$ROTEIRO" pt saida
+          fi
+          python canal/narrar_clone.py "$ROTEIRO" pt saida
+      - name: Montar (${{ inputs.etapa }})
+        run: |
+          pip install -q pillow numpy numba
+          python canal/lince/pintura.py "${{ inputs.etapa }}" "$ROTEIRO" saida
+      - name: Devolver para a Release privada do canal
+        run: |
+          slug=$(python -c "import json,sys;print(json.load(open(sys.argv[1]))['slug'])" "$ROTEIRO")
+          tag="$slug"
+          gh release view "$tag" -R "$CANAL_REPO" > /dev/null 2>&1 || gh release create "$tag" -R "$CANAL_REPO" --prerelease \
+            --title "Lince Lunar: $slug" --notes "Vídeo do canal Lince Lunar (ainda não postado)."
+          ls -la saida/*.jpg saida/*.mp4 2>/dev/null || true
+          for f in saida/*-previa.jpg saida/*.mp4; do
+            [ -f "$f" ] || continue
+            for i in 1 2 3; do gh release upload "$tag" -R "$CANAL_REPO" "$f" --clobber && break; sleep 5; done
+          done
+      - name: Apagar a voz e os arquivos desta máquina
+        if: always()
+        run: rm -rf vozes-ref saida hf
