@@ -5,4 +5,7 @@ jobs:
   ola:
     runs-on: ubuntu-latest
     steps:
-      - run: echo ola
+      - name: a
+        env:
+          GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
+        run: echo "tamanho ${#GEMINI_KEY}"
