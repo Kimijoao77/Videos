@@ -70,14 +70,14 @@ jobs:
           VOZ_ESTILO: ${{ inputs.estilo }}
         run: |
           pip install -q numpy num2words
-          if python canal/narrar_clone.py "$ROTEIRO" pt saida --verificar; then
+          if VOZ_REFAZER_RAPIDAS=1 python canal/narrar_clone.py "$ROTEIRO" pt saida --verificar; then
             echo "todas as falas já estão guardadas"
           else
             sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
             python -m venv /tmp/vv
             /tmp/vv/bin/pip install -q --no-cache-dir torch==2.6.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cpu
             /tmp/vv/bin/pip install -q --no-cache-dir chatterbox-tts soundfile num2words praat-parselmouth
-            /tmp/vv/bin/python canal/narrar_clone.py "$ROTEIRO" pt saida
+            VOZ_REFAZER_RAPIDAS=1 /tmp/vv/bin/python canal/narrar_clone.py "$ROTEIRO" pt saida
           fi
           python canal/narrar_clone.py "$ROTEIRO" pt saida
       - name: Amostra da voz (calma e animada, as primeiras falas)
