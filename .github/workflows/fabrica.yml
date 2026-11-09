@@ -1,0 +1,215 @@
+# Fábrica de vídeos dos canais Aqui Há Dragões / Here Be Dragons (documentários ilustrados da era dos galeões).
+# O código da fábrica, os roteiros, a gravação da voz e os vídeos ficam no repositório privado do canal; este fluxo
+# busca o código lá (com o segredo ENGFY_TOKEN), gera os vídeos e devolve tudo para as Releases privadas de lá.
+# Nada de voz nem de vídeo é publicado aqui: sem artefatos, e o registro não mostra o texto das falas.
+#
+# Sozinho: de 21:20 às 23:50 (Brasília) procura a cada meia hora roteiro novo (o roteiro do dia sai às 21:05),
+# e às 08:40 de garantia. À mão: Actions > Fábrica > Run workflow, com o caminho do roteiro no repositório do canal.
+name: Fábrica
+run-name: "Fábrica: ${{ inputs.roteiro || 'procura roteiro novo' }}"
+
+on:
+  schedule:
+    - cron: "20,50 0-2 * * *"
+    - cron: "40 11 * * *"
+  workflow_dispatch:
+    inputs:
+      roteiro:
+        description: "Roteiro no repositório do canal (ex.: canal/roteiros/<slug>.json). Vazio = procura os novos"
+        required: false
+        default: ""
+      idiomas:
+        description: "pt,en ou só um deles"
+        required: false
+        default: "pt,en"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fabrica
+  cancel-in-progress: false
+
+env:
+  CANAL_REPO: Kimijoao77/Engfy
+
+jobs:
+  escolher:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      fazer: ${{ steps.r.outputs.fazer }}
+      roteiro: ${{ steps.r.outputs.roteiro }}
+      slug: ${{ steps.r.outputs.slug }}
+      versao: ${{ steps.r.outputs.versao }}
+      motor: ${{ steps.r.outputs.motor }}
+      idiomas: ${{ steps.r.outputs.idiomas }}
+    steps:
+      - name: Conferir a chave do repositório do canal
+        env:
+          GH_TOKEN: ${{ secrets.ENGFY_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::falta o segredo ENGFY_TOKEN (Settings > Secrets and variables > Actions)"; exit 1
+          fi
+          gh api "repos/$CANAL_REPO" --jq .full_name > /dev/null || { echo "::error::a chave ENGFY_TOKEN não abre o repositório do canal"; exit 1; }
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CANAL_REPO }}
+          token: ${{ secrets.ENGFY_TOKEN }}
+          persist-credentials: false
+          sparse-checkout: |
+            canal/roteiros
+            canal/rascunhos
+          sparse-checkout-cone-mode: false
+      - uses: actions/checkout@v4
+        with:
+          path: este
+          persist-credentials: false
+          sparse-checkout: fabrica
+      - id: r
+        env:
+          GH_TOKEN: ${{ secrets.ENGFY_TOKEN }}
+          ROTEIRO: ${{ inputs.roteiro }}
+          IDIOMAS: ${{ inputs.idiomas }}
+        run: python3 este/fabrica/escolher.py
+
+  produzir:
+    # Um idioma por máquina: narração com a voz clonada, cenas, vídeo e miniatura, tudo na mesma máquina
+    needs: escolher
+    if: needs.escolher.outputs.fazer == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        idioma: ${{ fromJSON(needs.escolher.outputs.idiomas) }}
+    env:
+      GH_TOKEN: ${{ secrets.ENGFY_TOKEN }}
+      CANAL_PUBLICO: "1"
+      ROTEIRO: ${{ needs.escolher.outputs.roteiro }}
+      SLUG: ${{ needs.escolher.outputs.slug }}
+      IDIOMA: ${{ matrix.idioma }}
+    steps:
+      - name: Código e roteiro (repositório do canal)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CANAL_REPO }}
+          token: ${{ secrets.ENGFY_TOKEN }}
+          persist-credentials: false
+          sparse-checkout: canal
+      - name: Gravação de referência da voz (ramo privado 'vozes')
+        if: needs.escolher.outputs.motor == 'clone'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CANAL_REPO }}
+          token: ${{ secrets.ENGFY_TOKEN }}
+          persist-credentials: false
+          ref: vozes
+          path: vozes-ref
+      - name: Instalar ffmpeg e fontes
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg fonts-inter > /dev/null
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Narração com a voz clonada (${{ matrix.idioma }})
+        if: needs.escolher.outputs.motor == 'clone'
+        env:
+          HF_HOME: ${{ github.workspace }}/hf
+          REFS: ${{ github.workspace }}/vozes-ref
+        run: |
+          motor=$(python -c "import json,sys;print(json.load(open(sys.argv[1]))['voz'][sys.argv[2]])" "$ROTEIRO" "$IDIOMA")
+          echo "motor: $motor"
+          pip install -q numpy num2words
+          if python canal/narrar_clone.py "$ROTEIRO" "$IDIOMA" saida --verificar; then
+            echo "todas as falas já estão guardadas"; exit 0
+          fi
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          python -m venv /tmp/vv
+          if [ "$motor" = "chatterbox" ]; then
+            /tmp/vv/bin/pip install -q --no-cache-dir torch==2.6.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cpu
+            /tmp/vv/bin/pip install -q --no-cache-dir chatterbox-tts soundfile num2words
+          else
+            /tmp/vv/bin/pip install -q --no-cache-dir torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+            /tmp/vv/bin/pip install -q --no-cache-dir qwen-tts soundfile num2words
+          fi
+          /tmp/vv/bin/python canal/narrar_clone.py "$ROTEIRO" "$IDIOMA" saida
+      - run: pip install -q edge-tts pillow requests numpy google-auth num2words
+      - name: Preparar a fábrica v2 (recursos de mapas e cenas)
+        if: needs.escolher.outputs.versao == '2'
+        run: |
+          pip install -q numba
+          mkdir -p canal/recursos
+          gh release download canal-recursos -R "$CANAL_REPO" -D canal/recursos --clobber
+          ls canal/recursos
+      - name: Pegar a narração pronta (${{ matrix.idioma }})
+        if: needs.escolher.outputs.motor == 'clone'
+        env:
+          REFS: ${{ github.workspace }}/vozes-ref
+        run: python canal/narrar_clone.py "$ROTEIRO" "$IDIOMA" saida
+      - name: Gerar o vídeo (${{ matrix.idioma }})
+        run: |
+          if [ "${{ needs.escolher.outputs.versao }}" = "2" ]; then
+            python canal/filme.py "$ROTEIRO" --saida saida --idiomas "$IDIOMA"
+          else
+            python canal/gerar.py "$ROTEIRO" --saida saida --idiomas "$IDIOMA"
+          fi
+      - name: Devolver para a Release privada do canal
+        run: |
+          tag="canal-$SLUG"
+          gh release view "$tag" -R "$CANAL_REPO" > /dev/null 2>&1 || gh release create "$tag" -R "$CANAL_REPO" --prerelease \
+            --title "Canal: $SLUG" --notes "Vídeos gerados pela fábrica (português e inglês). Ainda não postados." || true
+          mkdir -p pub
+          for f in saida/$SLUG/$IDIOMA/*.*; do [ -f "$f" ] && cp "$f" "pub/$IDIOMA-$(basename "$f")"; done
+          ls pub
+          for i in 1 2 3; do gh release upload "$tag" -R "$CANAL_REPO" pub/* --clobber && break; sleep 5; done
+      - name: Apagar a voz e os arquivos desta máquina
+        if: always()
+        run: rm -rf vozes-ref saida pub hf
+
+  registrar:
+    # Grava no app (videos.json do repositório do canal) ou anota a falha
+    needs: [escolher, produzir]
+    if: always() && needs.escolher.outputs.fazer == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ secrets.ENGFY_TOKEN }}
+      SLUG: ${{ needs.escolher.outputs.slug }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CANAL_REPO }}
+          token: ${{ secrets.ENGFY_TOKEN }}
+          sparse-checkout: canal
+      - name: Anotar a falha (depois de 2 seguidas, só gera de novo à mão)
+        if: needs.produzir.result != 'success'
+        run: |
+          tag="canal-$SLUG"
+          gh release view "$tag" -R "$CANAL_REPO" > /dev/null 2>&1 || gh release create "$tag" -R "$CANAL_REPO" --prerelease \
+            --title "Canal: $SLUG" --notes "Vídeos gerados pela fábrica (português e inglês). Ainda não postados."
+          mkdir -p /tmp/f
+          gh release download "$tag" -R "$CANAL_REPO" -p fabrica-falhas.json -D /tmp/f 2>/dev/null || true
+          n=$(python3 -c "import json;print(json.load(open('/tmp/f/fabrica-falhas.json')).get('falhas',0))" 2>/dev/null || echo 0)
+          printf '{"falhas": %d, "ultima": "%s", "run": "%s"}\n' $((n + 1)) "$(date -u +%FT%TZ)" \
+            "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" > fabrica-falhas.json
+          gh release upload "$tag" -R "$CANAL_REPO" fabrica-falhas.json --clobber
+          echo "::error::a produção falhou ($((n + 1))ª vez seguida)"
+      - name: Registrar os vídeos no app
+        if: needs.produzir.result == 'success'
+        run: |
+          gh release delete-asset "canal-$SLUG" fabrica-falhas.json -R "$CANAL_REPO" -y 2>/dev/null || true
+          git config user.name "$(git log -1 --format=%an)"
+          git config user.email "$(git log -1 --format=%ae)"
+          for i in 1 2 3 4 5; do
+            git fetch -q origin main && git reset -q --hard origin/main
+            python3 canal/reconciliar.py
+            git add canal/dados/videos.json canal/saida
+            if git diff --cached --quiet; then echo "nada mudou"; exit 0; fi
+            git commit -q -m "Canal: registro dos vídeos (fábrica do repositório Videos)"
+            if git push -q origin HEAD:main; then exit 0; fi
+            sleep $((i * 7))
+          done
+          exit 1

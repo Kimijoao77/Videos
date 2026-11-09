@@ -1,0 +1,36 @@
+# Cópia diária do código da fábrica (só os .py) do repositório privado do canal para a pasta codigo/ daqui.
+# Os roteiros, os dados, a gravação da voz e os vídeos não vêm: ficam só no repositório privado.
+name: Espelho do código
+
+on:
+  schedule:
+    - cron: "10 12 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  copiar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: Kimijoao77/Engfy
+          token: ${{ secrets.ENGFY_TOKEN }}
+          persist-credentials: false
+          sparse-checkout: canal
+          path: canal-privado
+      - name: Copiar o código
+        run: |
+          rm -rf codigo && mkdir -p codigo
+          cp canal-privado/canal/*.py codigo/
+          rm -rf canal-privado
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A codigo
+          if git diff --cached --quiet; then echo "nada mudou"; exit 0; fi
+          git commit -q -m "Código da fábrica: cópia de $(date -u +%F)"
+          git push -q
