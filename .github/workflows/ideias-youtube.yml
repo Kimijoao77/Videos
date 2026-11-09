@@ -1,0 +1,49 @@
+# Buscador de ideias no YouTube rodando aqui (repositório público: minutos grátis). O código e os resultados ficam no
+# repositório privado Engfy (ideias/youtube/); o registro público só mostra títulos de vídeos (que já são públicos).
+# Segredos deste repositório: GEMINI_KEY (a chave do Gemini) e ENGFY_TOKEN (já existe). A lista de vídeos vem do yt-dlp.
+name: Ideias do YouTube
+
+on:
+  workflow_dispatch:
+    inputs:
+      assistir:
+        description: "Quantos vídeos o Gemini assiste nesta rodada"
+        required: false
+        default: "8"
+  schedule:
+    - cron: "17 9 * * 2,5"   # terça e sexta, 06:17 em Brasília
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ideias-youtube
+  cancel-in-progress: false
+
+jobs:
+  buscar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: Kimijoao77/Engfy
+          token: ${{ secrets.ENGFY_TOKEN }}
+          sparse-checkout: ideias
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -q requests yt-dlp
+      - name: Pré-seleção e vídeos assistidos (Gemini)
+        env:
+          GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
+        run: python ideias/youtube/buscar.py "${{ inputs.assistir || '8' }}"
+      - name: Guardar no Engfy
+        if: always()
+        run: |
+          git config user.name "Kimijoao77"
+          git config user.email "leclercjoao3@gmail.com"
+          git add ideias/youtube
+          git diff --cached --quiet && exit 0
+          git commit -q -m "Ideias do YouTube: $(date -u +'%Y-%m-%d %H:%M') UTC"
+          for i in 1 2 3; do git push -q && exit 0; git pull -q --rebase; done
