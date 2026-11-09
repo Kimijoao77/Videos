@@ -1,0 +1,18 @@
+/* A Máquina no computador: o visual do app, numa coluna um pouco mais larga e com as abas em cima */
+html, body { height: auto; min-height: 100%; }
+#app { max-width: 760px; height: auto; min-height: 100vh; }
+.tela { overflow: visible; padding-bottom: 40px; }
+.topo { gap: 12px; }
+.topo-modo { justify-content: flex-start; gap: 10px; }
+.pc-sub { font-size: 13px; color: var(--tinta-2); margin-left: 10px; }
+.pc-conta { padding: 8px 14px; border-radius: 999px; font: 700 13px var(--texto); color: var(--tinta-2); background: var(--superficie-2); }
+.pc-abas { position: sticky; top: 61px; z-index: 4; border-top: 0; border-bottom: 2px solid var(--linha); padding-bottom: 0; }
+.pc-abas .aba { flex-direction: row; justify-content: center; gap: 8px; font-size: 14px; padding: 12px 0; }
+.pc-abas .aba svg { width: 22px; height: 22px; }
+.pc-entrar { max-width: 460px; margin: 40px auto; display: grid; gap: 14px; }
+.pc-entrar h1 { font: 800 30px var(--display); margin: 0; }
+.pc-entrar p { margin: 0; font-size: 14.5px; line-height: 1.5; color: var(--tinta-2); }
+.pc-entrar label { display: grid; gap: 6px; font: 700 13px var(--texto); color: var(--tinta-2); }
+.pc-entrar input { font: 500 15px var(--texto); color: var(--tinta); padding: 12px 14px; border-radius: 12px; border: 2px solid var(--linha); background: var(--superficie); }
+.pc-entrar .mq-botao { border: 0; cursor: pointer; }
+@media (min-width: 900px) { .mq-vid { display: block; } }

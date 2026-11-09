@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="pt-BR" data-modo="maquina">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Máquina · Nexus</title>
+  <meta name="description" content="A Máquina do Nexus no computador: escala, vídeos, aprovar e postar nos canais.">
+  <link rel="stylesheet" href="estilo.css">
+  <link rel="stylesheet" href="pc.css">
+</head>
+<body>
+  <div id="app">
+    <header class="topo">
+      <div class="topo-modo" id="topo-modo"><b class="topo-titulo">Máquina</b><span class="pc-sub">Nexus no computador</span></div>
+      <button class="pc-conta" id="pc-conta" hidden>Sair</button>
+    </header>
+    <nav class="abas pc-abas" id="abas" aria-label="Abas da Máquina"></nav>
+    <main id="tela" class="tela"></main>
+  </div>
+  <div id="modal" class="modal" hidden></div>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script type="module" src="pc.js"></script>
+</body>
+</html>

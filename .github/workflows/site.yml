@@ -1,0 +1,66 @@
+# A Máquina do Nexus no computador (GitHub Pages: https://kimijoao77.github.io/Videos/).
+# Junta a casca daqui (site/) com o código da Máquina do app (copiado do repositório privado todo dia) e o passo a
+# passo de conectar os canais (canal/POSTAGEM.md). Os dados nunca vêm para cá: a página os lê do repositório
+# privado com o token que você digita no navegador.
+name: Site da Máquina
+
+on:
+  push:
+    branches: [main]
+    paths: ["site/**", ".github/workflows/site.yml"]
+  schedule:
+    - cron: "20 12 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: Kimijoao77/Engfy
+          token: ${{ secrets.ENGFY_TOKEN }}
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            app/www/estilo.css
+            app/www/js/maquina.js
+            app/www/js/ui.js
+            app/www/fontes/
+            app/www/fundo-curvas-claro.svg
+            app/www/fundo-curvas-escuro.svg
+            canal/POSTAGEM.md
+          path: privado
+      - name: Montar o site
+        run: |
+          set -e
+          rm -rf _site && mkdir -p _site/js _site/fontes
+          cp -r site/index.html site/pc.js site/pc.css site/js _site/
+          cp privado/app/www/estilo.css _site/
+          cp privado/app/www/js/maquina.js privado/app/www/js/ui.js _site/js/
+          cp privado/app/www/fontes/*.woff2 _site/fontes/
+          cp privado/app/www/fundo-curvas-*.svg _site/ || true
+          pip install -q markdown
+          python3 site/conectar.py privado/canal/POSTAGEM.md _site/conectar.html
+          rm -rf privado
+          ls -R _site | head -40
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deploy
+        uses: actions/deploy-pages@v4
