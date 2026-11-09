@@ -61,6 +61,7 @@ jobs:
           sparse-checkout: |
             canal/roteiros
             canal/rascunhos
+            canal/dados/fabrica.json
           sparse-checkout-cone-mode: false
       - uses: actions/checkout@v4
         with:

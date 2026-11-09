@@ -1,9 +1,9 @@
 """Escolhe o que a fábrica vai gerar e grava as saídas do passo em $GITHUB_OUTPUT.
 
 - Rodada à mão com um roteiro: gera esse roteiro, nos idiomas pedidos.
-- Rodada sozinha (horário): procura no repositório do canal os roteiros de canal/roteiros/ que mudaram nos últimos
-  3 dias e ainda não têm os vídeos na Release canal-<slug>. Pega o mais antigo. Um roteiro que falhou 2 vezes
-  seguidas só é gerado de novo à mão (para não ficar tentando sem parar).
+- Rodada sozinha (horário), se canal/dados/fabrica.json do canal disser "publica": procura os roteiros de
+  canal/roteiros/ que mudaram nos últimos 3 dias e ainda não têm os vídeos na Release canal-<slug>. Pega o mais
+  antigo. Um roteiro que falhou 2 vezes seguidas só é gerado de novo à mão (para não ficar tentando sem parar).
 
 Roda com o checkout do repositório do canal na pasta atual (canal/roteiros) e GH_TOKEN com acesso a ele.
 """
@@ -75,6 +75,14 @@ def main():
         if not alvo.is_file():
             sys.exit(f"roteiro não encontrado no repositório do canal: {pedido}")
     else:
+        try:
+            onde = json.loads(Path("canal/dados/fabrica.json").read_text(encoding="utf-8")).get("onde", "privada")
+        except (OSError, ValueError):
+            onde = "privada"
+        if onde != "publica":                         # o interruptor do canal manda gerar no repositório privado
+            print(f"canal/dados/fabrica.json diz '{onde}': quem gera é o repositório privado")
+            saida(fazer="false", idiomas='["pt"]')
+            return
         alvo, ids = None, []
         for nome in recentes():
             arq = Path(nome)
