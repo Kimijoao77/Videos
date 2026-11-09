@@ -101,8 +101,13 @@ jobs:
             for w in $(ls "saida/$slug/pt/_tmp"/b*.wav | sort); do echo "file '$PWD/$w'" >> lista.txt; echo "file '$PWD/pausa.wav'" >> lista.txt; done
             ffmpeg -loglevel error -y -f concat -safe 0 -i lista.txt -c:a libmp3lame -b:a 160k "saida/$slug-voz-$estilo.mp3"
           done
+      - name: Amostra das vozes nativas (Microsoft, grátis)
+        if: inputs.etapa == 'voz-edge'
+        run: |
+          pip install -q numpy num2words edge-tts
+          python canal/amostra_edge.py "$ROTEIRO" saida 5
       - name: Montar (${{ inputs.etapa }})
-        if: inputs.etapa != 'voz'
+        if: inputs.etapa != 'voz' && inputs.etapa != 'voz-edge'
         run: |
           pip install -q pillow numpy numba
           python canal/lince/pintura.py "${{ inputs.etapa }}" "$ROTEIRO" saida
