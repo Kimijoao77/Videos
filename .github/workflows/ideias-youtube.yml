@@ -10,6 +10,8 @@ on:
         description: "Quantos vídeos o Gemini assiste nesta rodada"
         required: false
         default: "8"
+  schedule:
+    - cron: "17 9 * * 2,5"   # terça e sexta, 06:17 em Brasília
 
 permissions:
   contents: read
