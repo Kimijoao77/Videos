@@ -5,8 +5,10 @@
 #
 # Sozinho: de 21:20 às 23:50 (Brasília) procura a cada meia hora roteiro novo (o roteiro do dia sai às 21:05),
 # e às 08:40 de garantia. À mão: Actions > Fábrica > Run workflow, com o caminho do roteiro no repositório do canal.
+# Todo documentário sai também com o Short (o gancho em vertical, canal/short_doc.py). Para um documentário que já
+# estava pronto antes disso: rodar à mão com "so_short" = sim (renderiza só o gancho e manda o Short para a Release).
 name: Fábrica
-run-name: "Fábrica: ${{ inputs.roteiro || 'procura roteiro novo' }}"
+run-name: "${{ inputs.so_short == 'sim' && 'Short' || 'Fábrica' }}: ${{ inputs.roteiro || 'procura roteiro novo' }}"
 
 on:
   schedule:
@@ -22,6 +24,10 @@ on:
         description: "pt,en ou só um deles"
         required: false
         default: "pt,en"
+      so_short:
+        description: "sim = o documentário já está pronto: faz só o Short (o gancho em vertical) e manda para a Release"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -91,6 +97,7 @@ jobs:
       ROTEIRO: ${{ needs.escolher.outputs.roteiro }}
       SLUG: ${{ needs.escolher.outputs.slug }}
       IDIOMA: ${{ matrix.idioma }}
+      SO_SHORT: ${{ inputs.so_short }}
     steps:
       - name: Código e roteiro (repositório do canal)
         uses: actions/checkout@v4
@@ -152,9 +159,19 @@ jobs:
         env:
           REFS: ${{ github.workspace }}/vozes-ref
         run: python canal/narrar_clone.py "$ROTEIRO" "$IDIOMA" saida
+      - name: Baixar o meta.json do documentário pronto (só o Short, ${{ matrix.idioma }})
+        if: env.SO_SHORT == 'sim'
+        run: |
+          d="saida/$SLUG/$IDIOMA"; mkdir -p "$d"
+          gh release download "canal-$SLUG" -R "$CANAL_REPO" -p "$IDIOMA-meta.json" -D "$d" --clobber
+          mv "$d/$IDIOMA-meta.json" "$d/meta.json"; ls -la "$d"
       - name: Gerar o vídeo (${{ matrix.idioma }})
         run: |
-          if [ "${{ needs.escolher.outputs.versao }}" = "2" ]; then
+          if [ "$SO_SHORT" = "sim" ]; then
+            # o documentário já está na Release: só o gancho é renderizado de novo, e sobem só o Short, o meta.json e os tempos
+            python canal/filme.py "$ROTEIRO" --saida saida --idiomas "$IDIOMA" --so-short
+            rm -f "saida/$SLUG/$IDIOMA/video.mp4" "saida/$SLUG/$IDIOMA/miniatura.jpg" "saida/$SLUG/$IDIOMA/capa.jpg"
+          elif [ "${{ needs.escolher.outputs.versao }}" = "2" ]; then
             python canal/filme.py "$ROTEIRO" --saida saida --idiomas "$IDIOMA"
           else
             python canal/gerar.py "$ROTEIRO" --saida saida --idiomas "$IDIOMA"
