@@ -1,0 +1,126 @@
+# Amostras da Speechify (10/11/2026): confere se o segredo SPEECHIFY_API_KEY funciona, lista as vozes e gera o mesmo
+# trecho (sinal "Wow!") em português e inglês com algumas vozes, no modelo simba-3.5. Os mp3 e a lista de vozes vão
+# para a Release privada "amostras-voz" do repositório do canal. Nada de voz é publicado aqui: sem artefatos.
+name: Amostras Speechify
+
+on:
+  workflow_dispatch:
+    inputs:
+      vozes_pt:
+        description: "IDs de vozes para o português, separados por vírgula (vazio = escolhe sozinho)"
+        required: false
+        default: ""
+      vozes_en:
+        description: "IDs de vozes para o inglês, separados por vírgula (vazio = escolhe sozinho)"
+        required: false
+        default: ""
+  push:
+    branches: [main]
+    paths: [".github/workflows/amostras-speechify.yml"]
+
+permissions:
+  contents: read
+
+env:
+  CANAL_REPO: Kimijoao77/Engfy
+
+jobs:
+  amostras:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ secrets.ENGFY_TOKEN }}
+      SPEECHIFY_API_KEY: ${{ secrets.SPEECHIFY_API_KEY }}
+      VOZES_PT: ${{ inputs.vozes_pt }}
+      VOZES_EN: ${{ inputs.vozes_en }}
+    steps:
+      - name: Conferir o segredo
+        run: |
+          if [ -z "$SPEECHIFY_API_KEY" ]; then
+            echo "::error::O segredo SPEECHIFY_API_KEY não existe ou está vazio neste repositório."
+            exit 1
+          fi
+          echo "Segredo encontrado (${#SPEECHIFY_API_KEY} caracteres)."
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -q requests
+      - name: Gerar as amostras
+        shell: python
+        run: |
+          import base64, json, os, re, sys, requests
+          API = "https://api.speechify.ai"
+          H = {"Authorization": f"Bearer {os.environ['SPEECHIFY_API_KEY']}"}
+          os.makedirs("amostras", exist_ok=True)
+
+          r = requests.get(f"{API}/v1/voices", headers=H, timeout=60)
+          print("GET /v1/voices ->", r.status_code)
+          if r.status_code != 200:
+              print(r.text[:1000]); sys.exit(1)
+          vozes = r.json()
+          if isinstance(vozes, dict):
+              vozes = vozes.get("voices") or vozes.get("data") or []
+          print(f"{len(vozes)} vozes na conta.")
+
+          def idiomas(v):
+              loc = {str(v.get("locale", ""))}
+              for m in v.get("models") or []:
+                  for l in m.get("languages") or []:
+                      loc.add(str(l.get("locale", "")))
+              return {x for x in loc if x}
+
+          linhas = []
+          for v in vozes:
+              linhas.append(f"{v.get('id')}\t{v.get('display_name', '')}\t{v.get('gender', '')}\t{v.get('locale', '')}\t{','.join(sorted(idiomas(v)))}\t{','.join(v.get('tags') or [])}")
+          with open("amostras/speechify-vozes.txt", "w") as f:
+              f.write("id\tnome\tgênero\tlocale\tidiomas\ttags\n" + "\n".join(linhas) + "\n")
+
+          def escolher(prefixo, pedidas, n=4):
+              if pedidas.strip():
+                  return [x.strip() for x in pedidas.split(",") if x.strip()]
+              nativas = [v["id"] for v in vozes if str(v.get("locale", "")).lower().startswith(prefixo)]
+              outras = [v["id"] for v in vozes if v["id"] not in nativas and str(v.get("locale", "")).lower().startswith("en")]
+              # metade masculina, metade feminina quando der
+              def por_genero(ids, g):
+                  return [i for i in ids if str(next(v for v in vozes if v["id"] == i).get("gender", "")).lower() == g]
+              ordem = []
+              for g in ("male", "female"):
+                  ordem += por_genero(nativas, g)[:2]
+              ordem += [i for i in nativas if i not in ordem]
+              ordem += outras
+              return ordem[:n]
+
+          textos = {
+              "pt": ("pt-BR", 'Em 1977, um radiotelescópio em Ohio captou um sinal tão forte que o astrônomo de plantão rabiscou uma única palavra na margem do papel: "Uau!". Ele durou 72 segundos. Nunca mais se repetiu. E até hoje, ninguém sabe dizer de onde ele veio.'),
+              "en": ("en-US", 'In 1977, a radio telescope in Ohio picked up a signal so strong that the astronomer on duty scribbled a single word in the margin: "Wow!". It lasted 72 seconds. It never happened again. And to this day, no one can say where it came from.'),
+          }
+          escolhidas = {"pt": escolher("pt", os.environ.get("VOZES_PT", "")), "en": escolher("en", os.environ.get("VOZES_EN", ""))}
+
+          ok = 0
+          for lang, (locale, texto) in textos.items():
+              for vid in escolhidas[lang]:
+                  body = {"input": texto, "voice_id": vid, "model": "simba-3.5", "language": locale, "audio_format": "mp3"}
+                  r = requests.post(f"{API}/v1/audio/speech", headers=H, json=body, timeout=120)
+                  nome = re.sub(r"[^a-zA-Z0-9_-]", "-", vid)
+                  if r.status_code != 200:
+                      print(f"[{lang}] {vid}: ERRO {r.status_code} {r.text[:300]}"); continue
+                  if r.headers.get("content-type", "").startswith("audio"):
+                      audio = r.content
+                  else:
+                      d = r.json(); audio = base64.b64decode(d.get("audio_data", ""))
+                  caminho = f"amostras/speechify-{lang}-{nome}.mp3"
+                  with open(caminho, "wb") as f:
+                      f.write(audio)
+                  ok += 1
+                  print(f"[{lang}] {vid}: ok ({len(audio)//1024} KB) -> {caminho}")
+          print(f"{ok} amostras geradas.")
+          if ok == 0:
+              sys.exit(1)
+      - name: Mandar para a Release privada do canal
+        run: |
+          gh release view amostras-voz -R "$CANAL_REPO" > /dev/null 2>&1 || gh release create amostras-voz -R "$CANAL_REPO" --prerelease \
+            --title "Amostras de voz" --notes "O mesmo trecho em cada voz, para comparar."
+          find amostras -type f -size +0 -print0 | xargs -0 gh release upload amostras-voz -R "$CANAL_REPO" --clobber
+      - name: Limpar
+        if: always()
+        run: rm -rf amostras
