@@ -1,11 +1,16 @@
 # Amostras de voz para comparar (10/11/2026): o mesmo trecho do Vasa nas vozes grátis da Microsoft e do Gemini, a voz
-# clonada de hoje (só do cache, nada é gerado com ela) e as amostras públicas do Google, da ElevenLabs e da Fish Audio.
+# clonada de hoje (só do cache, nada é gerado com ela) e as amostras públicas do Google (Chirp 3 HD).
 # O código fica no repositório privado do canal (canal/amostras_voz.py); os mp3 vão para a Release privada
 # "amostras-voz" de lá. Nada de voz é publicado aqui: sem artefatos.
 name: Amostras de voz
 
 on:
   workflow_dispatch:
+    inputs:
+      so_limpar:
+        description: "sim = só apaga da Release as amostras de comunidade (pt-fish-*, pt-elevenlabs-*), sem gerar nada"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -21,7 +26,13 @@ jobs:
       GH_TOKEN: ${{ secrets.ENGFY_TOKEN }}
       CANAL_PUBLICO: "1"
     steps:
+      - name: Apagar amostras de comunidade (vozes de outras pessoas)
+        run: |
+          for n in $(gh release view amostras-voz -R "$CANAL_REPO" --json assets --jq '.assets[].name' 2>/dev/null | grep -E '^pt-(fish|elevenlabs)-' || true); do
+            gh release delete-asset amostras-voz "$n" -R "$CANAL_REPO" -y && echo "apagado $n"
+          done
       - name: Código do canal
+        if: inputs.so_limpar != 'sim'
         uses: actions/checkout@v4
         with:
           repository: ${{ env.CANAL_REPO }}
@@ -29,6 +40,7 @@ jobs:
           persist-credentials: false
           sparse-checkout: canal
       - name: Gravação de referência da voz (ramo privado 'vozes', só para achar as falas guardadas)
+        if: inputs.so_limpar != 'sim'
         uses: actions/checkout@v4
         with:
           repository: ${{ env.CANAL_REPO }}
@@ -37,19 +49,24 @@ jobs:
           ref: vozes
           path: vozes-ref
       - name: Instalar ffmpeg
+        if: inputs.so_limpar != 'sim'
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg > /dev/null
-      - uses: actions/setup-python@v5
+      - if: inputs.so_limpar != 'sim'
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install -q edge-tts numpy num2words soundfile requests
+      - if: inputs.so_limpar != 'sim'
+        run: pip install -q edge-tts numpy num2words soundfile requests
       - name: Gerar as amostras
+        if: inputs.so_limpar != 'sim'
         env:
           GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
           REFS: ${{ github.workspace }}/vozes-ref
         run: python canal/amostras_voz.py
       - name: Mandar para a Release privada do canal
+        if: inputs.so_limpar != 'sim'
         run: |
           gh release view amostras-voz -R "$CANAL_REPO" > /dev/null 2>&1 || gh release create amostras-voz -R "$CANAL_REPO" --prerelease \
             --title "Amostras de voz" --notes "O mesmo trecho do Vasa em cada voz, para comparar."
