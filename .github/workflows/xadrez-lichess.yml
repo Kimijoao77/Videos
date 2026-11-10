@@ -1,12 +1,13 @@
 # Problemas de tática do Lichess (domínio público, CC0) para o app de xadrez do Nexus. Roda só sob pedido: baixa a base
-# inteira, escolhe ~10 mil problemas por tema e nível e deixa o arquivo como artefato (o Claude junta no app).
+# inteira, escolhe ~10 mil problemas por tema e nível e grava em xadrez/problemas-lichess.json (o Claude junta no app;
+# os problemas são de domínio público, então podem ficar neste repositório público).
 name: Xadrez (problemas do Lichess)
 
 on:
   workflow_dispatch: {}
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   gerar:
@@ -21,8 +22,13 @@ jobs:
         run: |
           command -v zstd || (sudo apt-get update -qq && sudo apt-get install -y -qq zstd)
           python codigo/xadrez_lichess.py
-      - uses: actions/upload-artifact@v4
-        with:
-          name: problemas-lichess
-          path: saida/problemas-lichess.json
-          retention-days: 7
+      - name: Guardar no repositório
+        run: |
+          mkdir -p xadrez && cp saida/problemas-lichess.json xadrez/problemas-lichess.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add xadrez/problemas-lichess.json
+          git diff --cached --quiet && { echo "nada novo"; exit 0; }
+          git commit -q -m "Xadrez: problemas do Lichess ($(date -u +%Y-%m-%d))"
+          for i in 1 2 3; do git push -q && exit 0; git pull -q --rebase; done
+          exit 1
