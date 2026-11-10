@@ -270,10 +270,11 @@ def numeros():
         res["canais"][idioma] = {"nome": c["snippet"].get("title"), "handle": c["snippet"].get("customUrl") or cfg[idioma].get("handle"),
                                  "id": cid, "inscritos": None if st.get("hiddenSubscriberCount") else int(st.get("subscriberCount", 0) or 0),
                                  "views": int(st.get("viewCount", 0) or 0), "videos": int(st.get("videoCount", 0) or 0)}
-    # 0.80.0: views, curtidas e comentários de cada vídeo que o robô de postagem mandou (1 unidade a cada 50 vídeos)
+    # 0.80.0: views, curtidas e comentários de cada vídeo que o robô de postagem mandou (1 unidade a cada 50 vídeos);
+    # 0.92.3: e dos Shorts deles
     post = (DADOS / "postagens.json")
-    vids = sorted({x["youtube_id"] for v in (json.loads(post.read_text(encoding="utf-8")).get("videos", {}) if post.exists() else {}).values()
-                  for x in v.values() if isinstance(x, dict) and x.get("youtube_id")})
+    vids = sorted({y["youtube_id"] for v in (json.loads(post.read_text(encoding="utf-8")).get("videos", {}) if post.exists() else {}).values()
+                   for x in v.values() if isinstance(x, dict) for y in (x, x.get("short") or {}) if y.get("youtube_id")})
     if vids:
         res["videos"] = {}
         for k in range(0, len(vids), 50):

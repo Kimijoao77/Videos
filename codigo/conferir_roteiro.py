@@ -17,7 +17,7 @@ AQUI = Path(__file__).parent
 sys.path.insert(0, str(AQUI))
 
 LETRAS_POR_S = {"pt": 18.2, "en": 15.5}     # fala da voz clonada (pt medido no Roanoke; en estimado)
-VOZ_PADRAO = {"motor": "clone", "pt": "chatterbox", "en": "chatterbox"}
+VOZ_PADRAO = {"motor": "clone", "pt": "chatterbox", "en": "edge"}   # 10/11: no inglês, a voz americana nativa (o clone ficou com sotaque)
 COMUNS = {"zoom", "pan", "etiquetas"}
 ESTILOS = {"papel", "amarelo", "vermelho"}
 TRANSICOES = {"corte", "zoom", "flash", "fade"}

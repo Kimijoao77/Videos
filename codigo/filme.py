@@ -486,6 +486,28 @@ class _SemLegenda:
         pass
 
 
+def fazer_short(r, idioma, video, tl, todas, pasta):
+    """O Short do documentário (canal/short_doc.py). Devolve o que entra no meta.json, ou None se falhar: o Short nunca
+    derruba o documentário."""
+    try:
+        import short_doc as SD
+        if not Path(video).exists():
+            raise RuntimeError(f"falta {video}")
+        print(f"[{idioma}] Short…", flush=True)
+        qc = SD.fazer(r, idioma, video, tl, todas, pasta / "short.mp4")
+        return {"_checagem": {"short": qc}, "duracao_short_s": round(qc["duracao_s"]), "short": SD.meta_short(r[idioma], idioma)}
+    except Exception as e:  # noqa: BLE001
+        print(f"[{idioma}] o Short falhou (o documentário segue normal): {e}", flush=True)
+        return None
+
+
+def juntar(video, audio, final):
+    """Imagem e som num mp4 só, com o volume no padrão do YouTube (-14 LUFS)."""
+    sh("ffmpeg", "-y", "-v", "error", "-i", video, "-i", audio, "-map", "0:v", "-map", "1:a", "-c:v", "copy",
+       "-af", "loudnorm=I=-14:TP=-1.0:LRA=11", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-shortest",
+       "-movflags", "+faststart", final)
+
+
 def checar(arq, total):
     log = sh("ffmpeg", "-v", "info", "-i", arq, "-af", "silencedetect=n=-45dB:d=2.5", "-f", "null", "-")
     silencios = [round(float(x), 1) for x in re.findall(r"silence_duration: ([\d.]+)", log)]
@@ -501,6 +523,9 @@ def main():
     ap.add_argument("--offline", action="store_true")
     ap.add_argument("--idiomas", default="pt,en")
     ap.add_argument("--ate", type=float, default=None, help="renderiza só os primeiros S segundos (teste)")
+    ap.add_argument("--so-short", action="store_true",
+                    help="documentário já pronto: renderiza só o gancho e faz o Short (precisa de <saida>/<slug>/<idioma>/meta.json)")
+    ap.add_argument("--sem-short", action="store_true", help="documentário sem o Short")
     a = ap.parse_args()
     r = json.loads(Path(a.roteiro).read_text(encoding="utf-8"))
     global W, H
@@ -524,19 +549,42 @@ def main():
         total = t + float(r.get("cauda", 0.5))
         tl[-1] = (tl[-1][0], total)
         todas = [{"w": p["w"], "t": ini + p["t"], "d": p["d"]} for (ini, _), pal in zip(tl, palavras) for p in pal]
+        (pasta / "tempos.json").write_text(json.dumps({"tl": tl, "palavras": todas}), encoding="utf-8")
         legenda = Legenda(todas, idioma) if (not doc or r.get("legenda")) else _SemLegenda()
         rl = dict(r, batidas=resolver(r["batidas"], idioma, palavras, tl))
         for b in rl["batidas"]:
             b.setdefault("transicao", r.get("transicao_padrao", "fade" if doc else "zoom"))
+        if a.so_short:
+            # O documentário já está na Release: renderiza de novo só o gancho (com a narração e o código de agora, então
+            # a legenda bate com a voz mesmo que alguma fala tenha sido refeita depois) e faz o Short dele. O meta.json do
+            # documentário (baixado da Release) só ganha o Short.
+            if not doc:
+                raise SystemExit("--so-short é só para documentário (formato doc)")
+            import short_doc as SD
+            meta_arq = pasta / "meta.json"
+            meta = json.loads(meta_arq.read_text(encoding="utf-8")) if meta_arq.exists() else {}
+            if not meta.get("titulo"):
+                raise SystemExit(f"[{idioma}] falta o meta.json do documentário em {meta_arq}")
+            fim, _ = SD.ponto_de_corte(r["batidas"], tl)
+            print(f"[{idioma}] só o Short: gancho de {fim:.1f}s; renderizando…", flush=True)
+            renderizar(rl, idioma, tl, total, legenda, tmp / "video.mp4", fim + 0.5)
+            gancho = tmp / "gancho.mp4"
+            juntar(tmp / "video.mp4", mixar(rl["batidas"], tl, total, vozes, tmp / "mix.wav"), gancho)
+            curto = fazer_short(r, idioma, gancho, tl, todas, pasta)
+            if not curto:
+                raise SystemExit(f"[{idioma}] o Short não saiu")
+            meta.setdefault("checagem", {}).update(curto.pop("_checagem"))
+            meta.update(curto)
+            meta_arq.write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")
+            print(f"ok {idioma}: {pasta / 'short.mp4'} · {meta['checagem'].get('short')}", flush=True)
+            continue
         print(f"[{idioma}] {len(r['batidas'])} batidas, {total:.1f}s; renderizando…", flush=True)
         video = tmp / "video.mp4"
         info = renderizar(rl, idioma, tl, total, legenda, video, a.ate)
         audio = mixar(rl["batidas"], tl, total, vozes, tmp / "mix.wav")
         nome = "video" if doc else "short"
         final = pasta / f"{nome}.mp4"
-        sh("ffmpeg", "-y", "-v", "error", "-i", video, "-i", audio, "-map", "0:v", "-map", "1:a", "-c:v", "copy",
-           "-af", "loudnorm=I=-14:TP=-1.0:LRA=11", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-shortest",
-           "-movflags", "+faststart", final)
+        juntar(video, audio, final)
         (miniatura_doc if doc else capa)(rl, idioma, tl, pasta)
         qc = checar(final, total)
         qc.update(info)
@@ -554,6 +602,11 @@ def main():
         meta = {"titulo": info_l["titulo"], "tags": info_l.get("tags", []), ("duracao_s" if doc else "duracao_short_s"): round(total),
                 "voz": sorted(origens), "checagem": {nome: qc},
                 "descricao": f"{info_l['descricao']}\n\n{creditos[0]}:\n{fontes_txt}\n\n{creditos[1]}"}
+        if doc and not a.sem_short:                            # o gancho vira um Short vertical (canal/short_doc.py)
+            curto = fazer_short(r, idioma, final, tl, todas, pasta)
+            if curto:
+                meta["checagem"].update(curto.pop("_checagem"))
+                meta.update(curto)
         (pasta / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")
         print(f"ok {idioma}: {final} · {qc}", flush=True)
 

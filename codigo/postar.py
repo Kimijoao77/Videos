@@ -19,6 +19,17 @@ Regras de segurança:
 - as chaves (YT_CLIENT_ID, YT_CLIENT_SECRET, YT_TOKEN_PT, YT_TOKEN_EN) só existem nos segredos do GitHub e nunca
   aparecem no log.
 Agendado = enviado como privado com hora de publicação (publishAt): quem publica na hora é o próprio YouTube.
+
+Short (desde 10/11): todo documentário sai da fábrica também com o Short (o gancho em vertical, <idioma>-short.mp4 na
+release). Ele vai como vídeo à parte, sem avisar os inscritos, com o link do documentário na descrição e na mesma hora
+de publicação dele, logo depois que o documentário daquele idioma sobe (ou na rodada seguinte, se o Short ficou pronto
+depois). O estado fica em "videos" → <slug> → <idioma> → "short"; uma falha no Short nunca mexe no documentário, e o
+botão do app "Postar o Short" (pedido "short") tenta de novo.
+
+Limite do dia: desde 2026 o envio de vídeo tem cota própria no Google (100 por dia por projeto), e o canal também
+tem um limite diário que o YouTube não publica. Se o YouTube recusar por limite (quotaExceeded/uploadLimitExceeded),
+o Short fica "espera" e o documentário fica com erro e "cota"; os dois são reenviados sozinhos a partir do dia
+seguinte da cota (vira à meia-noite do Pacífico, 5h de Brasília), na rodada diária das 5h40 ou em qualquer outra.
 """
 from __future__ import annotations
 
@@ -113,13 +124,33 @@ def motivo(e: Exception) -> str:
         except (ValueError, AttributeError):
             razao, msg = "", e.corpo[:120]
         if razao in ("quotaExceeded", "uploadLimitExceeded"):
-            return "o YouTube não aceita mais envios hoje (limite do dia); o robô tenta de novo amanhã"
+            return "o YouTube não aceita mais envios hoje (limite do dia); o robô tenta de novo sozinho amanhã cedo"
         if razao == "youtubeSignupRequired":
             return "esta conta não tem canal no YouTube"
         if e.codigo == 401:
             return "a autorização do canal não vale mais: refaça o passo 3 do passo a passo"
         return f"o YouTube recusou ({e.codigo}{f', {razao}' if razao else ''}){f': {msg[:140]}' if msg else ''}"
     return str(e)[:200]
+
+
+def estourou_cota(e: Exception) -> bool:
+    """O YouTube recusou porque acabou o limite do dia (volta sozinho no dia seguinte)."""
+    if not isinstance(e, ErroHTTP):
+        return False
+    try:
+        erro = json.loads(e.corpo).get("error", {})
+        return ((erro.get("errors") or [{}])[0].get("reason")) in ("quotaExceeded", "uploadLimitExceeded")
+    except (ValueError, AttributeError, IndexError):
+        return False
+
+
+def dia_cota(t: dt.datetime):
+    """O dia da cota do YouTube: vira à meia-noite do Pacífico (5h de Brasília; 4h no horário de verão de lá)."""
+    try:
+        from zoneinfo import ZoneInfo
+        return t.astimezone(ZoneInfo("America/Los_Angeles")).date()
+    except Exception:  # noqa: BLE001
+        return (t.astimezone(dt.timezone.utc) - dt.timedelta(hours=8)).date()
 
 
 # ---------------------------------------------------------------- Google: chave de acesso de cada canal
@@ -180,14 +211,17 @@ def canal_da_chave(token: str) -> dict:
 
 
 # ---------------------------------------------------------------- arquivos do vídeo (release privada do Engfy)
-def baixar_assets(slug: str, idioma: str, pasta: Path) -> dict:
-    """Baixa <idioma>-video.mp4, <idioma>-capa.jpg (ou miniatura) e <idioma>-meta.json da release canal-<slug>."""
+def baixar_assets(slug: str, idioma: str, pasta: Path, quais=("video", "capa", "meta")) -> dict:
+    """Baixa da release canal-<slug> o que for pedido: <idioma>-video.mp4, <idioma>-short.mp4, <idioma>-capa.jpg (ou
+    miniatura) e <idioma>-meta.json."""
     repo = os.environ.get("REPO") or os.environ.get("GITHUB_REPOSITORY", "Kimijoao77/Engfy")
     rel = json.loads(subprocess.run(["gh", "api", f"repos/{repo}/releases/tags/canal-{slug}"], check=True, capture_output=True, text=True).stdout)
     assets = {a["name"]: a["id"] for a in rel.get("assets", [])}
     pasta.mkdir(parents=True, exist_ok=True)
     saida = {}
-    for chave, nomes in (("video", [f"{idioma}-video.mp4"]), ("capa", [f"{idioma}-capa.jpg", f"{idioma}-miniatura.jpg"]), ("meta", [f"{idioma}-meta.json"])):
+    todos = {"video": [f"{idioma}-video.mp4"], "short": [f"{idioma}-short.mp4"],
+             "capa": [f"{idioma}-capa.jpg", f"{idioma}-miniatura.jpg"], "meta": [f"{idioma}-meta.json"]}
+    for chave, nomes in ((k, todos[k]) for k in quais):
         nome = next((n for n in nomes if n in assets), None)
         if not nome:
             if chave == "capa":
@@ -308,10 +342,15 @@ def tarefas(A: dict, P: dict, t: dt.datetime) -> list:
                 if acao == "tentar" and (estado in ("erro", "incerto") or velho) and not p.get("youtube_id"):
                     saida.append((slug, idioma, "enviar", ped_postar or {"quando": "agora"}))
                     continue
-                if acao in ("agora", "tirar", "capa") and p.get("youtube_id"):
+                if acao in ("agora", "tirar", "capa", "short") and p.get("youtube_id"):
                     saida.append((slug, idioma, acao, ped_acao))
                     continue
-            if not ped_postar or p.get("youtube_id") or estado in ("erro", "incerto"):
+            if not ped_postar or p.get("youtube_id"):
+                continue
+            if estado == "erro" and p.get("cota") and dia_cota(ler_iso(p.get("erro_em")) or t) != dia_cota(t):
+                saida.append((slug, idioma, "enviar", ped_postar))   # barrado pelo limite ontem: tenta de novo sozinho
+                continue
+            if estado in ("erro", "incerto"):
                 continue
             if estado == "enviando":
                 inicio = ler_iso(p.get("enviado_em"))
@@ -321,6 +360,75 @@ def tarefas(A: dict, P: dict, t: dt.datetime) -> list:
                 continue
             saida.append((slug, idioma, "enviar", ped_postar))
     return saida
+
+
+def meta_short(meta: dict, idioma: str, longo: str | None) -> dict:
+    """Título, descrição e tags do Short: os do meta.json ("short", feito pela fábrica) com o link do documentário."""
+    sh = meta.get("short") or {}
+    titulo = (sh.get("titulo") or f"{(meta.get('titulo') or '').strip()} #shorts").strip()
+    if len(titulo) > 100:
+        titulo = titulo.replace(" #shorts", "")[:91].rstrip(" :,-") + " #shorts"
+    base = (sh.get("descricao") or (meta.get("descricao") or "").split("\n\n")[0]).replace("#shorts", "").strip()
+    link = f"\n\n{'Documentário completo' if idioma == 'pt' else 'Full documentary'}: https://youtu.be/{longo}" if longo else ""
+    return {"titulo": titulo, "descricao": f"{base}{link}\n\n#shorts", "tags": meta.get("tags", [])}
+
+
+def com_short(V: dict) -> set:
+    """(slug, idioma) que têm Short registrado em videos.json (a fábrica fez e o registro anotou o arquivo)."""
+    return {(v.get("slug"), i) for v in V.get("videos", []) for i, info in (v.get("idiomas") or {}).items()
+            if ((info or {}).get("arquivos") or {}).get("short")}
+
+
+def pendentes_short(A: dict, P: dict, V: dict, t: dt.datetime) -> list:
+    """Shorts que já podem ir: vídeo aprovado, o documentário daquele idioma no YouTube (agendado ou no ar) e o Short
+    registrado, ainda não enviado ou barrado pelo limite num dia anterior da cota. Primeiro os de documentário agendado
+    (o mais próximo antes), depois os já no ar (o mais novo antes). Short que travou em "enviando" vira incerto (não
+    reenvia sozinho)."""
+    tem, saida = com_short(V), []
+    for slug, a in sorted((A.get("videos") or {}).items()):
+        if a.get("status") != "aprovado":
+            continue
+        for idioma in IDIOMAS:
+            p = ((P.get("videos") or {}).get(slug) or {}).get(idioma) or {}
+            if not p.get("youtube_id") or p.get("estado") not in ("agendado", "no_ar") or (slug, idioma) not in tem:
+                continue
+            s = p.get("short") or {}
+            q = ler_iso(p.get("publicar_em")) or t
+            ordem = (0, q.timestamp()) if p.get("estado") == "agendado" and q > t else (1, -q.timestamp())
+            if not s or (s.get("estado") == "espera" and dia_cota(ler_iso(s.get("em")) or t) != dia_cota(t)):
+                saida.append((ordem, (slug, idioma, "short", None)))
+            elif s.get("estado") == "enviando" and t - (ler_iso(s.get("enviado_em")) or t) >= dt.timedelta(minutes=INCERTO_MIN):
+                saida.append(((-1, 0.0), (slug, idioma, "short_incerto", None)))
+    return [x for _, x in sorted(saida, key=lambda y: y[0])]
+
+
+def postar_short(P: dict, slug: str, idioma: str, tok: str, cfg: dict) -> None:
+    """Envia o Short de um idioma (o documentário dele já está no YouTube). Uma falha fica só no Short."""
+    reg = P["videos"][slug][idioma]
+    s = reg.setdefault("short", {})
+    if s.get("estado") in ("agendado", "no_ar", "enviando"):
+        return
+    quando = ler_iso(reg.get("publicar_em"))               # documentário agendado: o Short vai ao ar junto
+    publicar_em = quando if reg.get("estado") == "agendado" and quando and quando > agora() + dt.timedelta(minutes=5) else None
+    s.clear()
+    s.update(estado="enviando", enviado_em=iso(agora()))
+    salvar(P, f"Canal: enviando o Short de {slug} ({idioma}) para o YouTube")
+    try:
+        arqs = baixar_assets(slug, idioma, Path("/tmp/postar") / slug, ("short", "meta"))
+        m = meta_short(ler(arqs["meta"], {}), idioma, reg.get("youtube_id"))
+        vid = enviar_video(tok, arqs["short"], m, idioma, {**cfg, "avisar_inscritos": False}, publicar_em)
+        s.update(estado="agendado" if publicar_em else "no_ar", youtube_id=vid, url=f"https://youtu.be/{vid}",
+                 titulo=m["titulo"], publicar_em=iso(publicar_em or agora()))
+        print(f"ok {slug} [{idioma}] Short: {s['estado']} {s['url']}")
+    except Exception as e:  # noqa: BLE001
+        if estourou_cota(e):                               # limite do dia: espera o dia seguinte, sem erro
+            s.clear()
+            s.update(estado="espera", em=iso(agora()))
+            print(f"{slug} [{idioma}] Short: espera (o YouTube disse que acabou o limite do dia)")
+        else:
+            s.update(estado="erro", erro=motivo(e), erro_em=iso(agora()))
+            print(f"ERRO {slug} [{idioma}] Short: {s['erro']}")
+    salvar(P, f"Canal: Short de {slug} ({idioma}) {'com erro' if s['estado'] == 'erro' else s['estado'].replace('_', ' ')}")
 
 
 def aplicar_videos(V: dict, P: dict) -> dict:
@@ -440,6 +548,9 @@ def main() -> int:
         salvar(P, "Canal: chave do YouTube cancelada")
         return 0
     fila = tarefas(A, P, t)
+    V = ler(VIDEOS, {"videos": []})
+    ja = {(s, i) for s, i, _, _ in fila}
+    fila += [x for x in pendentes_short(A, P, V, t) if (x[0], x[1]) not in ja]
     # Confere as duas chaves em toda rodada, mesmo sem nada para postar: é assim que o app mostra "conectado".
     tem_chave = {i: bool(os.environ.get(f"YT_TOKEN_{i.upper()}")) for i in IDIOMAS}
     if not (os.environ.get("YT_CLIENT_ID") and os.environ.get("YT_CLIENT_SECRET")):
@@ -511,6 +622,17 @@ def main() -> int:
                     if falha:
                         reg.update(aviso=falha)
                 salvar(P, f"Canal: {slug} ({idioma}) {'agendado' if publicar_em else 'no ar'} no YouTube")
+                if (slug, idioma) in com_short(V):            # o Short vai logo atrás, com o link do documentário
+                    postar_short(P, slug, idioma, tok, cfg)
+            elif tipo == "short":
+                postar_short(P, slug, idioma, tok, cfg)
+                if pedido:
+                    reg["pedido_feito"] = pedido.get("em")
+                    salvar(P, f"Canal: pedido do Short de {slug} ({idioma})")
+            elif tipo == "short_incerto":
+                reg.setdefault("short", {}).update(estado="incerto", erro="o envio do Short caiu no meio: veja no YouTube Studio se ele "
+                                                   "subiu. Se não subiu, toque em Tentar o Short de novo.")
+                salvar(P, f"Canal: envio incerto do Short ({slug}, {idioma})")
             elif tipo == "capa":
                 arqs = baixar_assets(slug, idioma, Path("/tmp/postar") / slug)
                 falha = enviar_capa(tok, reg["youtube_id"], arqs["capa"]) if arqs.get("capa") else "sem capa na release"
@@ -529,7 +651,8 @@ def main() -> int:
                 reg.update(estado="tirado", tirado_em=iso(agora()), pedido_feito=pedido.get("em"))
                 salvar(P, f"Canal: {slug} ({idioma}) tirado do ar (privado)")
             feitos += 1
-            print(f"ok {slug} [{idioma}] {tipo}: {reg.get('estado')} {reg.get('url', '')}")
+            if not tipo.startswith("short"):
+                print(f"ok {slug} [{idioma}] {tipo}: {reg.get('estado')} {reg.get('url', '')}")
         except Exception as e:  # noqa: BLE001
             if reg.get("youtube_id"):                       # o vídeo já está no YouTube: o estado fica, vira aviso
                 reg.update(aviso=motivo(e))
@@ -537,6 +660,8 @@ def main() -> int:
                     reg["estado"] = "agendado" if ler_iso(reg.get("publicar_em")) and ler_iso(reg["publicar_em"]) > agora() else "no_ar"
             else:
                 reg.update(estado="erro", erro=motivo(e), erro_em=iso(agora()))
+                if estourou_cota(e):                       # reenviado sozinho no dia seguinte (tarefas)
+                    reg["cota"] = True
             if tipo in ("agora", "tirar", "capa") and pedido:
                 reg["pedido_feito"] = pedido.get("em")
             print(f"ERRO {slug} [{idioma}] {tipo}: {reg.get('erro') or reg.get('aviso')}")
