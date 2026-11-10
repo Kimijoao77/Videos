@@ -1,0 +1,59 @@
+# Amostras de voz para comparar (10/11/2026): o mesmo trecho do Vasa nas vozes grátis da Microsoft e do Gemini, a voz
+# clonada de hoje (só do cache, nada é gerado com ela) e as amostras públicas do Google, da ElevenLabs e da Fish Audio.
+# O código fica no repositório privado do canal (canal/amostras_voz.py); os mp3 vão para a Release privada
+# "amostras-voz" de lá. Nada de voz é publicado aqui: sem artefatos.
+name: Amostras de voz
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CANAL_REPO: Kimijoao77/Engfy
+
+jobs:
+  amostras:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ secrets.ENGFY_TOKEN }}
+      CANAL_PUBLICO: "1"
+    steps:
+      - name: Código do canal
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CANAL_REPO }}
+          token: ${{ secrets.ENGFY_TOKEN }}
+          persist-credentials: false
+          sparse-checkout: canal
+      - name: Gravação de referência da voz (ramo privado 'vozes', só para achar as falas guardadas)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CANAL_REPO }}
+          token: ${{ secrets.ENGFY_TOKEN }}
+          persist-credentials: false
+          ref: vozes
+          path: vozes-ref
+      - name: Instalar ffmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg > /dev/null
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -q edge-tts numpy num2words soundfile requests
+      - name: Gerar as amostras
+        env:
+          GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
+          REFS: ${{ github.workspace }}/vozes-ref
+        run: python canal/amostras_voz.py
+      - name: Mandar para a Release privada do canal
+        run: |
+          gh release view amostras-voz -R "$CANAL_REPO" > /dev/null 2>&1 || gh release create amostras-voz -R "$CANAL_REPO" --prerelease \
+            --title "Amostras de voz" --notes "O mesmo trecho do Vasa em cada voz, para comparar."
+          gh release upload amostras-voz -R "$CANAL_REPO" amostras/* --clobber
+      - name: Apagar a voz desta máquina
+        if: always()
+        run: rm -rf vozes-ref saida amostras
