@@ -27,6 +27,10 @@ on:
         description: "sim = também o vídeo do trecho novo (filme.py) e o mesmo trecho do vídeo de antes (cortado da Release)"
         required: false
         default: ""
+      realce:
+        description: "Alvo do realce do tom em semitons (vazio = sem a versão realçada; o vídeo sai com ele)"
+        required: false
+        default: "3.0"
 
 permissions:
   contents: read
@@ -48,6 +52,7 @@ jobs:
       ANTES_FALAS: ${{ inputs.antes_falas }}
       NOME: ${{ inputs.nome }}
       VIDEO: ${{ inputs.video }}
+      REALCE: ${{ inputs.realce }}
     steps:
       - name: Código do canal
         uses: actions/checkout@v4
@@ -88,16 +93,17 @@ jobs:
       - name: Juntar e medir
         run: |
           /tmp/vv/bin/python canal/amostra_ritmo.py "$ROTEIRO" pt saida "pt-$NOME-depois"
+          if [ -n "$REALCE" ]; then /tmp/vv/bin/python canal/amostra_ritmo.py "$ROTEIRO" pt saida "pt-$NOME-realce" --realce "$REALCE"; fi
           if [ -n "$ANTES" ]; then /tmp/vv/bin/python canal/amostra_ritmo.py "$ANTES" pt saida "pt-$NOME-antes" --falas "$ANTES_FALAS"; fi
           ls -la saida
       - name: Vídeo do trecho novo e o mesmo trecho do vídeo de antes
         if: env.VIDEO == 'sim'
         run: |
           sudo apt-get install -y -qq fonts-inter > /dev/null
-          pip install -q edge-tts pillow requests numpy num2words numba soundfile
+          pip install -q edge-tts pillow requests numpy num2words numba soundfile praat-parselmouth
           mkdir -p canal/recursos
           gh release download canal-recursos -R "$CANAL_REPO" -D canal/recursos --clobber
-          python canal/narrar_clone.py "$ROTEIRO" pt saida
+          VOZ_REALCE="$REALCE" python canal/narrar_clone.py "$ROTEIRO" pt saida
           python canal/filme.py "$ROTEIRO" --saida saida --idiomas pt --sem-short
           slug=$(python -c "import json,sys;print(json.load(open(sys.argv[1]))['slug'])" "$ROTEIRO")
           ffmpeg -v error -y -i "saida/$slug/pt/video.mp4" -vf scale=1280:-2 -c:v libx264 -preset veryfast -crf 26 -c:a aac -b:a 128k "saida/pt-$NOME-depois.mp4"

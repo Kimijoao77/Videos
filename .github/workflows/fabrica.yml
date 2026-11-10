@@ -146,7 +146,7 @@ jobs:
             /tmp/vv/bin/pip install -q --no-cache-dir qwen-tts soundfile num2words
           fi
           /tmp/vv/bin/python canal/narrar_clone.py "$ROTEIRO" "$IDIOMA" saida
-      - run: pip install -q edge-tts pillow requests numpy google-auth num2words
+      - run: pip install -q edge-tts pillow requests numpy google-auth num2words soundfile praat-parselmouth
       - name: Preparar a fábrica v2 (recursos de mapas e cenas)
         if: needs.escolher.outputs.versao == '2'
         run: |
