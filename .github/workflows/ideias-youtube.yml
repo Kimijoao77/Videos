@@ -11,7 +11,7 @@ on:
         required: false
         default: "8"
   schedule:
-    - cron: "17 9 * * 2,5"   # terça e sexta, 06:17 em Brasília
+    - cron: "17 6 * * 2,5"   # terça e sexta, 03:17 em Brasília: às 5h a leitura do Claude já dá o veredito dos vídeos
 
 permissions:
   contents: read
