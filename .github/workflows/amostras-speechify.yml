@@ -55,13 +55,22 @@ jobs:
           H = {"Authorization": f"Bearer {os.environ['SPEECHIFY_API_KEY']}"}
           os.makedirs("amostras", exist_ok=True)
 
-          r = requests.get(f"{API}/v1/voices", headers=H, timeout=60)
-          print("GET /v1/voices ->", r.status_code)
-          if r.status_code != 200:
-              print(r.text[:1000]); sys.exit(1)
-          vozes = r.json()
-          if isinstance(vozes, dict):
-              vozes = vozes.get("voices") or vozes.get("data") or []
+          vozes, cursor = [], None
+          while True:
+              params = {"limit": 200}
+              if cursor:
+                  params["cursor"] = cursor
+              r = requests.get(f"{API}/v1/voices", headers=H, params=params, timeout=60)
+              print("GET /v1/voices ->", r.status_code)
+              if r.status_code != 200:
+                  print(r.text[:1000]); sys.exit(1)
+              d = r.json()
+              if isinstance(d, list):
+                  vozes += d; break
+              vozes += d.get("voices") or d.get("data") or d.get("items") or []
+              cursor = d.get("next_cursor")
+              if not d.get("has_more") or not cursor:
+                  break
           print(f"{len(vozes)} vozes na conta.")
 
           def idiomas(v):
