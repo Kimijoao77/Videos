@@ -1,0 +1,95 @@
+# Amostra do ritmo natural (10/11/2026): o começo de um roteiro narrado com a voz clonada frase por frase, com as
+# pausas e o tom de cada fala, e o Whisper conferindo cada frase (canal/narrar_clone.py, canal/ouvido.py). Junto, o
+# mesmo trecho do vídeo de antes, para comparar. O código fica no repositório privado do canal; os mp3 e o relatório
+# (só números) vão para a Release privada "amostras-voz" de lá. Nada de voz é publicado aqui: sem artefatos.
+name: Amostra de ritmo
+
+on:
+  workflow_dispatch:
+    inputs:
+      roteiro:
+        description: "Roteiro no ritmo natural (no repositório do canal)"
+        required: false
+        default: "canal/rascunhos/amostra-vasa-v3.json"
+      antes:
+        description: "Roteiro de antes, para comparar (vazio = sem)"
+        required: false
+        default: "canal/roteiros/o-naufragio-do-vasa.json"
+      antes_falas:
+        description: "Quantas falas do roteiro de antes (o mesmo trecho)"
+        required: false
+        default: "9"
+      nome:
+        description: "Nome dos arquivos na Release (pt-<nome>-depois.mp3 e pt-<nome>-antes.mp3)"
+        required: false
+        default: "vasa-gancho"
+
+permissions:
+  contents: read
+
+env:
+  CANAL_REPO: Kimijoao77/Engfy
+
+jobs:
+  amostra:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    env:
+      GH_TOKEN: ${{ secrets.ENGFY_TOKEN }}
+      CANAL_PUBLICO: "1"
+      HF_HOME: ${{ github.workspace }}/hf
+      REFS: ${{ github.workspace }}/vozes-ref
+      ROTEIRO: ${{ inputs.roteiro }}
+      ANTES: ${{ inputs.antes }}
+      ANTES_FALAS: ${{ inputs.antes_falas }}
+      NOME: ${{ inputs.nome }}
+    steps:
+      - name: Código do canal
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CANAL_REPO }}
+          token: ${{ secrets.ENGFY_TOKEN }}
+          persist-credentials: false
+          sparse-checkout: canal
+      - name: Gravação de referência da voz (ramo privado 'vozes')
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CANAL_REPO }}
+          token: ${{ secrets.ENGFY_TOKEN }}
+          persist-credentials: false
+          ref: vozes
+          path: vozes-ref
+      - name: Instalar ffmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg > /dev/null
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Instalar a voz (Chatterbox) e o ouvido (Whisper)
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          python -m venv /tmp/vv
+          /tmp/vv/bin/pip install -q --no-cache-dir torch==2.6.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cpu
+          /tmp/vv/bin/pip install -q --no-cache-dir chatterbox-tts soundfile num2words praat-parselmouth faster-whisper
+          /tmp/vv/bin/python -c "import faster_whisper, parselmouth, chatterbox; print('ok', faster_whisper.__version__)"
+      - name: Narrar o roteiro novo (ritmo natural)
+        run: /tmp/vv/bin/python canal/narrar_clone.py "$ROTEIRO" pt saida
+      - name: Narrar o trecho de antes (do cache, se já existir)
+        if: env.ANTES != ''
+        env:
+          VOZ_FALAS: ${{ inputs.antes_falas }}
+        run: /tmp/vv/bin/python canal/narrar_clone.py "$ANTES" pt saida
+      - name: Juntar e medir
+        run: |
+          /tmp/vv/bin/python canal/amostra_ritmo.py "$ROTEIRO" pt saida "pt-$NOME-depois"
+          if [ -n "$ANTES" ]; then /tmp/vv/bin/python canal/amostra_ritmo.py "$ANTES" pt saida "pt-$NOME-antes" --falas "$ANTES_FALAS"; fi
+          ls -la saida
+      - name: Mandar para a Release privada do canal
+        run: |
+          gh release view amostras-voz -R "$CANAL_REPO" > /dev/null 2>&1 || gh release create amostras-voz -R "$CANAL_REPO" --prerelease \
+            --title "Amostras de voz" --notes "Amostras de voz e de ritmo, para comparar."
+          for i in 1 2 3; do gh release upload amostras-voz -R "$CANAL_REPO" saida/pt-$NOME-*.mp3 saida/pt-$NOME-*.json --clobber && break; sleep 5; done
+      - name: Apagar a voz desta máquina
+        if: always()
+        run: rm -rf vozes-ref saida hf
