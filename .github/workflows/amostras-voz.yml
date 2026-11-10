@@ -53,7 +53,7 @@ jobs:
         run: |
           gh release view amostras-voz -R "$CANAL_REPO" > /dev/null 2>&1 || gh release create amostras-voz -R "$CANAL_REPO" --prerelease \
             --title "Amostras de voz" --notes "O mesmo trecho do Vasa em cada voz, para comparar."
-          gh release upload amostras-voz -R "$CANAL_REPO" amostras/* --clobber
+          find amostras -type f -size +0 -print0 | xargs -0 gh release upload amostras-voz -R "$CANAL_REPO" --clobber
       - name: Apagar a voz desta máquina
         if: always()
         run: rm -rf vozes-ref saida amostras
