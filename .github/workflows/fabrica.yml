@@ -140,7 +140,7 @@ jobs:
             /tmp/vv/bin/pip install -q --no-cache-dir edge-tts soundfile num2words numpy
           elif [ "$motor" = "chatterbox" ]; then
             /tmp/vv/bin/pip install -q --no-cache-dir torch==2.6.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cpu
-            /tmp/vv/bin/pip install -q --no-cache-dir chatterbox-tts soundfile num2words
+            /tmp/vv/bin/pip install -q --no-cache-dir chatterbox-tts soundfile num2words praat-parselmouth faster-whisper
           else
             /tmp/vv/bin/pip install -q --no-cache-dir torch torchaudio --index-url https://download.pytorch.org/whl/cpu
             /tmp/vv/bin/pip install -q --no-cache-dir qwen-tts soundfile num2words

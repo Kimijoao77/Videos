@@ -23,6 +23,10 @@ on:
         description: "Nome dos arquivos na Release (pt-<nome>-depois.mp3 e pt-<nome>-antes.mp3)"
         required: false
         default: "vasa-gancho"
+      video:
+        description: "sim = também o vídeo do trecho novo (filme.py) e o mesmo trecho do vídeo de antes (cortado da Release)"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -43,6 +47,7 @@ jobs:
       ANTES: ${{ inputs.antes }}
       ANTES_FALAS: ${{ inputs.antes_falas }}
       NOME: ${{ inputs.nome }}
+      VIDEO: ${{ inputs.video }}
     steps:
       - name: Código do canal
         uses: actions/checkout@v4
@@ -85,11 +90,30 @@ jobs:
           /tmp/vv/bin/python canal/amostra_ritmo.py "$ROTEIRO" pt saida "pt-$NOME-depois"
           if [ -n "$ANTES" ]; then /tmp/vv/bin/python canal/amostra_ritmo.py "$ANTES" pt saida "pt-$NOME-antes" --falas "$ANTES_FALAS"; fi
           ls -la saida
+      - name: Vídeo do trecho novo e o mesmo trecho do vídeo de antes
+        if: env.VIDEO == 'sim'
+        run: |
+          sudo apt-get install -y -qq fonts-inter > /dev/null
+          pip install -q edge-tts pillow requests numpy num2words numba soundfile
+          mkdir -p canal/recursos
+          gh release download canal-recursos -R "$CANAL_REPO" -D canal/recursos --clobber
+          python canal/narrar_clone.py "$ROTEIRO" pt saida
+          python canal/filme.py "$ROTEIRO" --saida saida --idiomas pt --sem-short
+          slug=$(python -c "import json,sys;print(json.load(open(sys.argv[1]))['slug'])" "$ROTEIRO")
+          ffmpeg -v error -y -i "saida/$slug/pt/video.mp4" -vf scale=1280:-2 -c:v libx264 -preset veryfast -crf 26 -c:a aac -b:a 128k "saida/pt-$NOME-depois.mp4"
+          if [ -n "$ANTES" ]; then
+            antes_slug=$(python -c "import json,sys;print(json.load(open(sys.argv[1]))['slug'])" "$ANTES")
+            mkdir -p antes
+            gh release download "canal-$antes_slug" -R "$CANAL_REPO" -p pt-video.mp4 -p pt-tempos.json -D antes --clobber
+            fim=$(python -c "import json,sys;print(json.load(open(sys.argv[1]))['tl'][int(sys.argv[2]) - 1][1] + 0.3)" antes/pt-tempos.json "$ANTES_FALAS")
+            ffmpeg -v error -y -i antes/pt-video.mp4 -t "$fim" -vf scale=1280:-2 -c:v libx264 -preset veryfast -crf 26 -c:a aac -b:a 128k "saida/pt-$NOME-antes.mp4"
+          fi
+          ls -la saida
       - name: Mandar para a Release privada do canal
         run: |
           gh release view amostras-voz -R "$CANAL_REPO" > /dev/null 2>&1 || gh release create amostras-voz -R "$CANAL_REPO" --prerelease \
             --title "Amostras de voz" --notes "Amostras de voz e de ritmo, para comparar."
-          for i in 1 2 3; do gh release upload amostras-voz -R "$CANAL_REPO" saida/pt-$NOME-*.mp3 saida/pt-$NOME-*.json --clobber && break; sleep 5; done
+          for i in 1 2 3; do gh release upload amostras-voz -R "$CANAL_REPO" saida/pt-$NOME-* --clobber && break; sleep 5; done
       - name: Apagar a voz desta máquina
         if: always()
-        run: rm -rf vozes-ref saida hf
+        run: rm -rf vozes-ref saida hf antes
