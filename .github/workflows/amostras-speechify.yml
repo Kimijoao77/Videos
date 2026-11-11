@@ -85,6 +85,9 @@ jobs:
               linhas.append(f"{v.get('id')}\t{v.get('display_name', '')}\t{v.get('gender', '')}\t{v.get('locale', '')}\t{','.join(sorted(idiomas(v)))}\t{','.join(v.get('tags') or [])}")
           print("\n".join(["VOZ\t" + l for l in linhas]))
           if os.environ.get("SO_LISTAR") == "sim":
+              for v in vozes:
+                  if idiomas(v) & {"pt-BR", "en-US", "en-GB"} or str(v.get("locale", "")).startswith(("pt", "en")):
+                      print("JSON\t" + json.dumps(v, ensure_ascii=False))
               sys.exit(0)
           with open("amostras/speechify-vozes.txt", "w") as f:
               f.write("id\tnome\tgênero\tlocale\tidiomas\ttags\n" + "\n".join(linhas) + "\n")
