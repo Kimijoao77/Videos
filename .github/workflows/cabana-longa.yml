@@ -1,7 +1,7 @@
 # Vídeo longo da cabana dos robôs (pixel art 100% por código, 11/11/2026): dia -> entardecer -> noite.
 # O código fica no repositório privado do canal (canal/pixel). Os quadros saem em 20 máquinas ao mesmo tempo
 # (minutos grátis do repositório público); a última junta tudo, gera o som (também por código, nada se repete) e
-# manda o vídeo inteiro e em partes de 30 min para a Release privada "cabana-robos" do canal. Nada é postado.
+# (desde 11/11 com música lofi feita por código e acontecimentos raros na cena) manda o vídeo inteiro e em partes de 30 min para a Release privada "cabana-robos" do canal. Nada é postado.
 name: Cabana longa
 
 on:
@@ -11,6 +11,14 @@ on:
         description: "Duração do vídeo em minutos"
         required: false
         default: "120"
+      nome:
+        description: "Nome dos arquivos na Release"
+        required: false
+        default: "cabana-robos-lofi"
+      musica:
+        description: "Música lofi por código por cima do som ambiente (sim/nao)"
+        required: false
+        default: "sim"
 
 permissions:
   contents: read
@@ -79,18 +87,26 @@ jobs:
           merge-multiple: true
       - name: Som (por código, do dia para a noite)
         run: cd canal/pixel && python som_longo.py $(( ${{ inputs.minutos }} * 60 )) ../../som.m4a $(nproc)
+      - name: Música lofi (por código) por cima do ambiente
+        if: inputs.musica == 'sim'
+        run: |
+          cd canal/pixel && python musica_longa.py $(( ${{ inputs.minutos }} * 60 )) ../../musica.m4a $(nproc) 100
+          cd ../.. && ffmpeg -v error -y -i musica.m4a -i som.m4a -filter_complex \
+            "[1:a]volume=0.35[amb];[0:a][amb]amix=inputs=2:normalize=0,alimiter=limit=0.95" -c:a aac -b:a 192k som2.m4a
+          mv som2.m4a som.m4a
+          mkdir -p envio && cp musica.json envio/${{ inputs.nome }}-faixas.json
       - name: Juntar
         run: |
           ls trechos | sort | sed "s|^|file 'trechos/|; s|$|'|" > lista.txt
           ffmpeg -v error -y -f concat -safe 0 -i lista.txt -c copy video-mudo.mp4
-          ffmpeg -v error -y -i video-mudo.mp4 -i som.m4a -map 0:v -map 1:a -c copy -shortest -movflags +faststart cabana-robos-${{ inputs.minutos }}min.mp4
-          mkdir -p envio && mv cabana-robos-${{ inputs.minutos }}min.mp4 envio/
+          ffmpeg -v error -y -i video-mudo.mp4 -i som.m4a -map 0:v -map 1:a -c copy -shortest -movflags +faststart ${{ inputs.nome }}-${{ inputs.minutos }}min.mp4
+          mkdir -p envio && mv ${{ inputs.nome }}-${{ inputs.minutos }}min.mp4 envio/
           dur=$(( ${{ inputs.minutos }} * 60 )); i=1
           for ((t=0; t<dur; t+=1800)); do
-            ffmpeg -v error -y -ss $t -i envio/cabana-robos-${{ inputs.minutos }}min.mp4 -t 1800 -c copy -movflags +faststart envio/cabana-robos-parte$i.mp4; i=$((i+1))
+            ffmpeg -v error -y -ss $t -i envio/${{ inputs.nome }}-${{ inputs.minutos }}min.mp4 -t 1800 -c copy -movflags +faststart envio/${{ inputs.nome }}-parte$i.mp4; i=$((i+1))
           done
           ls -la envio
-          ffprobe -v error -show_entries format=duration -of csv=p=0 envio/cabana-robos-${{ inputs.minutos }}min.mp4
+          ffprobe -v error -show_entries format=duration -of csv=p=0 envio/${{ inputs.nome }}-${{ inputs.minutos }}min.mp4
       - name: Mandar para a Release privada do canal
         run: |
           gh release view cabana-robos -R "$CANAL_REPO" > /dev/null 2>&1 || gh release create cabana-robos -R "$CANAL_REPO" --prerelease \
