@@ -160,3 +160,71 @@ main { max-width: 1320px; margin: 0 auto; padding: 28px 24px 64px; }
   .iv-titulo { flex-direction: column; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* ---------- versão 2: herói, cotações, ranking, curvas pequenas, calendário, linha do tempo ---------- */
+.iv-hero { display: grid; grid-template-columns: 1.2fr 1.1fr 1fr; gap: 0; background: var(--tinta); color: var(--superficie); border-radius: 22px; overflow: hidden; }
+.iv-hero > div { padding: 26px 28px; display: grid; align-content: start; gap: 6px; }
+.iv-hero > div + div { border-left: 1px solid color-mix(in srgb, var(--superficie) 16%, transparent); }
+.iv-hero small { color: color-mix(in srgb, var(--superficie) 70%, transparent); font-size: 13px; }
+.iv-hero b { font: 800 40px/1.05 var(--num); letter-spacing: -.02em; }
+.iv-hero span { color: color-mix(in srgb, var(--superficie) 78%, transparent); font-size: 13.5px; }
+.iv-hero em { font-style: normal; font-weight: 700; font-family: var(--num); }
+.iv-hero .pos, .iv-hero em.pos { color: #8DBBF3; } .iv-hero .neg, .iv-hero em.neg { color: #FFA8AC; }
+.iv-dias { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.iv-dias i { font-style: normal; font-size: 12px; padding: 3px 9px; border-radius: 999px; background: color-mix(in srgb, var(--superficie) 12%, transparent); }
+.iv-bala { margin-top: 8px; }
+.iv-bala .trilho { position: relative; height: 12px; border-radius: 999px; background: color-mix(in srgb, var(--superficie) 14%, transparent); }
+.iv-bala .valor { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; background: #86b6ef; }
+.iv-bala .valor.ok { background: #6da7ec; }
+.iv-bala .alvo, .iv-bala .ref { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--superficie); }
+.iv-bala .ref { opacity: .5; }
+.iv-bala .marcas { position: relative; height: 18px; font-size: 11.5px; color: color-mix(in srgb, var(--superficie) 70%, transparent); }
+.iv-bala .marcas span { position: absolute; top: 4px; transform: translateX(-50%); white-space: nowrap; }
+.iv-ticker { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; margin-top: 18px; }
+.iv-ticker > div { background: var(--superficie); border: 1px solid var(--linha); border-radius: var(--raio); padding: 14px 18px; display: grid; grid-template-columns: auto 1fr auto; gap: 2px 12px; align-items: baseline; }
+.iv-ticker b { font: 800 16px var(--display); }
+.iv-ticker .num { font-size: 17px; font-weight: 600; }
+.iv-ticker small { grid-column: 1 / -1; color: var(--tinta-2); font-size: 12px; }
+.iv-ticker .iv-nota { grid-column: 1 / -1; margin: -8px 0 0; }
+.iv-titulo-sec { display: flex; align-items: baseline; gap: 12px; margin: 6px 0 12px; }
+.iv-titulo-sec h2 { font: 700 19px var(--display); margin: 0; }
+.iv-titulo-sec p { margin: 0; color: var(--tinta-2); font-size: 13px; }
+.iv-rank tr[data-ir-teste] { cursor: pointer; }
+.iv-rank tr[data-ir-teste]:hover td { background: var(--superficie-2); }
+.iv-rank td { vertical-align: middle; }
+.iv-rank .barra-h { width: 34%; }
+.iv-bh { position: relative; height: 14px; }
+.iv-bh .zero { position: absolute; left: 50%; top: -4px; bottom: -4px; width: 1px; background: var(--tinta-3); }
+.iv-bh .p, .iv-bh .n { position: absolute; top: 0; bottom: 0; border-radius: 4px; }
+.iv-bh .p { background: var(--ganho); } .iv-bh .n { background: var(--perda); }
+.iv-selo.r1 { background: var(--ganho-fundo); color: var(--ganho-texto); }
+.iv-selo.r2 { background: var(--acento-suave); color: var(--acento); }
+.iv-selo.r3 { background: var(--aviso-fundo); color: var(--aviso); }
+.iv-selo.r4 { background: var(--perda-fundo); color: var(--perda-texto); }
+.iv-mini { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.iv-mini-c { text-align: left; padding: 14px 16px 12px; cursor: pointer; }
+.iv-mini-c:hover { border-color: var(--tinta-3); }
+.iv-mini-c .cab { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.iv-mini-c .cab b { font: 600 14px var(--texto); }
+.iv-mini-c .cab .num { font-weight: 700; }
+.iv-mini-c small { color: var(--tinta-2); font-size: 12px; }
+.iv-mini-c .iv-graf text { font-size: 18px; }
+.iv-cal .sem, .iv-cal .grade { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+.iv-cal .sem span { font-size: 11.5px; color: var(--tinta-2); text-align: center; }
+.iv-cal .grade { margin-top: 5px; }
+.iv-cal .c { aspect-ratio: 1; border-radius: 7px; display: grid; place-items: center; font: 600 12px var(--num); color: var(--tinta-2); background: var(--superficie-2); }
+.iv-cal .c.v { background: transparent; border: 1px dashed var(--grade); }
+.iv-cal .c.p { background: color-mix(in srgb, var(--ganho) calc(18% + var(--k, 0) * 70%), var(--superficie)); color: var(--tinta); }
+.iv-cal .c.n { background: color-mix(in srgb, var(--perda) calc(18% + var(--k, 0) * 70%), var(--superficie)); color: var(--tinta); }
+.iv-cal .c.x { outline: 2px dotted var(--aviso); outline-offset: -3px; }
+.iv-linha-tempo { list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 2px solid var(--grade); display: grid; gap: 12px; }
+.iv-linha-tempo li { position: relative; padding-left: 10px; }
+.iv-linha-tempo li::before { content: ""; position: absolute; left: -21px; top: 6px; width: 12px; height: 12px; border-radius: 50%; background: var(--tinta-3); border: 2px solid var(--superficie); }
+.iv-linha-tempo li.ok::before { background: var(--ganho); } .iv-linha-tempo li.falhou::before { background: var(--perda); }
+.iv-linha-tempo b { font-family: var(--num); margin-right: 6px; }
+.iv-linha-tempo small { display: block; color: var(--tinta-2); font-size: 12.5px; margin-top: 2px; }
+.iv-sobre p { margin: 6px 0 0; max-width: 85ch; }
+.iv-sobre small { color: var(--tinta-2); font-size: 12.5px; }
+.iv-sobre h2 { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+@media (max-width: 1100px) { .iv-hero { grid-template-columns: 1fr; } .iv-hero > div + div { border-left: 0; border-top: 1px solid color-mix(in srgb, var(--superficie) 16%, transparent); } .iv-mini, .iv-ticker { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .iv-mini, .iv-ticker { grid-template-columns: minmax(0, 1fr); } .iv-rank th:nth-child(4), .iv-rank td:nth-child(4), .iv-rank th:nth-child(6), .iv-rank td:nth-child(6) { display: none; } }

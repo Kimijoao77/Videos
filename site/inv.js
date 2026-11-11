@@ -10,6 +10,30 @@ const ARQS = ["copia_fiel", "grade", "cofres", "concentradas", "apostas", "lista
 const CDI_AO_ANO = 0.1365;            // Selic 13,75 % (Copom de 04/11/2026) menos 0,10: o mesmo do app
 const ABAS = [["geral", "Visão geral"], ["pingpong", "Ping pong"], ["placar", "Placar"], ["ideias", "Ideias"]];
 const BANCOS = { mp: "Mercado Pago", astro: "AstroPay", "99": "99Pay", "": "sem destino" };
+const REGUA = 0.45;                   // a régua do João: só interessa o que rende 45 % ao ano ou mais
+// Os horários do ping pong (ida do Arq às :45, volta meia hora depois)
+const HORARIOS = [["17:45", "Mercado Pago"], ["20:45", "AstroPay"], ["23:45", "99Pay"]];
+const MOEDAS = ["BTC", "ETH", "SOL", "HYPE"];
+// O que é cada teste, em português simples (o mesmo do documento "Estratégias do Placar")
+const INFO = {
+  copia: { onde: "Hyperliquid", risco: 3, oque: "Segue carteiras com lucro consistente: quando elas mudam de posição, a cópia faz o mesmo 1 minuto depois, na mesma proporção do saldo.",
+    ganha: "Quando as carteiras copiadas acertam.", perde: "Quando erram, e com o atraso de 1 minuto; uma carteira só pode carregar o resultado." },
+  tendencia: { onde: "Hyperliquid", risco: 4, oque: "Fica sempre no mercado: comprado quando o preço sobe e vendido quando cai (médias de 2 e 7 dias, ou rompimento de 10 dias), com 2× a 3×.",
+    ganha: "Em tendências longas, para cima ou para baixo.", perde: "Em mercado de lado; no histórico teve quedas de 48 % a 81 % no caminho." },
+  dca: { onde: "Hyperliquid", risco: 3, oque: "Compra um pouco, compra mais a cada queda (cada compra 1,5 vez a anterior) e vende tudo um pouco acima do preço médio.",
+    ganha: "Quase sempre, em sobe e desce.", perde: "Numa queda grande e sem volta: prende o dinheiro e, com 3×, pode zerar." },
+  reversao: { onde: "Hyperliquid", risco: 3, oque: "Espera um movimento forte (5 % a 8 % em 24 h) e aposta na volta, com alvo pequeno.",
+    ganha: "Quando o exagero do mercado se corrige.", perde: "Quando o movimento continua." },
+  cofres: { onde: "Hyperliquid", risco: 2, oque: "O HLP é o cofre da própria Hyperliquid: faz o papel de banca e assume as liquidações. Deposita uma vez e rende sozinho.",
+    ganha: "Com a diferença de compra e venda, taxas e liquidações.", perde: "Em liquidações grandes que dão errado; o dinheiro fica preso 4 dias." },
+  cofres_risco: { onde: "Hyperliquid", risco: 4, oque: "Cofres de traders: você deposita e o dono opera com o dinheiro de todos (ele fica com 10 % do lucro).",
+    ganha: "Quando o trader acerta.", perde: "Quando ele erra: estes cofres já caíram de 13 % a 51 % no passado." },
+  concentradas: { onde: "Meteora (Solana)", risco: 4, oque: "Deixa SOL ou USDC numa faixa logo abaixo do preço de uma moeda nova e ganha parte da taxa de cada troca.",
+    ganha: "Com as taxas, enquanto o preço fica na faixa.", perde: "Se a moeda despenca: você termina com ela no lugar do SOL." },
+  apostas: { onde: "Bolsa de apostas", risco: 3, oque: "Só aposta quando a odd está acima da justa.", ganha: "No longo prazo, se a vantagem existir.", perde: "Em sequências ruins; a vantagem pode ter sido sorte da escolha." },
+  listagens: { onde: "Hyperliquid", risco: 4, oque: "Vende (aposta na queda) uma moeda 24 h depois que ela estreia, com parada em +30 %.", ganha: "Quando a moeda nova murcha, o mais comum.", perde: "Quando ela dispara." },
+};
+const RISCO = ["", "baixo", "médio", "alto", "muito alto"];
 
 const $ = (s, el = document) => el.querySelector(s);
 const tela = $("#tela"), abas = $("#abas"), acoes = $("#acoes");
@@ -36,13 +60,13 @@ function marcas(lo, hi, n = 5) {
 }
 
 // ---------- estado ----------
-const D = { placar: null, pp: null, ideias: null, yt: null, quando: null, erros: [], carregando: false };
+const D = { placar: null, pp: null, ideias: null, yt: null, mercado: null, quando: null, erros: [], carregando: false };
 let testeAberto = null, filtroYT = "todos", filtroEventos = "todos";
 
 // ---------- gráficos (SVG à mão, com dica ao passar o mouse) ----------
 let nGraf = 0;
 /** Linha no tempo. series: [{nome, pts: [[ms, y]], ref?}] (a 1ª é a principal). fmt: formata o valor do eixo y. */
-function grafLinha(series, { fmt = (v) => pct(v, 1), altura = 260, area = false, fmtDica, W = 800 } = {}) {
+function grafLinha(series, { fmt = null, altura = 260, area = false, fmtDica, W = 800, semLegenda = false, semEixoX = false } = {}) {
   const id = `g${++nGraf}`, H = altura, PL = 58, PR = 18, PT = 14, PB = 28;
   const todos = series.flatMap(s => s.pts);
   if (todos.length < 2) return `<p class="iv-vazio">O gráfico aparece quando houver mais pontos.</p>`;
@@ -54,6 +78,8 @@ function grafLinha(series, { fmt = (v) => pct(v, 1), altura = 260, area = false,
   const tk = marcas(y0, y1); y0 = Math.min(y0, tk[0]); y1 = Math.max(y1, tk.at(-1));
   const X = (x) => PL + (x - x0) / ((x1 - x0) || 1) * (W - PL - PR), Y = (y) => PT + (y1 - y) / ((y1 - y0) || 1) * (H - PT - PB);
   const ticks = tk;
+  if (!fmt) { const passo = Math.abs((tk[1] ?? tk[0]) - tk[0]) || 0.01, casas = Math.max(0, Math.min(3, Math.ceil(-Math.log10(passo * 100) + 0.0001)));
+    fmt = (v) => Math.abs(v) < passo / 1000 ? "0%" : pct(v, casas); }
   const curto_ = (x1 - x0) < 3 * 86400000, nx = curto_ ? 6 : Math.min(7, Math.max(2, Math.round((x1 - x0) / 86400000)));
   const rotX = (t) => curto_ ? new Date(t).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" }).replace(",", "") : dataCurta(t);
   const xt = Array.from({ length: nx + 1 }, (_, i) => x0 + (x1 - x0) * i / nx).filter((t, i, a) => !i || rotX(t) !== rotX(a[i - 1]));
@@ -64,15 +90,16 @@ function grafLinha(series, { fmt = (v) => pct(v, 1), altura = 260, area = false,
   const svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(pri.nome)}">
     ${ticks.map(t => `<line class="grid" x1="${PL}" x2="${W - PR}" y1="${Y(t).toFixed(1)}" y2="${Y(t).toFixed(1)}"/><text x="${PL - 8}" y="${(Y(t) + 4).toFixed(1)}" text-anchor="end">${esc(fmt(t))}</text>`).join("")}
     ${series.some(s => s.zero) && y0 < 0 && y1 > 0 ? `<line class="zero" x1="${PL}" x2="${W - PR}" y1="${Y(0).toFixed(1)}" y2="${Y(0).toFixed(1)}"/>` : ""}
-    ${xt.map(t => `<text x="${X(t).toFixed(1)}" y="${H - 8}" text-anchor="middle">${rotX(t)}</text>`).join("")}
+    ${semEixoX ? "" : xt.map(t => `<text x="${X(t).toFixed(1)}" y="${H - 8}" text-anchor="middle">${rotX(t)}</text>`).join("")}
     ${areaD ? `<path class="area" d="${areaD}"/>` : ""}
     ${series.slice().reverse().map(s => `<path class="linha${s.ref ? " ref" : ""}" d="${caminho(s.pts)}"/>`).join("")}
     ${u ? `<circle class="pto" cx="${X(u[0]).toFixed(1)}" cy="${Y(u[1]).toFixed(1)}" r="4.5"/>` : ""}
     <line class="mira" id="${id}-m" x1="0" x2="0" y1="${PT}" y2="${H - PB}" visibility="hidden"/>
     <rect id="${id}-h" x="${PL}" y="${PT}" width="${W - PL - PR}" height="${H - PT - PB}" fill="transparent"/>
   </svg>`;
-  setTimeout(() => ligarDica(id, { W, X, x0, x1, PL, PR, series, fmtDica: fmtDica || fmt }), 0);
-  const leg = series.length > 1 ? `<div class="iv-legenda">${series.map(s => `<span><i class="${s.ref ? "ref" : ""}"></i>${esc(s.nome)}</span>`).join("")}</div>` : "";
+  const fd = fmtDica || ((v) => pct(v, 2));
+  setTimeout(() => ligarDica(id, { W, X, x0, x1, PL, PR, series, fmtDica: fd }), 0);
+  const leg = series.length > 1 && !semLegenda ? `<div class="iv-legenda">${series.map(s => `<span><i class="${s.ref ? "ref" : ""}"></i>${esc(s.nome)}</span>`).join("")}</div>` : "";
   return `<div class="iv-graf" id="${id}">${svg}</div>${leg}`;
 }
 function ligarDica(id, g) {
@@ -160,7 +187,8 @@ function montarPlacar(d) {
     out.push({ id: "copia", nome: "Copy trading", como: `${cv.carteiras} carteiras · até 3× · parada em −25%`, desde: d.copia_fiel.inicio, retorno: cv.retorno,
       curva: [[d.copia_fiel.inicio, 0], ...(cv.curva || [])],
       numeros: [["Resultado", pct(cv.retorno)], ["Carteiras no lucro", `${subs.filter(x => x.retorno > 0).length} de ${subs.length}`], ["Ordens copiadas", (cv.ordens || 0).toLocaleString("pt-BR")], ["Taxas pagas", pct(-(cv.taxas || 0) / Math.max(1, cv.capital))]],
-      itens: subs.map(x => ({ nome: x.apelido || `${x.w.slice(0, 6)}…${x.w.slice(-4)}`, r: x.retorno, sub: x.parou ? `parou: ${x.parou}` : `${(x.ordens || 0).toLocaleString("pt-BR")} ordens` })).sort((a, b) => b.r - a.r) });
+      itens: subs.map(x => ({ nome: x.apelido || `${x.w.slice(0, 6)}…${x.w.slice(-4)}`, r: x.retorno, sub: x.parou ? `parou: ${x.parou}` : `${(x.ordens || 0).toLocaleString("pt-BR")} ordens` })).sort((a, b) => b.r - a.r),
+      ops: (cv.ordens_recentes || []).map(o => ({ t: o.t, titulo: `${o.lado === "compra" ? "Comprou" : "Vendeu"} ${o.moeda}`, sub: `US$ ${Math.round(o.valor).toLocaleString("pt-BR")}${o.obs ? ` · ${o.obs}` : ""}` })) });
   }
   const g = d.grade?.ao_vivo;
   if (g?.length) {
@@ -173,7 +201,9 @@ function montarPlacar(d) {
       out.push({ id, nome, como: `${gv.length} robôs: ${[...new Set(gv.map(x => x.moeda))].join(", ")}`, desde, retorno: media(rs),
         curva: [[desde, 0], ...curvaNoTempo(gv.map(x => [[ini(x), cap], ...(x.resultado.curva || [])]), cap)],
         numeros: [["Resultado (média)", pct(media(rs))], ["Melhor robô", pct(Math.max(...rs))], ["Pior robô", pct(Math.min(...rs))], ["Maior queda no caminho", pct(-Math.max(...gv.map(x => x.resultado.pior_queda || 0)))]],
-        itens: gv.map(x => ({ nome: `${x.moeda} · ${x.nome}`, r: x.resultado.final / cap - 1, sub: `só segurar ${x.moeda}: ${pct(x.resultado.segurar_moeda || 0)} · ${x.resultado.ciclos || 0} ciclos` })).sort((a, b) => b.r - a.r) });
+        queda: Math.max(...gv.map(x => x.resultado.pior_queda || 0)),
+        itens: gv.map(x => ({ nome: `${x.moeda} · ${x.nome}`, r: x.resultado.final / cap - 1, sub: `só segurar ${x.moeda}: ${pct(x.resultado.segurar_moeda || 0)} · ${x.resultado.ciclos || 0} ciclos` })).sort((a, b) => b.r - a.r),
+        ops: gv.flatMap(x => (x.resultado.ops || []).map(o => ({ t: o.t, titulo: `${o.tipo === "venda" ? "Vendeu" : "Comprou"} ${x.moeda} a US$ ${Number(o.px).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}`, sub: `${o.obs || ""}${o.lucro != null ? ` · lucro US$ ${o.lucro.toLocaleString("pt-BR")}` : ""}` }))) });
     }
   }
   for (const [id, nome, como, k] of [["cofres", "Cofre HLP", "O cofre da própria Hyperliquid", d.cofres?.carteira], ["cofres_risco", "Cofres de risco", "Cofres de traders de maior retorno", d.cofres?.risco]]) {
@@ -189,7 +219,8 @@ function montarPlacar(d) {
     out.push({ id: "concentradas", nome: "Pools concentradas", como: "Meteora: só SOL ou USDC abaixo do preço", desde: d.concentradas.inicio, retorno: media(rs),
       curva: [[d.concentradas.inicio, 0], ...curvaNoTempo(fs.map(f => f.curva || []), cap)],
       numeros: [["Resultado (média)", pct(media(rs))], ...fs.map(f => [f.nome.replace(/ \(.*\)/, ""), pct(f.patrimonio / cap - 1)])],
-      itens: fs.flatMap(f => (f.abertas || []).map(a => ({ nome: a.nome, r: a.r, sub: `${f.nome} · ${a.dentro ? "dentro da faixa" : "fora da faixa"} · taxas ${pct(a.taxas)}` }))).sort((a, b) => b.r - a.r) });
+      itens: fs.flatMap(f => (f.abertas || []).map(a => ({ nome: a.nome, r: a.r, sub: `${f.nome} · ${a.dentro ? "dentro da faixa" : "fora da faixa"} · taxas ${pct(a.taxas)}` }))).sort((a, b) => b.r - a.r),
+      ops: fs.flatMap(f => [...(f.abertas || []).map(a => ({ t: a.entrou, titulo: `Entrou em ${a.nome}`, sub: f.nome })), ...(f.fechadas || []).map(x => ({ t: x.saiu, titulo: `Saiu de ${x.nome}`, sub: `${f.nome} · ${x.motivo || ""} · ${pct(x.r)}` }))]) });
   }
   const av = d.apostas?.ao_vivo;
   if (av && d.apostas.capital && !d.apostas.desligado) {
@@ -236,7 +267,14 @@ async function carregar() {
     const js = fs.filter(f => f.nome.endsWith(".json")).slice(-40);
     D.yt = (await Promise.all(js.map(f => json(f.caminho).catch(() => null)))).filter(Boolean).sort((a, b) => String(b.visto_em || "").localeCompare(String(a.visto_em || "")));
   }).catch(e => D.erros.push(`Ideias do YouTube: ${e.message}`));
-  await Promise.all([placar, pp, ideias, yt]);
+  const mercado = fetch("https://api.hyperliquid.xyz/info", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "metaAndAssetCtxs" }) })
+    .then(r => r.ok ? r.json() : null).then(j => {
+      if (!j) return;
+      const [meta, ctx] = j;
+      D.mercado = MOEDAS.map(m => { const i = meta.universe.findIndex(u => u.name === m); const c = ctx[i];
+        return c ? { moeda: m, preco: +c.markPx, dia: +c.markPx / +c.prevDayPx - 1, funding: +c.funding * 24 * 365 } : null; }).filter(Boolean);
+    }).catch(() => { D.mercado = null; });
+  await Promise.all([placar, pp, ideias, yt, mercado]);
   D.quando = Date.now(); D.carregando = false;
   desenharAcoes(); irPara(tela.dataset.tela || location.hash.slice(1));
 }
@@ -246,16 +284,63 @@ const tile = (rot, valor, sub = "", classe = "", extra = "") => `<div class="iv-
 const erros = () => D.erros.length ? `<p class="iv-erro">${D.erros.map(esc).join("<br>")}</p>` : "";
 const carregando = () => `<p class="iv-vazio">Carregando os dados do GitHub…</p>`;
 
+/** Barra de comparação (ritmo ao ano do ping pong × régua × CDI). */
+function bala(valor, alvo, ref) {
+  const mx = Math.max(valor ?? 0, alvo, ref) * 1.15, w = (v) => `${Math.max(0, Math.min(100, v / mx * 100)).toFixed(1)}%`;
+  return `<div class="iv-bala" role="img" aria-label="Ritmo ao ano comparado com a régua e o CDI">
+    <div class="trilho"><span class="ref" style="left:${w(ref)}"></span><span class="alvo" style="left:${w(alvo)}"></span>
+      ${valor != null ? `<span class="valor ${valor >= alvo ? "ok" : ""}" style="width:${w(valor)}"></span>` : ""}</div>
+    <div class="marcas"><span style="left:${w(ref)}">CDI ${pct(ref, 0).replace("+", "")}</span><span style="left:${w(alvo)}">régua ${pct(alvo, 0).replace("+", "")}</span></div></div>`;
+}
+function proximoCiclo() {
+  const agora = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+  for (const dia of [0, 1]) for (const [h, banco] of HORARIOS) {
+    const [hh, mm] = h.split(":").map(Number), t = new Date(agora); t.setDate(t.getDate() + dia); t.setHours(hh, mm, 0, 0);
+    if (t > agora) { const min = Math.round((t - agora) / 60000); return { h, banco, falta: min >= 60 ? `${Math.floor(min / 60)} h ${min % 60} min` : `${min} min` }; }
+  }
+  return null;
+}
+function tickers() {
+  if (!D.mercado?.length) return "";
+  return `<div class="iv-ticker">${D.mercado.map(m => `<div><b>${m.moeda}</b><span class="num">US$ ${m.preco.toLocaleString("pt-BR", { maximumFractionDigits: m.preco < 100 ? 3 : 0 })}</span>
+    <span class="num ${cls(m.dia)}">${pct(m.dia)}</span><small title="Funding: o que quem está comprado paga por ano">funding ${pct(m.funding, 1)} a.a.</small></div>`).join("")}
+    <p class="iv-nota">Preços da Hyperliquid agora · variação em 24 h</p></div>`;
+}
+function curvasPequenas(t) {
+  return `<div class="iv-mini">${t.map(x => { const fim = Math.max(...x.curva.map(p => p[0]));
+    return `<button class="iv-card iv-mini-c" data-ir-teste="${x.id}"><div class="cab"><b>${esc(x.nome)}</b><span class="num ${cls(x.retorno)}">${pct(x.retorno)}</span></div>
+      ${grafLinha([{ nome: x.nome, pts: x.curva, zero: true }, { nome: "CDI", ref: true, pts: [0, .5, 1].map(k => x.desde + (fim - x.desde) * k).map(tt => [tt, cdi(x.desde, tt)]) }], { altura: 150, W: 360, semLegenda: true, semEixoX: true })}
+      <small>${emDias(x.desde)} · risco ${RISCO[INFO[x.id]?.risco] || "—"}</small></button>`; }).join("")}</div>`;
+}
+function tabelaRanking(t) {
+  if (!t.length) return `<p class="iv-vazio">Sem testes ainda.</p>`;
+  const mx = Math.max(...t.map(x => Math.abs(x.retorno)), 1e-6);
+  return `<table class="iv-tab iv-rank"><thead><tr><th>Teste</th><th class="barra-h">Resultado</th><th class="n">%</th><th class="n">CDI no período</th><th class="n">Diferença</th><th class="n">Tempo</th><th>Risco</th></tr></thead><tbody>
+    ${t.map(x => { const c = cdi(x.desde), d = x.retorno - c, w = Math.abs(x.retorno) / mx * 50;
+      return `<tr data-ir-teste="${x.id}" tabindex="0"><td><b>${esc(x.nome)}</b><small>${esc(INFO[x.id]?.onde || "")}</small></td>
+        <td class="barra-h"><div class="iv-bh"><span class="zero"></span><span class="${x.retorno >= 0 ? "p" : "n"}" style="${x.retorno >= 0 ? `left:50%;width:${w}%` : `right:50%;width:${w}%`}"></span></div></td>
+        <td class="n ${cls(x.retorno)}"><b>${pct(x.retorno)}</b></td><td class="n">${pct(c, 2)}</td><td class="n ${cls(Math.round(d * 1e4))}">${Math.abs(d) < 5e-5 ? "0,00 p.p." : pct(d, 2).replace("%", " p.p.")}</td>
+        <td class="n">${emDias(x.desde)}</td><td><span class="iv-selo r${INFO[x.id]?.risco || 0}">${RISCO[INFO[x.id]?.risco] || "—"}</span></td></tr>`; }).join("")}</tbody></table>`;
+}
 function telaGeral() {
   if (!D.quando) { tela.innerHTML = carregando(); return; }
-  const p = D.pp, t = D.placar || [], melhor = t[0];
+  const p = D.pp, t = D.placar || [], prox = proximoCiclo();
   const ideiasHoje = D.ideias?.dias?.[0], ytTestar = (D.yt || []).filter(v => v.claude?.veredito === "testar");
   const falhas = (p?.eventos || []).filter(e => e.tipo === "falha" && Date.now() - Date.parse(e.quando) < 3 * 86400000);
-  tela.innerHTML = `<div class="iv-titulo"><h1>Visão geral</h1><p>O seu dinheiro (ping pong) e os testes no papel, com os mesmos dados do app.</p></div>${erros()}
-    <div class="iv-grade g4">
-      ${tile("Saldo do ping pong", p?.saldo != null ? `<span class="num">${reais(p.saldo)}</span>` : "—", p?.quando ? `último ciclo em ${dataHora(Date.parse(p.quando))}` : "", "", "destaque")}
-      ${tile("Lucro em 7 dias", p?.semana != null ? reais(p.semana, true) : "—", p?.aoMes != null ? `ritmo de ${pct(p.aoMes)} ao mês` : "", cls(p?.semana))}
-      ${tile("Melhor teste do Placar", melhor ? pct(melhor.retorno) : "—", melhor ? `${esc(melhor.nome)}, em ${emDias(melhor.desde)}` : "", cls(melhor?.retorno))}
+  const ult = p?.dias?.filter(d => d.lucro != null).at(-1);
+  tela.innerHTML = `${erros()}
+    <section class="iv-hero">
+      <div><small>Patrimônio no ping pong</small><b class="num">${p?.saldo != null ? reais(p.saldo) : "—"}</b>
+        <span>${p?.semana != null ? `<em class="${cls(p.semana)}">${reais(p.semana, true)}</em> em 7 dias` : ""}${ult ? ` · último dia (${diaBR(ult.dia)}): <em class="${cls(ult.lucro)}">${reais(ult.lucro, true)}</em>` : ""}</span></div>
+      <div><small>Ritmo ao ano, se continuar igual</small><b class="num ${p?.aoAno != null ? (p.aoAno >= REGUA ? "pos" : "") : ""}">${p?.aoAno != null ? pct(p.aoAno, 0) : "—"}</b>${bala(p?.aoAno ?? null, REGUA, CDI_AO_ANO)}</div>
+      <div><small>Próxima ida do Arq</small><b class="num">${prox ? prox.h : "—"}</b><span>${prox ? `para o ${esc(prox.banco)}, em ${prox.falta}` : ""}</span>
+        <span class="iv-dias">${HORARIOS.map(([h, b]) => `<i>${h} ${esc(b)}</i>`).join("")}</span></div>
+    </section>
+    ${tickers()}
+    <div class="iv-grade g4 iv-sec">
+      ${tile("Lucro em 30 dias", p?.mes != null ? reais(p.mes, true) : "—", p ? `${p.dias.filter(d => d.lucro != null).length} dias registrados` : "", cls(p?.mes))}
+      ${tile("Melhor teste do Placar", t[0] ? pct(t[0].retorno) : "—", t[0] ? `${esc(t[0].nome)}, em ${emDias(t[0].desde)}` : "", cls(t[0]?.retorno))}
+      ${tile("Testes no positivo", `${t.filter(x => x.retorno > 0).length} de ${t.length}`, `${t.filter(x => x.retorno > cdi(x.desde)).length} batendo o CDI no mesmo período`)}
       ${tile("Ideias que passaram na régua", String((ideiasHoje?.ideias?.length || 0) + ytTestar.length), ideiasHoje ? `WhatsApp de ${diaBR(ideiasHoje.dia)} e vídeos para testar` : "")}
     </div>
     <div class="iv-grade g-21 iv-sec">
@@ -263,8 +348,11 @@ function telaGeral() {
         ${p ? grafLinha([{ nome: "Saldo", pts: p.dias.map(d => [Date.parse(d.quando || d.dia + "T23:00:00-03:00"), d.saldo]) }], { fmt: (v) => reais(v).replace(",00", ""), fmtDica: (v) => reais(v), area: true, W: 820 }) : "<p class='iv-vazio'>Sem o registro do ping pong.</p>"}</section>
       <section class="iv-card"><h2>Atenção</h2><p class="sub">O que pede um olhar agora.</p>${atencao(falhas, t)}</section>
     </div>
-    <section class="iv-card iv-sec"><h2>Placar: resultado de cada teste</h2><p class="sub">Dinheiro de mentira, preços de verdade. A maioria começou há poucos dias: ainda não prova nada.</p>
-      ${grafRanking(t.map(x => ({ rot: x.nome, v: x.retorno, dias: diasDesde(x.desde) })))}</section>`;
+    <section class="iv-card iv-sec"><h2>Placar: cada teste contra o CDI</h2><p class="sub">Dinheiro de mentira, preços de verdade. "Diferença" é quanto o teste ganhou a mais (ou a menos) que a renda fixa no mesmo período. Clique num teste para abrir.</p>
+      ${tabelaRanking(t)}</section>
+    <section class="iv-sec"><div class="iv-titulo-sec"><h2>As curvas lado a lado</h2><p>Linha cheia: o teste. Tracejada: o CDI.</p></div>${curvasPequenas(t)}</section>`;
+  tela.querySelectorAll("[data-ir-teste]").forEach(el => { const ir = () => { testeAberto = el.dataset.irTeste; irPara("placar"); };
+    el.onclick = ir; el.onkeydown = (e) => { if (e.key === "Enter") ir(); }; });
 }
 function atencao(falhas, t) {
   const itens = [];
@@ -276,6 +364,46 @@ function atencao(falhas, t) {
   return itens.length ? `<ul style="margin:0;padding-left:18px;display:grid;gap:10px">${itens.join("")}</ul>` : `<p class="iv-vazio">Nada fora do normal.</p>`;
 }
 
+/** Calendário do lucro: um quadrado por dia, azul quando ganhou e vermelho quando perdeu (mais forte = mais). */
+function calendario(dias) {
+  if (!dias.length) return "";
+  const porDia = Object.fromEntries(dias.map((d, i) => [d.dia, { ...d, r: d.lucro != null && dias[i - 1]?.saldo ? d.lucro / dias[i - 1].saldo : null }]));
+  const ini = new Date(dias[0].dia + "T12:00:00"); ini.setDate(ini.getDate() - ini.getDay());
+  const fim = new Date(); const cel = [];
+  for (let d = new Date(ini); d <= fim; d.setDate(d.getDate() + 1)) cel.push(d.toISOString().slice(0, 10));
+  const mx = Math.max(0.002, ...Object.values(porDia).map(d => Math.abs(d.r ?? 0)).filter(v => v < 0.01));
+  const cor = (r) => r == null ? "" : `--k:${Math.min(1, Math.abs(r) / mx).toFixed(2)}`;
+  return `<div class="iv-cal"><div class="sem">${["dom", "seg", "ter", "qua", "qui", "sex", "sáb"].map(x => `<span>${x}</span>`).join("")}</div>
+    <div class="grade">${cel.map(c => { const d = porDia[c];
+      return `<span class="c ${d?.r == null ? (d ? "s" : "v") : d.r >= 0 ? "p" : "n"}${Math.abs(d?.r ?? 0) > 0.01 ? " x" : ""}" style="${cor(d?.r)}" title="${diaBR(c)}${d ? ` · saldo ${reais(d.saldo)}${d.lucro != null ? ` · ${reais(d.lucro, true)} (${pct(d.r, 3)})` : ""}` : " · sem registro"}">${Number(c.slice(8))}</span>`; }).join("")}</div>
+    <p class="iv-nota">Mais forte = dia melhor (ou pior). Contorno pontilhado: mais de 1% num dia, quase sempre dinheiro que entrou ou saiu.</p></div>`;
+}
+/** O que cada macro fez hoje (desde a meia-noite de Brasília). */
+function hojeMacros(eventos) {
+  const hoje = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+  const ev = eventos.filter(e => e.quando.slice(0, 10) === hoje).slice().reverse();
+  if (!ev.length) return `<p class="iv-vazio">Nenhuma macro rodou hoje ainda (ou o app ainda não sincronizou).</p>`;
+  const runs = []; let atual = null;
+  for (const e of ev) {
+    if (e.tipo === "inicio" || !atual || atual.macro !== e.macro) { atual = { macro: e.macro, ini: e.quando, fim: null, falhas: 0, eventos: [] }; runs.push(atual); }
+    atual.eventos.push(e); if (e.tipo === "fim") atual.fim = e.quando; if (e.tipo === "falha") atual.falhas++;
+  }
+  return `<ol class="iv-linha-tempo">${runs.slice().reverse().map(r => `<li class="${r.falhas ? "falhou" : r.fim ? "ok" : ""}"><b>${r.ini.slice(11, 16)}</b> ${esc(r.macro)}
+    <span class="iv-selo ${r.falhas ? "falha" : r.fim ? "testar" : "aviso"}">${r.falhas ? `${r.falhas} ${r.falhas === 1 ? "falha" : "falhas"}` : r.fim ? `terminou ${r.fim.slice(11, 16)}` : "sem fim registrado"}</span>
+    <small>${esc(r.eventos.filter(e => ["envio", "devolucao", "saldo", "saldo_ida", "guardou", "falha"].includes(e.tipo)).map(e => e.texto).slice(0, 3).join(" · "))}</small></li>`).join("")}</ol>`;
+}
+function projecaoPP(p) {
+  if (p.aoMes == null || p.saldo == null) return `<p class="iv-vazio">A projeção aparece com 3 dias de lucro registrados.</p>`;
+  const linhas = [[1, "1 mês"], [3, "3 meses"], [6, "6 meses"], [12, "1 ano"]];
+  const cdiMes = Math.pow(1 + CDI_AO_ANO, 1 / 12) - 1, regMes = Math.pow(1 + REGUA, 1 / 12) - 1;
+  return `<table class="iv-tab"><thead><tr><th>Daqui a</th><th class="n">No ritmo atual</th><th class="n">Na régua (45% a.a.)</th><th class="n">No CDI</th></tr></thead><tbody>
+    ${linhas.map(([m, rot]) => `<tr><td>${rot}</td><td class="n"><b>${reais(p.saldo * Math.pow(1 + p.aoMes, m))}</b></td><td class="n">${reais(p.saldo * Math.pow(1 + regMes, m))}</td><td class="n">${reais(p.saldo * Math.pow(1 + cdiMes, m))}</td></tr>`).join("")}
+    </tbody></table><p class="iv-nota">Conta simples: o ritmo dos últimos dias repetido, sem colocar nem tirar dinheiro. Ritmo de poucos dias muda muito.</p>`;
+}
+function rendArq(eventos) {
+  const e = eventos.find(x => x.tipo === "rend_arq");
+  return e ? `<p class="iv-nota">Arq (lido em ${dataHora(Date.parse(e.quando))}): ${esc(e.texto)}</p>` : "";
+}
 function telaPingPong() {
   if (!D.quando) { tela.innerHTML = carregando(); return; }
   const p = D.pp;
@@ -291,6 +419,11 @@ function telaPingPong() {
       ${tile("Lucro em 30 dias", reais(p.mes, true), `${p.dias.filter(d => d.lucro != null).length} dias com lucro registrado`, cls(p.mes))}
       ${tile("Ritmo", p.aoMes != null ? `${pct(p.aoMes)} <small style="display:inline;font-size:14px">ao mês</small>` : "—", p.aoAno != null ? `${pct(p.aoAno, 0)} ao ano, se continuar igual` : "precisa de 3 dias de lucro", cls(p.aoMes))}
     </div>
+    <div class="iv-grade g-21 iv-sec">
+      <section class="iv-card"><h2>Hoje nas macros</h2><p class="sub">Cada vez que uma macro rodou hoje, do mais recente para o mais antigo.</p>${hojeMacros(p.eventos)}${rendArq(p.eventos)}</section>
+      <section class="iv-card"><h2>Calendário</h2><p class="sub">Lucro de cada dia, em % do saldo.</p>${calendario(p.dias)}</section>
+    </div>
+    <section class="iv-card iv-sec"><h2>Projeção</h2><p class="sub">Para onde o saldo vai se o ritmo continuar, comparado com a régua e o CDI.</p>${projecaoPP(p)}</section>
     <div class="iv-grade g2 iv-sec">
       <section class="iv-card"><h2>Lucro por dia</h2><p class="sub">Saldo do dia menos o do dia anterior, sem contar dinheiro que entrou ou saiu. Um dia acima de 1% quase sempre é dinheiro que entrou ou saiu sem registro no app (marcado "conferir" no dia a dia).</p>
         ${grafBarras(p.dias.filter(d => d.lucro != null).map(d => ({ rot: diaBR(d.dia), v: d.lucro, dica: `${diaBR(d.dia)}: <b>${reais(d.lucro, true)}</b>${d.fluxo ? `<br>entrou/saiu ${reais(d.fluxo, true)}` : ""}` })))}</section>
@@ -325,9 +458,14 @@ function telaPlacar() {
       <div>
         <section class="iv-card"><h2>${esc(sel.nome)}</h2><p class="sub">${esc(sel.como)} · desde ${dataCurta(sel.desde)} · o CDI rendeu ${pct(ref)} no mesmo período</p>
           ${grafLinha([{ nome: sel.nome, pts: sel.curva, zero: true }, { nome: "CDI", ref: true, pts: [0, .25, .5, .75, 1].map(k => sel.desde + (Math.max(...sel.curva.map(p => p[0])) - sel.desde) * k).map(tt => [tt, cdi(sel.desde, tt)]) }], { altura: 320, W: 860 })}</section>
+        ${INFO[sel.id] ? `<section class="iv-card iv-sec iv-sobre"><h2>Como funciona <span class="iv-selo r${INFO[sel.id].risco}">risco ${RISCO[INFO[sel.id].risco]}</span> <span class="iv-selo">${esc(INFO[sel.id].onde)}</span></h2>
+          <p>${esc(INFO[sel.id].oque)}</p><div class="iv-grade g2"><div><small>Ganha</small><p>${esc(INFO[sel.id].ganha)}</p></div><div><small>Perde</small><p>${esc(INFO[sel.id].perde)}</p></div></div>
+          <p class="iv-nota">Contra o CDI no mesmo período: <b class="${cls(sel.retorno - ref)}">${pct(sel.retorno - ref).replace("%", " pontos")}</b>. Com ${emDias(sel.desde)} de teste, ainda é cedo para comparar com a régua de 45% ao ano.</p></section>` : ""}
         <div class="iv-grade g4 iv-sec">${sel.numeros.map(([r, v]) => tile(r, `<span class="num">${esc(v)}</span>`, "", v.startsWith("+") ? "pos" : v.startsWith("−") ? "neg" : "")).join("")}</div>
         ${sel.itens.length ? `<section class="iv-card iv-sec"><h2>Por dentro</h2><table class="iv-tab"><thead><tr><th>Item</th><th class="n">Resultado</th></tr></thead><tbody>
           ${sel.itens.map(i => `<tr><td>${esc(i.nome)}${i.sub ? `<small>${esc(i.sub)}</small>` : ""}</td><td class="n ${cls(i.r)}">${pct(i.r)}</td></tr>`).join("")}</tbody></table></section>` : ""}
+        ${sel.ops?.length ? `<section class="iv-card iv-sec"><h2>Últimas operações</h2><div class="iv-rolar"><table class="iv-tab"><thead><tr><th>Quando</th><th>O quê</th></tr></thead><tbody>
+          ${sel.ops.filter(o => o.t).sort((a, b) => b.t - a.t).slice(0, 25).map(o => `<tr><td style="white-space:nowrap">${dataHora(o.t)}</td><td>${esc(o.titulo)}${o.sub ? `<small>${esc(o.sub)}</small>` : ""}</td></tr>`).join("")}</tbody></table></div></section>` : ""}
       </div>
     </div>`;
   tela.querySelectorAll("[data-t]").forEach(b => b.onclick = () => { testeAberto = b.dataset.t; telaPlacar(); });
