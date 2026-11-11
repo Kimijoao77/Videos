@@ -1,0 +1,98 @@
+# Painel de vozes da Speechify (10/11/2026): baixa a amostra oficial de cada voz em português e inglês e gera o mesmo
+# trecho (sinal "Wow!") nas vozes pt-BR e nas de narração em inglês, para o painel de escolha. Os mp3 (só vozes de
+# catálogo da Speechify, nenhuma voz do canal) saem num artefato do run que expira em 1 dia.
+name: Painel de vozes
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  painel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SPEECHIFY_API_KEY: ${{ secrets.SPEECHIFY_API_KEY }}
+    steps:
+      - name: Instalar ffmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg > /dev/null
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -q requests
+      - name: Baixar amostras e gerar o trecho
+        shell: python
+        run: |
+          import base64, json, os, re, subprocess, sys, time, requests
+          API = "https://api.speechify.ai"
+          H = {"Authorization": f"Bearer {os.environ['SPEECHIFY_API_KEY']}"}
+          os.makedirs("painel/audio", exist_ok=True)
+
+          vozes, cursor = [], None
+          while True:
+              p = {"limit": 200}
+              if cursor: p["cursor"] = cursor
+              d = requests.get(f"{API}/v1/voices", headers=H, params=p, timeout=60).json()
+              if isinstance(d, list): vozes += d; break
+              vozes += d.get("voices") or d.get("data") or []
+              cursor = d.get("next_cursor")
+              if not d.get("has_more") or not cursor: break
+
+          def leve(src, dst):
+              r = subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", src, "-ac", "1", "-b:a", "64k", dst])
+              return r.returncode == 0
+
+          textos = {
+              "pt": ("pt-BR", 'Em 1977, um radiotelescópio em Ohio captou um sinal tão forte que o astrônomo de plantão rabiscou uma única palavra na margem do papel: "Uau!". Ele durou 72 segundos. Nunca mais se repetiu. E até hoje, ninguém sabe dizer de onde ele veio.'),
+              "en": ("en-US", 'In 1977, a radio telescope in Ohio picked up a signal so strong that the astronomer on duty scribbled a single word in the margin: "Wow!". It lasted 72 seconds. It never happened again. And to this day, no one can say where it came from.'),
+          }
+
+          saida = []
+          for v in vozes:
+              loc = str(v.get("locale", ""))
+              if not (loc == "pt-BR" or loc in ("en-US", "en-GB")):
+                  continue
+              vid = v["id"]; nome = re.sub(r"[^a-zA-Z0-9_-]", "-", vid)
+              tags = v.get("tags") or []
+              item = {"id": vid, "nome": v.get("display_name", vid), "genero": v.get("gender", ""), "locale": loc, "tags": tags}
+              prev = v.get("preview_audio")
+              if prev:
+                  try:
+                      r = requests.get(prev, timeout=60)
+                      if r.ok:
+                          open("tmp.mp3", "wb").write(r.content)
+                          if leve("tmp.mp3", f"painel/audio/{nome}-oficial.mp3"):
+                              item["oficial"] = f"audio/{nome}-oficial.mp3"
+                  except Exception as e:
+                      print("preview falhou", vid, e)
+              narracao = any(t in tags for t in ("use-case:video-narration", "use-case:narration"))
+              lang = "pt" if loc == "pt-BR" else ("en" if narracao else None)
+              if lang:
+                  locale, texto = textos[lang]
+                  body = {"input": texto, "voice_id": vid, "model": "simba-3.5", "language": locale, "audio_format": "mp3"}
+                  for tent in range(3):
+                      r = requests.post(f"{API}/v1/audio/speech", headers=H, json=body, timeout=120)
+                      if r.status_code == 429:
+                          time.sleep(2); continue
+                      break
+                  if r.status_code == 200:
+                      audio = r.content if r.headers.get("content-type", "").startswith("audio") else base64.b64decode(r.json().get("audio_data", ""))
+                      open("tmp.mp3", "wb").write(audio)
+                      if leve("tmp.mp3", f"painel/audio/{nome}-{lang}.mp3"):
+                          item["trecho"] = f"audio/{nome}-{lang}.mp3"
+                  else:
+                      print("trecho falhou", vid, r.status_code, r.text[:200])
+                  time.sleep(1.1)
+              saida.append(item)
+              print(vid, "oficial" in item, "trecho" in item)
+          json.dump(saida, open("painel/vozes.json", "w"), ensure_ascii=False)
+          print(len(saida), "vozes no painel")
+      - uses: actions/upload-artifact@v4
+        with:
+          name: painel-vozes
+          path: painel
+          retention-days: 1
