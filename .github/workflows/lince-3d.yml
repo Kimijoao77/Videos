@@ -1,0 +1,117 @@
+# Lince Lunar — Short em 3D estilizado (11/11/2026): a cena é montada por código no Blender (canal/lince no repositório
+# privado do canal). 20 máquinas renderizam os quadros (minutos grátis do repositório público); a última junta,
+# renderiza os closes dos círculos de zoom, põe a legenda e manda o vídeo para a Release privada "lince-lunar".
+# Nada é postado; sem voz (a voz entra depois, se aprovado).
+name: Lince 3D
+
+on:
+  workflow_dispatch:
+    inputs:
+      cena:
+        description: "Script da cena em canal/lince"
+        required: false
+        default: "cena_geladeira.py"
+      nome:
+        description: "Nome do vídeo na Release"
+        required: false
+        default: "lince-geladeira-3d"
+      quadros:
+        description: "Total de quadros (24 por segundo)"
+        required: false
+        default: "1200"
+      largura:
+        description: "Largura do render 3D (a altura é 16:9 em pé)"
+        required: false
+        default: "720"
+      amostras:
+        description: "Amostras do Cycles"
+        required: false
+        default: "20"
+
+permissions:
+  contents: read
+
+env:
+  CANAL_REPO: Kimijoao77/Engfy
+  PARTES: "20"
+
+jobs:
+  quadros:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        parte: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CANAL_REPO }}
+          token: ${{ secrets.ENGFY_TOKEN }}
+          persist-credentials: false
+          sparse-checkout: canal/lince
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Blender (como módulo Python)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg libxrender1 libxxf86vm1 libxfixes3 libxi6 libxkbcommon0 libsm6 libgl1 > /dev/null
+          pip install -q bpy==4.2.0
+      - name: Renderizar o trecho
+        run: |
+          total=${{ inputs.quadros }}
+          ini=$(( total * ${{ matrix.parte }} / PARTES ))
+          fim=$(( total * (${{ matrix.parte }} + 1) / PARTES ))
+          echo "quadros $ini a $fim"
+          python canal/lince/${{ inputs.cena }} "$PWD/q" ${{ inputs.largura }} ${{ inputs.amostras }} "trecho:$ini-$fim" > render.log 2>&1 || (tail -40 render.log; exit 1)
+          grep -c "Saved:" render.log
+          ffmpeg -v error -y -framerate 24 -start_number $ini -i q/f%05d.png -c:v libx264 -preset medium -crf 14 -pix_fmt yuv420p \
+            trecho-$(printf %02d ${{ matrix.parte }}).mp4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: trecho-${{ matrix.parte }}
+          path: trecho-*.mp4
+          retention-days: 1
+
+  juntar:
+    needs: quadros
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      GH_TOKEN: ${{ secrets.ENGFY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CANAL_REPO }}
+          token: ${{ secrets.ENGFY_TOKEN }}
+          persist-credentials: false
+          sparse-checkout: canal/lince
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Blender, cairo e a fonte
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg libxrender1 libxxf86vm1 libxfixes3 libxi6 libxkbcommon0 libsm6 libgl1 libcairo2-dev pkg-config > /dev/null
+          pip install -q bpy==4.2.0 pycairo numpy pillow
+          mkdir -p ~/.local/share/fonts && cp canal/lince/fontes/*.ttf ~/.local/share/fonts/ && fc-cache -f > /dev/null
+      - uses: actions/download-artifact@v4
+        with:
+          path: trechos
+          merge-multiple: true
+      - name: Closes dos círculos de zoom
+        run: python canal/lince/${{ inputs.cena }} "$PWD/zooms" 1000 48 zoom:compressor zoom:capilar zoom:evaporador > zoom.log 2>&1 || (tail -30 zoom.log; exit 1)
+      - name: Juntar e legendar
+        run: |
+          ls trechos | sort | sed "s|^|file 'trechos/|; s|$|'|" > lista.txt
+          ffmpeg -v error -y -f concat -safe 0 -i lista.txt -c copy mudo.mp4
+          mkdir -p envio
+          python canal/lince/legendas.py mudo.mp4 zooms envio/${{ inputs.nome }}.mp4
+          ffprobe -v error -show_entries format=duration -of csv=p=0 envio/${{ inputs.nome }}.mp4
+          ls -la envio
+      - name: Mandar para a Release privada do canal
+        run: |
+          gh release view lince-lunar -R "$CANAL_REPO" > /dev/null 2>&1 || gh release create lince-lunar -R "$CANAL_REPO" --prerelease \
+            --title "Lince Lunar" --notes "Vídeos de teste do Lince Lunar."
+          for i in 1 2 3; do gh release upload lince-lunar -R "$CANAL_REPO" envio/* --clobber && break; sleep 10; done
