@@ -3,10 +3,11 @@
 // - Ping pong (o seu dinheiro): progresso/macros.json do repositório privado, que o app envia a cada sincronização.
 // - Ideias (WhatsApp e YouTube): ideias/ do repositório privado, gravadas pelas tarefas das 5h.
 // O token fica só neste navegador (o mesmo da Máquina no computador). Nada daqui grava no repositório.
-import { temToken, salvarConfig, esquecer, configPC, baixarTexto, listar } from "./js/dados.js";
+import { temToken, salvarConfig, esquecer, configPC, baixarTexto } from "./js/dados.js";
 
 const BASE = window.PLACAR_BASE || "https://raw.githubusercontent.com/Kimijoao77/radar-hyperliquid/main/saida/";
-const ARQS = ["copia_fiel", "grade", "cofres", "concentradas", "apostas", "listagens"];
+// 11/11: "ideias" = os testes que o Claude cria a partir das ideias dos vídeos (lab/ideias no radar-hyperliquid)
+const ARQS = ["copia_fiel", "grade", "cofres", "concentradas", "apostas", "listagens", "ideias"];
 const CDI_AO_ANO = 0.1365;            // Selic 13,75 % (Copom de 04/11/2026) menos 0,10: o mesmo do app
 const ABAS = [["geral", "Visão geral"], ["pingpong", "Ping pong"], ["placar", "Placar"], ["ideias", "Ideias"]];
 const BANCOS = { mp: "Mercado Pago", astro: "AstroPay", "99": "99Pay", "": "sem destino" };
@@ -236,6 +237,21 @@ function montarPlacar(d) {
       curva: [[lv.inicio, 0], [d.listagens.gerado || Date.now(), rs.length ? media(rs) : 0]],
       numeros: [["Resultado (média)", pct(rs.length ? media(rs) : 0)], ["Operações ao vivo", String((lv.operacoes || []).length)]], itens: [] });
   }
+  // testes das ideias dos vídeos: cada um traz a página dele (guia) e o vídeo de onde veio
+  for (const ti of d.ideias?.testes || []) {
+    if (!ti?.id || ti.capital == null || ti.desde == null) continue;
+    const id = `ideia_${ti.id}`, cap = ti.capital || 1000, g = ti.guia || {}, m = ti.moeda || "US$";
+    const dinheiro = (v) => `${m} ${Number(v).toLocaleString("pt-BR", { maximumFractionDigits: Math.abs(v) < 10 ? 4 : 2 })}`;
+    INFO[id] = { onde: (g.onde || []).join(", ") || "simulação", risco: g.risco || 3, oque: ti.como || "", ganha: g.ganha || "Quando a ideia do vídeo funciona com os preços de verdade.",
+      perde: g.perde || "Quando a ideia não funciona, ou os custos comem o ganho.", origem: ti.origem || {} };
+    out.push({ id, ideia: true, nome: `${ti.nome || ti.id}${ti.parado ? " (parado)" : ""}`, como: `Ideia de vídeo · ${ti.como || ""}`, desde: ti.desde, retorno: ti.retorno ?? 0,
+      curva: [[ti.desde, 0], ...(ti.curva || []).map(([t, v]) => [t, v / cap - 1])],
+      numeros: [["Resultado", pct(ti.retorno ?? 0)], ["Saldo de mentira", dinheiro(ti.saldo ?? cap)], ["Taxas pagas", dinheiro(ti.taxas || 0)], ["Rendimentos e custos", dinheiro(ti.creditos || 0)]],
+      itens: Object.entries(ti.posicoes || {}).map(([a, p]) => ({ nome: a, r: 0, sub: `${p.lado === "venda" ? "vendido" : "comprado"} · preço médio ${dinheiro(p.preco_medio)}` })),
+      ops: (ti.ops || []).map(o => ({ t: o.t, titulo: `${{ compra: "Comprou", venda: "Vendeu", venda_descoberto: "Vendeu a descoberto", recompra: "Recomprou", credito: "Recebeu", custo: "Pagou" }[o.tipo] || o.tipo} ${o.ativo || dinheiro(Math.abs(o.valor || 0))}`,
+        sub: [o.ativo && o.valor != null ? dinheiro(o.valor) : "", o.preco ? `preço ${dinheiro(o.preco)}` : "", o.obs].filter(Boolean).join(" · ") })),
+      nota: [ti.nota, ti.erro ? `Erro: ${ti.erro}` : ""].filter(Boolean).join(" · ") });
+  }
   return out.filter(t => Number.isFinite(t.retorno)).sort((a, b) => b.retorno - a.retorno);
 }
 
@@ -263,10 +279,8 @@ async function carregar() {
   const json = async (c) => { const t = await baixarTexto(c); return t ? JSON.parse(t) : null; };
   const pp = json("progresso/macros.json").then(m => { D.pp = pingPong(m); }).catch(e => D.erros.push(`Ping pong: ${e.message}`));
   const ideias = json("ideias/whatsapp/ultimas.json").then(x => { D.ideias = x; }).catch(e => D.erros.push(`Ideias do WhatsApp: ${e.message}`));
-  const yt = listar("ideias/youtube/videos").then(async (fs) => {
-    const js = fs.filter(f => f.nome.endsWith(".json")).slice(-40);
-    D.yt = (await Promise.all(js.map(f => json(f.caminho).catch(() => null)))).filter(Boolean).sort((a, b) => String(b.visto_em || "").localeCompare(String(a.visto_em || "")));
-  }).catch(e => D.erros.push(`Ideias do YouTube: ${e.message}`));
+  // 11/11: um arquivo só (resumo.py) com todos os vídeos assistidos, o potencial do Gemini e o veredito do Claude
+  const yt = json("ideias/youtube/resumo.json").then(r => { D.ytResumo = r; D.yt = r?.videos || []; }).catch(e => D.erros.push(`Ideias do YouTube: ${e.message}`));
   const mercado = fetch("https://api.hyperliquid.xyz/info", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "metaAndAssetCtxs" }) })
     .then(r => r.ok ? r.json() : null).then(j => {
       if (!j) return;
@@ -325,7 +339,7 @@ function tabelaRanking(t) {
 function telaGeral() {
   if (!D.quando) { tela.innerHTML = carregando(); return; }
   const p = D.pp, t = D.placar || [], prox = proximoCiclo();
-  const ideiasHoje = D.ideias?.dias?.[0], ytTestar = (D.yt || []).filter(v => v.claude?.veredito === "testar");
+  const ideiasHoje = D.ideias?.dias?.[0], ytTestar = (D.yt || []).filter(v => ["testar", "apresentar", "automatizado"].includes(v.claude?.veredito));
   const falhas = (p?.eventos || []).filter(e => e.tipo === "falha" && Date.now() - Date.parse(e.quando) < 3 * 86400000);
   const ult = p?.dias?.filter(d => d.lucro != null).at(-1);
   tela.innerHTML = `${erros()}
@@ -341,7 +355,7 @@ function telaGeral() {
       ${tile("Lucro em 30 dias", p?.mes != null ? reais(p.mes, true) : "—", p ? `${p.dias.filter(d => d.lucro != null).length} dias registrados` : "", cls(p?.mes))}
       ${tile("Melhor teste do Placar", t[0] ? pct(t[0].retorno) : "—", t[0] ? `${esc(t[0].nome)}, em ${emDias(t[0].desde)}` : "", cls(t[0]?.retorno))}
       ${tile("Testes no positivo", `${t.filter(x => x.retorno > 0).length} de ${t.length}`, `${t.filter(x => x.retorno > cdi(x.desde)).length} batendo o CDI no mesmo período`)}
-      ${tile("Ideias que passaram na régua", String((ideiasHoje?.ideias?.length || 0) + ytTestar.length), ideiasHoje ? `WhatsApp de ${diaBR(ideiasHoje.dia)} e vídeos para testar` : "")}
+      ${tile("Ideias que passaram na régua", String((ideiasHoje?.ideias?.length || 0) + ytTestar.length), ideiasHoje ? `WhatsApp de ${diaBR(ideiasHoje.dia)} e vídeos com potencial` : "")}
     </div>
     <div class="iv-grade g-21 iv-sec">
       <section class="iv-card"><h2>Saldo do ping pong</h2><p class="sub">Saldo no fim de cada dia (o que o app registrou).</p>
@@ -452,14 +466,14 @@ function telaPlacar() {
   if (!t.length) { tela.innerHTML = `${erros()}<p class="iv-vazio">O Placar não respondeu agora.</p>`; return; }
   const sel = t.find(x => x.id === testeAberto) || t[0]; testeAberto = sel.id;
   const ref = cdi(sel.desde);
-  tela.innerHTML = `<div class="iv-titulo"><h1>Placar</h1><p>Cada teste começa com US$ 1.000 de mentira e segue os preços de verdade. O CDI tracejado é a renda fixa no mesmo período.</p></div>${erros()}
+  tela.innerHTML = `<div class="iv-titulo"><h1>Placar</h1><p>Cada teste começa com dinheiro de mentira (US$ 1.000, ou R$ nas ideias da bolsa) e segue os preços de verdade. O CDI tracejado é a renda fixa no mesmo período.</p></div>${erros()}
     <div class="iv-grade g-12">
       <div class="iv-testes" role="list">${t.map(x => `<button class="iv-teste" data-t="${x.id}" aria-pressed="${x.id === sel.id}"><span><b>${esc(x.nome)}</b><small>${esc(x.como)}</small><small>${emDias(x.desde)} · desde ${dataCurta(x.desde)}</small></span>${spark(x.curva)}<span class="r ${cls(x.retorno)}">${pct(x.retorno)}</span></button>`).join("")}</div>
       <div>
         <section class="iv-card"><h2>${esc(sel.nome)}</h2><p class="sub">${esc(sel.como)} · desde ${dataCurta(sel.desde)} · o CDI rendeu ${pct(ref)} no mesmo período</p>
           ${grafLinha([{ nome: sel.nome, pts: sel.curva, zero: true }, { nome: "CDI", ref: true, pts: [0, .25, .5, .75, 1].map(k => sel.desde + (Math.max(...sel.curva.map(p => p[0])) - sel.desde) * k).map(tt => [tt, cdi(sel.desde, tt)]) }], { altura: 320, W: 860 })}</section>
         ${INFO[sel.id] ? `<section class="iv-card iv-sec iv-sobre"><h2>Como funciona <span class="iv-selo r${INFO[sel.id].risco}">risco ${RISCO[INFO[sel.id].risco]}</span> <span class="iv-selo">${esc(INFO[sel.id].onde)}</span></h2>
-          <p>${esc(INFO[sel.id].oque)}</p><div class="iv-grade g2"><div><small>Ganha</small><p>${esc(INFO[sel.id].ganha)}</p></div><div><small>Perde</small><p>${esc(INFO[sel.id].perde)}</p></div></div>
+          <p>${esc(INFO[sel.id].oque)}</p>${INFO[sel.id].origem?.video_id ? `<p>Ideia do vídeo <a href="https://www.youtube.com/watch?v=${encodeURIComponent(INFO[sel.id].origem.video_id)}" target="_blank" rel="noopener">${esc(INFO[sel.id].origem.titulo || "no YouTube")}</a> (${esc(INFO[sel.id].origem.canal || "")}${INFO[sel.id].origem.minuto ? `, a partir de ${esc(INFO[sel.id].origem.minuto)}` : ""}): o Gemini assistiu e o Claude transformou neste teste.</p>` : ""}${sel.nota ? `<p class="iv-nota">${esc(sel.nota)}</p>` : ""}<div class="iv-grade g2"><div><small>Ganha</small><p>${esc(INFO[sel.id].ganha)}</p></div><div><small>Perde</small><p>${esc(INFO[sel.id].perde)}</p></div></div>
           <p class="iv-nota">Contra o CDI no mesmo período: <b class="${cls(sel.retorno - ref)}">${pct(sel.retorno - ref).replace("%", " pontos")}</b>. Com ${emDias(sel.desde)} de teste, ainda é cedo para comparar com a régua de 45% ao ano.</p></section>` : ""}
         <div class="iv-grade g4 iv-sec">${sel.numeros.map(([r, v]) => tile(r, `<span class="num">${esc(v)}</span>`, "", v.startsWith("+") ? "pos" : v.startsWith("−") ? "neg" : "")).join("")}</div>
         ${sel.itens.length ? `<section class="iv-card iv-sec"><h2>Por dentro</h2><table class="iv-tab"><thead><tr><th>Item</th><th class="n">Resultado</th></tr></thead><tbody>
@@ -474,20 +488,23 @@ function telaPlacar() {
 function telaIdeias() {
   if (!D.quando) { tela.innerHTML = carregando(); return; }
   const dias = D.ideias?.dias || [], yt = D.yt || [];
-  const VER = { testar: "testar", ja_testamos: "já testamos", info: "informação", nao_vale: "não vale" };
-  const ys = yt.filter(v => filtroYT === "todos" || (filtroYT === "sem" ? !v.claude : v.claude?.veredito === filtroYT));
+  const VER = { apresentar: "para você decidir", automatizado: "virou teste", testar: "testar", ja_testamos: "já testamos", info: "informação", descartado: "descartado", nao_vale: "não vale" };
+  const grupo = (v) => v.claude?.veredito || (v.potencial ? "esperando" : v.potencial === false ? "sem_potencial" : "esperando");
+  const FILTROS = { todos: "Todos", apresentar: "Para você decidir", automatizado: "Viraram teste", esperando: "Esperando o Claude", descartados: "Descartados" };
+  const ys = yt.filter(v => filtroYT === "todos" ? v.potencial !== false || v.claude : filtroYT === "descartados" ? ["descartado", "nao_vale", "sem_potencial"].includes(grupo(v)) : filtroYT === "apresentar" ? ["apresentar", "testar"].includes(grupo(v)) : grupo(v) === filtroYT);
+  const R = D.ytResumo, k = R?.contagem || {};
   tela.innerHTML = `<div class="iv-titulo"><h1>Ideias</h1><p>O que o buscador achou nos grupos de finanças do WhatsApp e nos vídeos do YouTube, pela régua de 45 % ao ano ou mais.</p></div>${erros()}
     <div class="iv-grade g2">
       <section class="iv-card"><h2>WhatsApp</h2><p class="sub">Leitura das 5h${D.ideias?.atualizado ? `, atualizada em ${dataHora(Date.parse(D.ideias.atualizado))}` : ""}.</p>
         ${dias.length ? dias.map(d => `<div class="iv-ideia"><h3>${diaBR(d.dia)} <small>${(d.mensagens || 0).toLocaleString("pt-BR")} mensagens lidas</small></h3>
           ${d.ideias?.length ? d.ideias.map(i => `<div class="iv-ideia"><h3>${esc(i.titulo)} <span class="iv-selo ${/golpe/i.test(i.rende) ? "golpe" : /aviso/i.test(i.rende) ? "aviso" : "testar"}">${esc(i.rende)}</span>${i.risco ? `<span class="iv-selo">risco ${["", "baixo", "médio", "alto", "muito alto"][i.risco] || i.risco}</span>` : ""}</h3>
             <p>${esc(i.resumo)}</p>${i.acao ? `<p><b>O que fazer:</b> ${esc(i.acao)}</p>` : ""}<small>${esc(i.grupo)}</small></div>`).join("") : `<p class="iv-nota">${esc(d.nada || "Nada novo.")}</p>`}</div>`).join("") : "<p class='iv-vazio'>Nenhuma leitura ainda.</p>"}</section>
-      <section class="iv-card"><h2>YouTube</h2><p class="sub">Os vídeos que o Gemini separou e o veredito do Claude.</p>
-        <div class="iv-filtros">${["todos", "testar", "ja_testamos", "info", "nao_vale", "sem"].map(k => `<button data-yt="${k}" aria-pressed="${filtroYT === k}">${{ todos: "Todos", sem: "Sem veredito", ...VER }[k]}</button>`).join("")}</div>
+      <section class="iv-card"><h2>YouTube</h2><p class="sub">Todo dia à 01h o Gemini assiste os vídeos novos dos canais e, com o que sobra do limite, os antigos. Às 5h o Claude confere os que têm potencial: descarta, vira teste no Placar ou vai para você decidir.${R ? ` ${(k.assistidos || 0).toLocaleString("pt-BR")} assistidos, ${(k.com_potencial || 0).toLocaleString("pt-BR")} com potencial, ${(R.na_fila || 0).toLocaleString("pt-BR")} na fila.` : ""}</p>
+        <div class="iv-filtros">${Object.keys(FILTROS).map(f => `<button data-yt="${f}" aria-pressed="${filtroYT === f}">${FILTROS[f]}</button>`).join("")}</div>
         ${ys.length ? ys.map(v => `<div class="iv-ideia"><h3>${v.id ? `<a href="https://www.youtube.com/watch?v=${encodeURIComponent(v.id)}" target="_blank" rel="noopener" style="color:inherit">${esc(v.titulo)}</a>` : esc(v.titulo)}
-          ${v.claude ? `<span class="iv-selo ${v.claude.veredito}">${esc(VER[v.claude.veredito] || v.claude.veredito)}</span>` : `<span class="iv-selo">sem veredito</span>`}</h3>
+          ${v.claude ? `<span class="iv-selo ${["apresentar", "automatizado"].includes(v.claude.veredito) ? "testar" : v.claude.veredito === "descartado" ? "nao_vale" : v.claude.veredito}">${esc(VER[v.claude.veredito] || v.claude.veredito)}</span>` : v.potencial === false ? `<span class="iv-selo">sem potencial</span>` : `<span class="iv-selo">esperando o Claude</span>`}${v.tipo === "novo" ? ` <span class="iv-selo">vídeo novo</span>` : ""}</h3>
           <small>${esc(v.canal || "")}${v.claude?.rende ? ` · ${esc(v.claude.rende)}` : ""}</small>
-          <p>${esc(v.claude?.frase || v.gemini?.resumo || v.motivo || "")}</p></div>`).join("") : "<p class='iv-vazio'>Nenhum vídeo nesse filtro.</p>"}</section>
+          <p>${esc(v.claude?.frase || v.por_que || "")}</p>${v.claude?.acao ? `<p><b>O que dá para fazer:</b> ${esc(v.claude.acao)}</p>` : ""}</div>`).join("") : "<p class='iv-vazio'>Nenhum vídeo nesse filtro.</p>"}</section>
     </div>`;
   tela.querySelectorAll("[data-yt]").forEach(b => b.onclick = () => { filtroYT = b.dataset.yt; telaIdeias(); });
 }
