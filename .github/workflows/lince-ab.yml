@@ -1,0 +1,107 @@
+# Lince Lunar — teste A/B da voz (11/11/2026): reaproveita os quadros 3D já renderizados de uma rodada do "Lince 3D"
+# (artefatos de 1 dia) e monta os primeiros segundos do Short em várias versões de voz, para o João escolher:
+#   A  = como está (Fábio, texto original, sem trilha)
+#   B  = Fábio mais rápido e mais agudo, texto mais "falado", trilha e efeitos por código
+#   C1, C2 = outras vozes masculinas pt-BR da Speechify (as mais animadas pelo catálogo), mesmo texto, trilha e efeitos
+# Tudo vai para a Release privada "lince-lunar". Nada é postado.
+name: Lince A/B
+
+on:
+  workflow_dispatch:
+    inputs:
+      rodada:
+        description: "Id da rodada do Lince 3D com os quadros (artefatos trecho-*)"
+        required: true
+      segundos:
+        description: "Quantos segundos do começo"
+        required: false
+        default: "20.6"
+      rate:
+        description: "Ritmo da versão B/C (prosody rate)"
+        required: false
+        default: "+12%"
+      pitch:
+        description: "Tom da versão B/C (prosody pitch)"
+        required: false
+        default: "+8%"
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  CANAL_REPO: Kimijoao77/Engfy
+
+jobs:
+  ab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ secrets.ENGFY_TOKEN }}
+      SPEECHIFY_API_KEY: ${{ secrets.SPEECHIFY_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CANAL_REPO }}
+          token: ${{ secrets.ENGFY_TOKEN }}
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            canal/lince
+            canal/voz.py
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Ferramentas
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg libxrender1 libxxf86vm1 libxfixes3 libxi6 libxkbcommon0 libsm6 libgl1 libcairo2-dev pkg-config > /dev/null
+          pip install -q bpy==4.2.0 pycairo numpy pillow requests scipy
+          mkdir -p ~/.local/share/fonts && cp canal/lince/fontes/*.ttf ~/.local/share/fonts/ && fc-cache -f > /dev/null
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: trecho-*
+          path: trechos
+          merge-multiple: true
+          run-id: ${{ inputs.rodada }}
+          github-token: ${{ github.token }}
+      - name: O começo do vídeo, sem legenda
+        run: |
+          ls trechos | sort | sed "s|^|file 'trechos/|; s|$|'|" > lista.txt
+          ffmpeg -v error -y -f concat -safe 0 -i lista.txt -t ${{ inputs.segundos }} -c:v libx264 -preset fast -crf 16 -pix_fmt yuv420p mudo.mp4
+          ffprobe -v error -show_entries format=duration -of csv=p=0 mudo.mp4
+      - name: Close do compressor
+        run: python canal/lince/cena_geladeira.py "$PWD/zooms" 1000 48 zoom:compressor zoom:capilar zoom:evaporador > zoom.log 2>&1 || (tail -30 zoom.log; exit 1)
+      - name: Versões
+        run: |
+          set -e
+          L=canal/lince; S=${{ inputs.segundos }}; mkdir -p envio
+          montar () {   # nome, voz, extras do narrar, com_trilha
+            nome=$1; voz=$2; extras=$3; trilha=$4
+            rm -rf v && mkdir v
+            python $L/narrar.py $S v/voz.wav v/tempos.json $voz --ate $S $extras
+            python $L/legendas.py mudo.mp4 zooms v/leg.mp4 v/tempos.json
+            if [ "$trilha" = sim ]; then
+              python $L/trilha.py $S v/tempos.json v/trilha.wav 112
+              ffmpeg -v error -y -i v/voz.wav -i v/trilha.wav -filter_complex \
+                "[1:a]volume=0.32[m];[m][0:a]sidechaincompress=threshold=0.04:ratio=5:attack=15:release=350[md];[0:a][md]amix=inputs=2:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=9[a]" \
+                -map "[a]" -ar 44100 v/audio.wav
+            else
+              cp v/voz.wav v/audio.wav
+            fi
+            ffmpeg -v error -y -i v/leg.mp4 -i v/audio.wav -map 0:v -map 1:a -c:v copy -c:a aac -b:a 192k -shortest -movflags +faststart envio/lince-ab-$nome.mp4
+            echo "pronto: $nome"
+          }
+          montar A fabio-agent "" nao
+          montar B fabio-agent "--falas $L/falas_ab.json --rate ${{ inputs.rate }} --pitch ${{ inputs.pitch }}" sim
+          outras=$(python $L/escolher_vozes.py envio/lince-ab-vozes.json 2)
+          echo "outras vozes: $outras"
+          i=1
+          for v in $outras; do
+            montar C$i "$v" "--falas $L/falas_ab.json --rate ${{ inputs.rate }}" sim || echo "a voz $v falhou"
+            i=$((i+1))
+          done
+          ls -la envio
+      - name: Mandar para a Release privada do canal
+        run: |
+          for i in 1 2 3; do gh release upload lince-lunar -R "$CANAL_REPO" envio/* --clobber && break; sleep 10; done
