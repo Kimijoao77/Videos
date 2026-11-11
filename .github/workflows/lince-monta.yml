@@ -120,7 +120,7 @@ jobs:
           echo "quadros $ini a $fim de $total"
           MARCAS=$PWD/voz/marcas.json python canal/lince/${{ inputs.cena }} "$PWD/q" ${{ inputs.largura }} ${{ inputs.amostras }} "trecho:$ini-$fim" > render.log 2>&1 || (tail -40 render.log; exit 1)
           grep -c "Saved:" render.log
-          ffmpeg -v error -y -framerate 24 -start_number $ini -i q/f%05d.png -c:v libx264 -preset medium -crf 14 -pix_fmt yuv420p \
+          ffmpeg -v error -y -framerate 24 -start_number $ini -i q/f%05d.png -vf "scale=trunc(iw/2)*2:trunc(ih/2)*2" -c:v libx264 -preset medium -crf 14 -pix_fmt yuv420p \
             trecho-$(printf %02d ${{ matrix.parte }}).mp4
       - uses: actions/upload-artifact@v4
         with:
