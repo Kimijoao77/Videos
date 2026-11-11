@@ -1,25 +1,31 @@
 # Buscador de ideias no YouTube rodando aqui (repositório público: minutos grátis). O código e os resultados ficam no
 # repositório privado Engfy (ideias/youtube/); o registro público só mostra títulos de vídeos (que já são públicos).
 # Segredos deste repositório: GEMINI_KEY (a chave do Gemini) e ENGFY_TOKEN (já existe). A lista de vídeos vem do yt-dlp.
+# 11/11: todo dia de madrugada. Primeiro os vídeos novos dos canais; depois, com o que sobrar do limite do dia do
+# Gemini, os antigos. Os novos vão para o Engfy assim que são assistidos (o Claude das 5h já acha).
 name: Ideias do YouTube
 
 on:
   workflow_dispatch:
     inputs:
       assistir:
-        description: "Quantos vídeos o Gemini assiste nesta rodada"
+        description: "Até quantos vídeos o Gemini assiste nesta rodada (para antes se acabar o limite do dia)"
         required: false
-        default: "8"
+        default: "60"
   schedule:
-    - cron: "17 6 * * 2,5"   # terça e sexta, 03:17 em Brasília: às 5h a leitura do Claude já dá o veredito dos vídeos
+    - cron: "17 4 * * *"   # 01:17 em Brasília, todo dia: às 5h a leitura do Claude dá o veredito dos que têm potencial
 
 permissions:
   contents: read
 
+concurrency:
+  group: ideias-youtube
+  cancel-in-progress: false
+
 jobs:
   buscar:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
         with:
@@ -29,11 +35,21 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install -q requests yt-dlp
-      - name: Pré-seleção e vídeos assistidos (Gemini)
+      # o yt-dlp usa o Deno para ler o YouTube de hoje (legendas); se faltar, só a transcrição fica de fora
+      - uses: denoland/setup-deno@v2
+        continue-on-error: true
+        with:
+          deno-version: v2.x
+      - run: pip install -q requests "yt-dlp[default]"
+      - name: Vídeos novos e antigos (Gemini)
         env:
           GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
-        run: python ideias/youtube/buscar.py "${{ inputs.assistir || '8' }}"
+          SALVAR_PARCIAL: "1"
+          TEMPO_MAX_MIN: "150"
+        run: |
+          git config user.name "Kimijoao77"
+          git config user.email "leclercjoao3@gmail.com"
+          python ideias/youtube/buscar.py "${{ inputs.assistir || '60' }}"
       - name: Guardar no Engfy
         if: always()
         run: |
