@@ -1,0 +1,69 @@
+# Short de teste com uma voz de API (10/11/2026): renderiza um roteiro do repositório do canal (canal/filme.py) com a
+# voz que o próprio roteiro pede (ex.: Speechify "fabio-agent") e manda o short.mp4 para a Release privada
+# "amostras-voz" do canal. Nada é postado e nada de voz fica aqui: sem artefatos.
+name: Short de teste
+
+on:
+  workflow_dispatch:
+    inputs:
+      roteiro:
+        description: "Roteiro no repositório do canal"
+        required: false
+        default: "canal/rascunhos/teste-fabio-vasa.json"
+      idioma:
+        description: "Idioma (pt ou en)"
+        required: false
+        default: "pt"
+
+permissions:
+  contents: read
+
+env:
+  CANAL_REPO: Kimijoao77/Engfy
+
+jobs:
+  short:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ secrets.ENGFY_TOKEN }}
+      SPEECHIFY_API_KEY: ${{ secrets.SPEECHIFY_API_KEY }}
+      CANAL_PUBLICO: "1"
+      ROTEIRO: ${{ inputs.roteiro }}
+      IDIOMA: ${{ inputs.idioma }}
+    steps:
+      - name: Código do canal
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CANAL_REPO }}
+          token: ${{ secrets.ENGFY_TOKEN }}
+          persist-credentials: false
+          sparse-checkout: canal
+      - name: Instalar ffmpeg e fontes
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg fonts-inter > /dev/null
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -q edge-tts pillow requests numpy num2words soundfile numba
+      - name: Recursos de mapas e cenas
+        run: |
+          mkdir -p canal/recursos
+          gh release download canal-recursos -R "$CANAL_REPO" -D canal/recursos --clobber
+      - name: Renderizar o Short
+        run: |
+          python canal/filme.py "$ROTEIRO" --saida saida --idiomas "$IDIOMA"
+          slug=$(python -c "import json,sys;print(json.load(open(sys.argv[1]))['slug'])" "$ROTEIRO")
+          mkdir -p envio
+          cp "saida/$slug/$IDIOMA/short.mp4" "envio/$IDIOMA-$slug.mp4"
+          python -c "import json,sys;m=json.load(open(sys.argv[1]));print({k:v for k,v in m.items() if k in ('duracao_short_s','checagem')})" "saida/$slug/$IDIOMA/meta.json"
+          ls -la envio
+      - name: Mandar para a Release privada do canal
+        run: |
+          gh release view amostras-voz -R "$CANAL_REPO" > /dev/null 2>&1 || gh release create amostras-voz -R "$CANAL_REPO" --prerelease \
+            --title "Amostras de voz" --notes "Amostras de voz, para comparar."
+          for i in 1 2 3; do gh release upload amostras-voz -R "$CANAL_REPO" envio/* --clobber && break; sleep 5; done
+      - name: Limpar
+        if: always()
+        run: rm -rf saida envio
