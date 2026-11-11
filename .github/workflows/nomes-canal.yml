@@ -1,0 +1,50 @@
+# Confere nomes de canal no YouTube (11/11/2026): para cada nome, se o @ já existe e quais canais aparecem na busca
+# com esse nome. Só lê páginas públicas (yt-dlp); não entra em conta nenhuma.
+name: Nomes de canal
+
+on:
+  workflow_dispatch:
+    inputs:
+      nomes:
+        description: "Nomes separados por vírgula (ex.: Kyoto Lofi, Lofi Atlas)"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  conferir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -q "yt-dlp[default]"
+      - name: Conferir
+        env:
+          NOMES: ${{ inputs.nomes }}
+        run: |
+          python - <<'PY'
+          import json, os, subprocess, urllib.parse
+          for nome in [n.strip() for n in os.environ["NOMES"].split(",") if n.strip()]:
+              handle = "".join(nome.split())
+              r = subprocess.run(["yt-dlp", "-J", "--flat-playlist", "--playlist-end", "1", f"https://www.youtube.com/@{handle}"],
+                                 capture_output=True, text=True, timeout=120)
+              if r.returncode == 0 and r.stdout.strip():
+                  j = json.loads(r.stdout)
+                  arroba = f"OCUPADO por '{j.get('channel') or j.get('title')}' ({j.get('channel_follower_count') or '?'} inscritos)"
+              else:
+                  arroba = "livre" if "does not exist" in r.stderr or "404" in r.stderr else f"? ({r.stderr.strip()[-120:]})"
+              q = urllib.parse.quote_plus(nome)
+              s = subprocess.run(["yt-dlp", "-J", "--flat-playlist", "--playlist-end", "6",
+                                  f"https://www.youtube.com/results?search_query={q}&sp=EgIQAg%253D%253D"],
+                                 capture_output=True, text=True, timeout=120)
+              achados = []
+              try:
+                  for e in json.loads(s.stdout).get("entries") or []:
+                      achados.append(f"{e.get('channel') or e.get('title')} [{e.get('channel_follower_count') or e.get('subscriber_count') or '?'}]")
+              except ValueError:
+                  achados = ["(busca falhou)"]
+              print(f"RESULTADO | {nome} | @{handle}: {arroba} | busca: {'; '.join(achados[:6]) or 'nenhum canal'}", flush=True)
+          PY
