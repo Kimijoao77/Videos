@@ -380,10 +380,12 @@ function pedirToken(erro = "") {
     <p class="iv-nota">Num computador que não é seu, toque em Sair quando terminar: o token é apagado deste navegador.</p></section>`;
   const ok = async () => {
     const r = $("#iv-repo").value.trim(), tk = $("#iv-token").value.trim();
-    if (!/^[\w.-]+\/[\w.-]+$/.test(r) || !tk) return pedirToken("Preencha o repositório (dono/nome) e o token.");
+    const aviso = (t) => { let e = $(".iv-erro", tela); if (!e) { e = document.createElement("p"); e.className = "iv-erro"; $("#iv-ok").before(e); } e.textContent = t; };
+    if (!tk) return aviso("O campo do token está vazio: cole o código github_pat_... (Ctrl+V) e toque em Entrar.");
+    if (!/^[\w.-]+\/[\w.-]+$/.test(r)) return aviso("O repositório tem que ser dono/nome, por exemplo Kimijoao77/Engfy.");
     try { const resp = await fetch(`https://api.github.com/repos/${r}`, { headers: { Authorization: `Bearer ${tk}`, Accept: "application/vnd.github+json" } });
-      if (!resp.ok) return pedirToken(resp.status === 404 ? "Repositório não encontrado com este token." : "O GitHub recusou este token."); }
-    catch { return pedirToken("Sem internet agora."); }
+      if (!resp.ok) return aviso(resp.status === 404 ? "Repositório não encontrado com este token: confira se o token tem acesso ao Kimijoao77/Engfy." : "O GitHub recusou este token: confira se copiou ele inteiro."); }
+    catch { return aviso("Sem internet agora."); }
     salvarConfig(r, tk); iniciar();
   };
   $("#iv-ok").onclick = ok; $("#iv-token").onkeydown = (e) => { if (e.key === "Enter") ok(); };
