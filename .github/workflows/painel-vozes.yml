@@ -1,6 +1,6 @@
 # Painel de vozes da Speechify (10/11/2026): baixa a amostra oficial de cada voz em português e inglês e gera o mesmo
 # trecho (sinal "Wow!") nas vozes pt-BR e nas de narração em inglês, para o painel de escolha. Os mp3 (só vozes de
-# catálogo da Speechify, nenhuma voz do canal) saem num artefato do run que expira em 1 dia.
+# catálogo da Speechify) vão para o ramo privado "painel-vozes" do repositório do canal.
 name: Painel de vozes
 
 on:
@@ -91,8 +91,12 @@ jobs:
               print(vid, "oficial" in item, "trecho" in item)
           json.dump(saida, open("painel/vozes.json", "w"), ensure_ascii=False)
           print(len(saida), "vozes no painel")
-      - uses: actions/upload-artifact@v4
-        with:
-          name: painel-vozes
-          path: painel
-          retention-days: 1
+      - name: Guardar no ramo privado 'painel-vozes' do repositório do canal
+        env:
+          TOKEN: ${{ secrets.ENGFY_TOKEN }}
+        run: |
+          cd painel
+          git init -q -b painel-vozes
+          git config user.name "fabrica"; git config user.email "fabrica@users.noreply.github.com"
+          git add -A && git commit -q -m "Painel de vozes da Speechify"
+          git push -q -f "https://x-access-token:${TOKEN}@github.com/Kimijoao77/Engfy.git" painel-vozes
