@@ -1,0 +1,98 @@
+# Vídeo longo da cabana dos robôs (pixel art 100% por código, 11/11/2026): dia -> entardecer -> noite.
+# O código fica no repositório privado do canal (canal/pixel). Os quadros saem em 20 máquinas ao mesmo tempo
+# (minutos grátis do repositório público); a última junta tudo, gera o som (também por código, nada se repete) e
+# manda o vídeo inteiro e em partes de 30 min para a Release privada "cabana-robos" do canal. Nada é postado.
+name: Cabana longa
+
+on:
+  workflow_dispatch:
+    inputs:
+      minutos:
+        description: "Duração do vídeo em minutos"
+        required: false
+        default: "120"
+
+permissions:
+  contents: read
+
+env:
+  CANAL_REPO: Kimijoao77/Engfy
+  PARTES: "20"
+
+jobs:
+  quadros:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        parte: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CANAL_REPO }}
+          token: ${{ secrets.ENGFY_TOKEN }}
+          persist-credentials: false
+          sparse-checkout: canal/pixel
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+          pip install -q numpy pillow scipy soundfile
+      - name: Renderizar o trecho
+        run: |
+          total=$(( ${{ inputs.minutos }} * 60 * 12 ))
+          ini=$(( total * ${{ matrix.parte }} / PARTES ))
+          fim=$(( total * (${{ matrix.parte }} + 1) / PARTES ))
+          ini=$(( ini / 96 * 96 )); [ ${{ matrix.parte }} -eq $(( PARTES - 1 )) ] || fim=$(( fim / 96 * 96 ))
+          echo "quadros $ini a $fim de $total"
+          cd canal/pixel && python render_trecho.py $ini $fim $total ../../trecho-$(printf %02d ${{ matrix.parte }}).mp4 $(nproc)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: trecho-${{ matrix.parte }}
+          path: trecho-*.mp4
+          retention-days: 1
+
+  juntar:
+    needs: quadros
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      GH_TOKEN: ${{ secrets.ENGFY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CANAL_REPO }}
+          token: ${{ secrets.ENGFY_TOKEN }}
+          persist-credentials: false
+          sparse-checkout: canal/pixel
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+          pip install -q numpy pillow scipy soundfile
+      - uses: actions/download-artifact@v4
+        with:
+          path: trechos
+          merge-multiple: true
+      - name: Som (por código, do dia para a noite)
+        run: cd canal/pixel && python som_longo.py $(( ${{ inputs.minutos }} * 60 )) ../../som.m4a $(nproc)
+      - name: Juntar
+        run: |
+          ls trechos | sort | sed "s|^|file 'trechos/|; s|$|'|" > lista.txt
+          ffmpeg -v error -y -f concat -safe 0 -i lista.txt -c copy video-mudo.mp4
+          ffmpeg -v error -y -i video-mudo.mp4 -i som.m4a -map 0:v -map 1:a -c copy -shortest -movflags +faststart cabana-robos-${{ inputs.minutos }}min.mp4
+          mkdir -p envio && mv cabana-robos-${{ inputs.minutos }}min.mp4 envio/
+          dur=$(( ${{ inputs.minutos }} * 60 )); i=1
+          for ((t=0; t<dur; t+=1800)); do
+            ffmpeg -v error -y -ss $t -i envio/cabana-robos-${{ inputs.minutos }}min.mp4 -t 1800 -c copy -movflags +faststart envio/cabana-robos-parte$i.mp4; i=$((i+1))
+          done
+          ls -la envio
+          ffprobe -v error -show_entries format=duration -of csv=p=0 envio/cabana-robos-${{ inputs.minutos }}min.mp4
+      - name: Mandar para a Release privada do canal
+        run: |
+          gh release view cabana-robos -R "$CANAL_REPO" > /dev/null 2>&1 || gh release create cabana-robos -R "$CANAL_REPO" --prerelease \
+            --title "Cabana dos robôs" --notes "Vídeos longos da cabana dos robôs (pixel art por código)."
+          for f in envio/*; do for i in 1 2 3; do gh release upload cabana-robos -R "$CANAL_REPO" "$f" --clobber && break; sleep 10; done; done
