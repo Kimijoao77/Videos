@@ -31,6 +31,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
+        continue-on-error: true      # sem o token, o painel de investimentos sai assim mesmo (a Máquina fica para a próxima)
         with:
           repository: Kimijoao77/Engfy
           token: ${{ secrets.ENGFY_TOKEN }}
@@ -50,12 +51,17 @@ jobs:
           set -e
           rm -rf _site && mkdir -p _site/js _site/fontes
           cp -r site/index.html site/pc.js site/pc.css site/js site/investimentos.html site/inv.js site/inv.css _site/
-          cp privado/app/www/estilo.css _site/
-          cp privado/app/www/js/maquina.js privado/app/www/js/ui.js _site/js/
-          cp privado/app/www/fontes/*.woff2 _site/fontes/
-          cp privado/app/www/fundo-curvas-*.svg _site/ || true
+          cp site/fontes/*.woff2 _site/fontes/
           pip install -q markdown
-          python3 site/pagina.py privado/canal/POSTAGEM.md _site/conectar.html "Conectar os canais" "Passo a passo para ligar o robô de postagem do Nexus aos canais do YouTube." voltar
+          if [ -f privado/app/www/estilo.css ]; then
+            cp privado/app/www/estilo.css _site/
+            cp privado/app/www/js/maquina.js privado/app/www/js/ui.js _site/js/
+            cp privado/app/www/fontes/*.woff2 _site/fontes/
+            cp privado/app/www/fundo-curvas-*.svg _site/ || true
+            python3 site/pagina.py privado/canal/POSTAGEM.md _site/conectar.html "Conectar os canais" "Passo a passo para ligar o robô de postagem do Nexus aos canais do YouTube." voltar
+          else
+            echo "::warning::Sem acesso ao repositório privado (ENGFY_TOKEN): publicando só o painel de investimentos e as páginas públicas."
+          fi
           # Página inicial, privacidade e termos: o Google pede esses links para publicar o app de postagem
           python3 site/pagina.py site/paginas/sobre.md _site/sobre.html "Nexus Canal" "A ferramenta que publica os vídeos dos canais Aqui Há Dragões e Here Be Dragons."
           python3 site/pagina.py site/paginas/privacidade.md _site/privacidade.html "Política de privacidade" "Que dados o Nexus Canal usa e o que faz com eles."
