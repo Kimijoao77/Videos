@@ -303,6 +303,60 @@ def _elevenlabs(texto, idioma, wav, voz, velocidade=1.0, modelo="eleven_multilin
     return faladas or tempos_por_pausas(wav, texto)
 
 
+def _speechify(texto, idioma, wav, voz, modelo="simba-3.5"):
+    """Speechify (segredo SPEECHIFY_API_KEY no GitHub, 10/11/2026). voz = id da voz do catálogo (ex.: fabio-agent).
+    A API devolve as marcas de fala (tempo de cada palavra); sem elas, o tempo sai pelas pausas."""
+    import base64
+    import os
+    import time
+    import requests
+    chave = os.environ.get("SPEECHIFY_API_KEY", "")
+    if not chave:
+        raise RuntimeError("falta o segredo SPEECHIFY_API_KEY")
+    corpo = {"input": texto, "voice_id": voz, "model": modelo, "language": {"pt": "pt-BR", "en": "en-US"}[idioma],
+             "audio_format": "mp3"}
+    for tentativa in range(5):
+        r = requests.post("https://api.speechify.ai/v1/audio/speech", headers={"Authorization": f"Bearer {chave}"},
+                          json=corpo, timeout=180)
+        if r.status_code == 200:
+            break
+        if r.status_code in (429, 500, 502, 503):
+            time.sleep(3 * (tentativa + 1))
+            continue
+        raise RuntimeError(f"Speechify {r.status_code}: {r.text[:300]}")
+    else:
+        raise RuntimeError(f"Speechify {r.status_code}: {r.text[:300]}")
+    marcas = None
+    if r.headers.get("content-type", "").startswith("audio"):
+        audio = r.content
+    else:
+        j = r.json()
+        audio = base64.b64decode(j.get("audio_data", ""))
+        marcas = j.get("speech_marks")
+    mp3 = wav.with_suffix(".sf.mp3")
+    mp3.write_bytes(audio)
+    _sh("ffmpeg", "-y", "-v", "error", "-i", mp3, "-ar", "44100", "-ac", "1", wav)
+    palavras = []
+
+    def achar(no):
+        if isinstance(no, dict):
+            if no.get("type") == "word" and "start_time" in no:
+                palavras.append(no)
+            for v in no.values():
+                achar(v)
+        elif isinstance(no, list):
+            for v in no:
+                achar(v)
+    achar(marcas)
+    if not palavras:
+        return tempos_por_pausas(wav, texto)
+    dur = duracao(wav)
+    fim = max(float(p.get("end_time", p["start_time"])) for p in palavras)
+    esc = 1000.0 if fim > dur * 3 else 1.0                   # milissegundos ou segundos
+    return [{"w": str(p.get("value", "")), "t": float(p["start_time"]) / esc,
+             "d": max(0.02, (float(p.get("end_time", p["start_time"])) - float(p["start_time"])) / esc)} for p in palavras]
+
+
 _MESES_EN = "January|February|March|April|May|June|July|August|September|October|November|December"
 
 
@@ -323,13 +377,20 @@ def por_extenso(texto, idioma):
     return re.sub(r"\b\d+\b", lambda m: num2words(int(m.group(0)), lang="pt_BR").replace(",", ""), texto)
 
 
-def narrar(texto, idioma, pasta, nome, offline=False, motor="edge", voz=None, velocidade=1.0):
+def narrar(texto, idioma, pasta, nome, offline=False, motor="edge", voz=None, velocidade=1.0, trocas=None):
     """Gera <pasta>/<nome>.wav. Devolve (duração, palavras com tempo, de onde veio a voz).
     motor: edge (Microsoft, grátis), kokoro (modelo aberto rodando no GitHub), google (Chirp 3 HD), elevenlabs ou
     clone (a voz do dono do canal, gerada antes por narrar_clone.py: aqui só lê o arquivo e acha o tempo das palavras);
     voz: nome (ou id) da voz no motor."""
     wav = pasta / f"{nome}.wav"
     palavras = texto.split()
+    if motor == "speechify" and not offline:
+        falado = texto
+        for de, para in (trocas or {}).items():               # "pronuncia" do roteiro: só para a voz, a legenda fica igual
+            falado = re.sub(rf"\b{re.escape(de)}\b", para, falado)
+        faladas = _speechify(falado, idioma, wav, voz)
+        dur = duracao(wav)
+        return dur, _casar(palavras, faladas, dur), f"speechify-{voz}"
     if motor == "elevenlabs" and not offline:
         faladas = _elevenlabs(texto, idioma, wav, voz, velocidade)
         dur = duracao(wav)

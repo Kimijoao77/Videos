@@ -29,7 +29,8 @@ def roteiros():
                 r = json.loads(arq.read_text(encoding="utf-8"))
             except ValueError:
                 continue
-            if r.get("formato") == "doc" and r.get("slug") and r["slug"] not in ARQUIVADOS:
+            if r.get("formato") == "doc" and r.get("slug") and r["slug"] not in ARQUIVADOS \
+                    and not r["slug"].startswith("amostra-"):     # amostras de voz e de texto não vão para o app
                 achados[r["slug"]] = f"canal/{pasta}/{arq.name}"
     return achados
 

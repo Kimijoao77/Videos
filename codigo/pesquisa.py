@@ -251,13 +251,40 @@ def analytics(idioma):
         return None
 
 
+def id_do_canal_robos(cfg, arq):
+    """Circuit Cabin (0.95.0): o canal é criado e o 1º vídeo postado na mão; quando o app marca o vídeo como postado
+    (canal/pixel/dados/postados.json), o id do canal sai do próprio vídeo e fica guardado em canais-youtube.json."""
+    r = cfg.get("robos")
+    if not isinstance(r, dict) or r.get("id"):
+        return
+    post = DADOS.parent / "pixel" / "dados" / "postados.json"
+    try:
+        urls = [x.get("url", "") for x in json.loads(post.read_text(encoding="utf-8")).values() if isinstance(x, dict)]
+    except (OSError, ValueError):
+        return
+    vids = [m.group(1) for u in urls for m in [re.search(r"(?:youtu\.be/|[?&]v=|/shorts/|/live/)([\w-]{11})", u or "")] if m]
+    if not vids:
+        return
+    it = get("videos", part="snippet", id=vids[0]).get("items", [])
+    if it:
+        r["id"] = it[0]["snippet"]["channelId"]
+        r["link"] = f"https://www.youtube.com/channel/{r['id']}"
+        arq.write_text(json.dumps(cfg, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        print("Circuit Cabin: canal", r["id"])
+
+
 def numeros():
-    """Inscritos, views e vídeos de cada canal (canal/dados/canais-youtube.json), 1 unidade de cota."""
+    """Inscritos, views e vídeos de cada canal (canal/dados/canais-youtube.json), 1 unidade de cota.
+    pt e en são os Dragões; desde 0.95.0 também lince (Lince Lunar) e robos (Circuit Cabin)."""
     arq = DADOS / "canais-youtube.json"
     if not arq.exists():
         return
     cfg = json.loads(arq.read_text(encoding="utf-8"))
-    ids = {i: cfg[i]["id"] for i in ("pt", "en") if cfg.get(i, {}).get("id")}
+    try:
+        id_do_canal_robos(cfg, arq)
+    except Exception as e:  # noqa: BLE001
+        print("id do Circuit Cabin falhou:", type(e).__name__)
+    ids = {i: cfg[i]["id"] for i in ("pt", "en", "lince", "robos") if isinstance(cfg.get(i), dict) and cfg[i].get("id")}
     if not ids:
         return
     itens = {c["id"]: c for c in get("channels", part="snippet,statistics", id=",".join(ids.values())).get("items", [])}
@@ -273,8 +300,22 @@ def numeros():
     # 0.80.0: views, curtidas e comentários de cada vídeo que o robô de postagem mandou (1 unidade a cada 50 vídeos);
     # 0.92.3: e dos Shorts deles
     post = (DADOS / "postagens.json")
-    vids = sorted({y["youtube_id"] for v in (json.loads(post.read_text(encoding="utf-8")).get("videos", {}) if post.exists() else {}).values()
-                   for x in v.values() if isinstance(x, dict) for y in (x, x.get("short") or {}) if y.get("youtube_id")})
+    vids = {y["youtube_id"] for v in (json.loads(post.read_text(encoding="utf-8")).get("videos", {}) if post.exists() else {}).values()
+            for x in v.values() if isinstance(x, dict) for y in (x, x.get("short") or {}) if y.get("youtube_id")}
+    # 0.95.0: e os do Lince Lunar e do Circuit Cabin (o app Canais mostra as views do último vídeo de cada canal)
+    for arq_c, chave in ((DADOS.parent / "lince" / "dados" / "canal.json", "videos"),):
+        try:
+            vids |= {v["youtube_id"] for v in json.loads(arq_c.read_text(encoding="utf-8")).get(chave, []) if v.get("youtube_id")}
+        except (OSError, ValueError):
+            pass
+    try:
+        for x in json.loads((DADOS.parent / "pixel" / "dados" / "postados.json").read_text(encoding="utf-8")).values():
+            m = re.search(r"(?:youtu\.be/|[?&]v=|/shorts/|/live/)([\w-]{11})", (x or {}).get("url", "") if isinstance(x, dict) else "")
+            if m:
+                vids.add(m.group(1))
+    except (OSError, ValueError):
+        pass
+    vids = sorted(vids)
     if vids:
         res["videos"] = {}
         for k in range(0, len(vids), 50):
@@ -294,7 +335,7 @@ def numeros():
         if h and t - h[-1][0] < 30 * 60:
             h = h[:-1]
         c["historico"] = (h + [[t, c["inscritos"] or 0, c["views"]]])[-400:]
-        an = analytics(idioma)
+        an = analytics(idioma) if idioma in ("pt", "en") else None
         if an is None:
             an = ((antigo.get("canais") or {}).get(idioma) or {}).get("analytics")
         if an:

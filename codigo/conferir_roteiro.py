@@ -10,7 +10,8 @@ Sai com erro (código 1) se tiver ERRO; AVISO é para olhar e decidir. As duraç
 clonada medida no Roanoke (português: 18,2 letras por segundo).
 Precisa de: pip install numpy pillow numba num2words
 """
-import json, re, sys
+import json, re, sys, unicodedata
+from collections import Counter, defaultdict
 from pathlib import Path
 
 AQUI = Path(__file__).parent
@@ -115,8 +116,8 @@ def conferir(r, arq):
         erro("checagem: uma linha por fato conferido (número, data, nome) e de onde veio")
 
     B = r.get("batidas") or []
-    if not 35 <= len(B) <= 110:
-        aviso(f"{len(B)} batidas (o Roanoke tem 64 para 6 min 48 s)")
+    if not 10 <= len(B) <= 110:
+        aviso(f"{len(B)} batidas (alvo: 50 a 75 para 7 a 10 min)")
     n_cap = 0
     for i, b in enumerate(B):
         onde = f"batida {i}"
@@ -203,13 +204,251 @@ def conferir(r, arq):
             aviso(f"não consegui medir as linhas da capa ({e})")
 
     # duração estimada
-    import voz as V
     for idioma in ("pt", "en"):
-        letras = sum(len(V.por_extenso(b["fala"][idioma], idioma)) for b in B if isinstance(b.get("fala"), dict) and b["fala"].get(idioma))
-        dur = letras / LETRAS_POR_S[idioma] + sum(float(b.get("respiro", 0.12)) for b in B) + float(r.get("cauda", 0.5))
-        print(f"{idioma}: ~{dur / 60:.1f} min ({letras} letras faladas)")
-        if idioma == "pt" and not 5.5 * 60 <= dur <= 11 * 60:
-            aviso(f"duração estimada em português {dur / 60:.1f} min (alvo: 6 a 10 min)")
+        dur = estimar_duracao(r, idioma)
+        print(f"{idioma}: ~{dur / 60:.1f} min")
+        if idioma == "pt" and len(B) >= 30 and not 6.5 * 60 <= dur <= 11 * 60:
+            aviso(f"duração estimada em português {dur / 60:.1f} min (alvo: 7 a 10 min)")
+    conferir_estilo(r)
+
+
+# ------------------------------------------------------------------ estilo (10/11/2026)
+# O dono achou os vídeos repetitivos, densos, sem pausa e com cara de texto de IA. Estas conferências acusam o que
+# causou isso no Vasa (ver "Como escrever" no ROTEIRO.md).
+FORMULAS = {                       # fórmulas de texto de IA: ERRO
+    "pt": [r"\bneste (v[ií]deo|document[aá]rio)\b", r"\bvamos (descobrir|explorar|mergulhar|desvendar|entender|conhecer)\b",
+           r"\bpara entender\b[^.?!…]*\b(precisa|precisamos|temos que)\b",
+           r"\bagora,? (a gente|n[oó]s) (pode|podemos) voltar\b", r"\bum detalhe (fazia|faz|fez) toda a diferen[cç]a\b",
+           r"\b[eé] aqui que (tudo|a hist[oó]ria)\b", r"\ba hist[oó]ria n[aã]o (termina|acaba|para) (a[ií]|por a[ií])\b",
+           r"\bmudaria (tudo )?para sempre\b", r"\bprepare-se\b", r"\bsem mais delongas\b", r"\bfique at[eé] o final\b"],
+    "en": [r"\bin this (video|documentary)\b", r"\blet'?s (dive|explore|uncover|take a (closer )?look)\b", r"\bdelve\b",
+           r"\blittle did (they|he|she|anyone) know\b", r"\bbuckle up\b", r"\bthe story doesn'?t (end|stop) there\b",
+           r"\bto understand\b[^.?!…]*\bwe (need|have) to\b", r"\bchanged? (\w+ )?forever\b", r"\bstay (tuned|until the end)\b"],
+}
+GASTAS = {                         # palavras de redação: AVISO
+    "pt": [r"\bintrigante", r"\bfascinante", r"\benigm[aá]tic", r"\bjornada\b", r"\bdesvendar", r"\bcrucia(l|is)\b",
+           r"\bfundamenta(l|is)\b", r"\bvale (lembrar|ressaltar|destacar)\b", r"\bcuriosamente\b", r"\bum[a]? verdadeir[oa]\b",
+           r"\bno cora[cç][aã]o d", r"\bacredite\b", r"\bspoiler\b", r"\bsimplesmente\b", r"\bliteralmente\b"],
+    "en": [r"\btapestry\b", r"\btestament to\b", r"\bjourney\b", r"\bunravel", r"\bfascinating\b", r"\bintriguing\b",
+           r"\benigmatic\b", r"\bit'?s worth noting\b", r"\bin the heart of\b", r"\bcrucial\b", r"\bsimply\b", r"\bliterally\b"],
+}
+TIQUES = {                         # construções que viram tique: no máximo 1 por vídeo
+    "pt": [(r"\bn[aã]o era\b[^.?!…]{0,60}[.…]\s+era\b", "Não era X. Era Y."), (r"\btalvez \w+ demais\b", "Talvez X demais.")],
+    "en": [(r"\b(it|this|that) wasn'?t\b[^.?!…]{0,60}[.…]\s+it was\b", "It wasn't X. It was Y."), (r"\bmaybe too \w+\b", "Maybe too X.")],
+}
+PARADAS = {
+    "pt": "a o os as um uma uns umas de do da dos das em no na nos nas num numa por pelo pela pelos pelas para pra pro com "
+          "sem e ou mas que se ele ela eles elas lhe isso isto esse essa este esta aquele aquela foi era e ser ter tinha tem "
+          "ha ja nao mais muito muita bem so tambem quando como onde quem qual seu sua seus suas dele dela ao aos ate ainda "
+          "depois antes entao ai la aqui ali eu voce a gente nos ia vai vao estava estavam".split(),
+    "en": "a an the of to in on at by for with without and or but that this these those it its he she they them his her "
+          "their was were is are be been had has have not no more very so just also when how where who which as from into "
+          "out up then there here still after before you we".split(),
+}
+NUMEROS = {
+    "pt": set("dois duas tres quatro cinco seis sete oito nove dez onze doze treze catorze quatorze quinze dezesseis "
+              "dezessete dezoito dezenove vinte trinta quarenta cinquenta sessenta setenta oitenta noventa cem cento "
+              "duzentos duzentas trezentos trezentas quatrocentos quinhentos seiscentos setecentos oitocentos novecentos "
+              "mil milhao milhoes bilhao bilhoes duzia".split()),
+    "en": set("two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen "
+              "eighteen nineteen twenty thirty forty fifty sixty seventy eighty ninety hundred thousand million billion "
+              "dozen".split()),
+}
+TONS_ROTEIRO = {"narra", "tenso", "impacto", "leve"}
+PAUSA_FRASE = 0.55                 # pausa entre frases no ritmo natural (a do dono, medida na gravação: ~0,5 a 0,7 s)
+
+
+def _sem_acento(txt):
+    t = unicodedata.normalize("NFD", txt.lower())
+    return "".join(c for c in t if unicodedata.category(c) != "Mn")
+
+
+def tokens(txt):
+    return re.findall(r"[a-z0-9]+", _sem_acento(txt))
+
+
+def frases_de(txt):
+    return [x for x in re.split(r"(?<=[.?!…])\s+", txt.strip()) if x.strip()]
+
+
+def contar_numeros(txt, idioma):
+    """Números e datas falados (uma data inteira, "10 de agosto de 1628", conta como um)."""
+    t = re.sub(r"\b\d{1,2} de \w+ de \d{3,4}\b", " 0 ", txt)
+    t = re.sub(r"\b[A-Z][a-z]+ \d{1,2}, \d{3,4}\b", " 0 ", t)
+    n = len(re.findall(r"\d[\d.,]*", t))
+    seguidos = False
+    for w in tokens(re.sub(r"\d[\d.,]*", " ", t)):
+        if w in NUMEROS[idioma]:
+            n += 0 if seguidos else 1
+            seguidos = True
+        elif w not in ("e", "and"):
+            seguidos = False
+    return n
+
+
+def nomes_de(txt):
+    """Nomes próprios (palavras com maiúscula fora do começo da frase; seguidas contam como um nome)."""
+    out = []
+    for f in re.split(r"(?<=[.?!…:])\s+", txt.strip()):
+        atual = []
+        for k, w in enumerate(f.split()):
+            w2 = w.strip(",;:()\"'“”‘’.?!…")
+            if k > 0 and w2[:1].isupper() and not w2.isupper():
+                atual.append(w2)
+                if re.search(r"[,;:.?!…]$", w):
+                    out.append(" ".join(atual))
+                    atual = []
+            elif atual:
+                out.append(" ".join(atual))
+                atual = []
+        if atual:
+            out.append(" ".join(atual))
+    return [x for x in out if x not in ("Sua Majestade", "Majestade", "Deus")]
+
+
+def estimar_duracao(r, idioma):
+    """Segundos de vídeo: fala (letras por segundo da voz) + pausas entre as frases (ritmo natural) + respiros."""
+    import voz as V
+    natural = (r.get("voz") or {}).get("ritmo") == "natural"
+    padrao = 0.5 if natural else 0.12
+    total = float(r.get("cauda", 0.5))
+    for b in r.get("batidas") or []:
+        fala = L(b.get("fala") or {}, idioma) or ""
+        total += len(V.por_extenso(fala, idioma)) / LETRAS_POR_S[idioma] + float(b.get("respiro", padrao))
+        if natural and idioma == "pt":
+            total += PAUSA_FRASE * max(0, len(frases_de(fala)) - 1)
+    return total
+
+
+def conferir_estilo(r):
+    B = [b for b in r.get("batidas") or [] if isinstance(b.get("fala"), dict)]
+    if not B:
+        return
+    voz = r.get("voz") or {}
+    if voz.get("ritmo") != "natural":
+        aviso('voz: use "ritmo": "natural" (frases com pausas e tom por batida; desde 10/11/2026)')
+    tons = [b.get("tom", "narra") for b in B]
+    for i, t in enumerate(tons):
+        if t not in TONS_ROTEIRO:
+            erro(f"batida {i}: tom {t!r} (use {', '.join(sorted(TONS_ROTEIRO))})")
+    if len(B) >= 30 and sum(t != "narra" for t in tons) < 0.1 * len(B):
+        aviso(f"só {sum(t != 'narra' for t in tons)} batidas com tom diferente de narra: marque tenso, impacto ou leve onde a história pede (1 de cada 4 ou 5)")
+    for idioma in ("pt", "en"):
+        falas = [L(b["fala"], idioma) or "" for b in B]
+        for i, f in enumerate(falas):
+            for rx in FORMULAS[idioma]:
+                m = re.search(rx, f, re.I)
+                if m:
+                    erro(f"batida {i} ({idioma}): fórmula de texto de IA: {m.group(0)!r}")
+            for rx in GASTAS[idioma]:
+                m = re.search(rx, f, re.I)
+                if m:
+                    aviso(f"batida {i} ({idioma}): palavra de redação {m.group(0)!r} (fale como gente)")
+        tudo = " ".join(falas)
+        for rx, nome in TIQUES[idioma]:
+            n = len(re.findall(rx, tudo, re.I))
+            if n > 1:
+                aviso(f"{idioma}: a construção {nome!r} aparece {n} vezes (no máximo 1 por vídeo)")
+        # repetição: trechos de 4 palavras em batidas diferentes
+        onde = defaultdict(set)
+        for i, f in enumerate(falas):
+            ts = tokens(f)
+            for k in range(len(ts) - 3):
+                g = ts[k:k + 4]
+                if sum(w not in PARADAS[idioma] for w in g) >= 2:
+                    onde[" ".join(g)].add(i)
+        rep = sorted(((g, sorted(v)) for g, v in onde.items() if len(v) >= 2), key=lambda x: (-len(x[1]), x[1]))
+        juntos = []                                       # "a b c d" e "b c d e" nas mesmas batidas = um trecho só
+        for g, v in rep:
+            if not any(set(v) == set(v2) and (g.split()[:3] == g2.split()[1:] or g.split()[1:] == g2.split()[:3]) for g2, v2 in juntos):
+                juntos.append((g, v))
+        for g, v in juntos[:8]:
+            (erro if len(v) >= 3 else aviso)(f"{idioma}: repetido nas batidas {', '.join(map(str, v))}: \"{g}\"")
+        if len(juntos) >= 6:
+            erro(f"{idioma}: {len(juntos)} trechos repetidos: o texto está repetitivo (conte cada coisa uma vez)")
+        # gancho recontado depois do título
+        k_tit = next((i for i, b in enumerate(B) if b.get("cena") == "titulo"), None)
+        if k_tit:
+            conteudo = lambda f: {w for w in tokens(f) if w not in PARADAS[idioma] and len(w) >= 5}  # noqa: E731
+            gancho = [conteudo(f) for f in falas[:k_tit]]
+            for i in range(k_tit + 1, len(falas)):
+                c = conteudo(falas[i])
+                for j, g in enumerate(gancho):
+                    comuns = c & g
+                    if len(comuns) >= 3:
+                        aviso(f"{idioma}: a batida {i} conta de novo a batida {j} do gancho ({', '.join(sorted(comuns))}): mostre o que o gancho não mostrou")
+                        break
+        # densidade: números, nomes, perguntas
+        nums = [contar_numeros(f, idioma) for f in falas]
+        for i, n in enumerate(nums):
+            if n >= 3:
+                erro(f"batida {i} ({idioma}): {n} números ou datas numa fala só (no máximo 1)")
+        if sum(nums) > 35:
+            erro(f"{idioma}: {sum(nums)} números e datas no vídeo (alvo: até 25; arredonde e corte os que não mudam a história)")
+        elif sum(nums) > 25:
+            aviso(f"{idioma}: {sum(nums)} números e datas no vídeo (alvo: até 25)")
+        if idioma == "pt":
+            por_batida = [set(nomes_de(f)) for f in falas]
+            for i, ns in enumerate(por_batida):
+                if len(ns) >= 3:
+                    aviso(f"batida {i}: {len(ns)} nomes próprios numa fala ({', '.join(sorted(ns))})")
+            todos = set().union(*por_batida)
+            if len(todos) > 18:
+                erro(f"{len(todos)} nomes próprios diferentes no vídeo (alvo: até 12; chame as pessoas pelo papel)")
+            elif len(todos) > 12:
+                aviso(f"{len(todos)} nomes próprios diferentes no vídeo (alvo: até 12): {', '.join(sorted(todos))}")
+            perguntas = tudo.count("?")
+            if perguntas > 5:
+                aviso(f"{perguntas} perguntas no texto (até 4 ou 5: a do gancho, uma ou duas no meio e a do fim)")
+            # ritmo: tamanho das frases
+            frases = [len(fr.split()) for f in falas for fr in frases_de(f)]
+            if len(frases) >= 20:
+                media = sum(frases) / len(frases)
+                dp = (sum((x - media) ** 2 for x in frases) / len(frases)) ** 0.5
+                curtas = sum(x <= 4 for x in frases) / len(frases)
+                duas = sum(len(frases_de(f)) == 2 for f in falas) / len(falas)
+                if dp / media < 0.45:
+                    aviso(f"frases todas do mesmo tamanho (variação {dp / media:.2f}; alvo acima de 0,45): misture frase bem curta com frase longa")
+                if curtas < 0.08:
+                    aviso(f"só {curtas:.0%} de frases curtas (até 4 palavras); elas dão o respiro e o impacto")
+                if duas > 0.6:
+                    aviso(f"{duas:.0%} das falas têm exatamente duas frases: o ritmo fica de fórmula")
+            # gancho cabe no Short
+            if k_tit:
+                pal = sum(len(f.split()) for f in falas[:k_tit])
+                if pal > 170:
+                    aviso(f"gancho com {pal} palavras até o título: passa de 75 s e o Short sai cortado (alvo: até 160)")
+            dur = estimar_duracao(r, "pt")
+            ppm = sum(len(f.split()) for f in falas) / max(1e-6, dur / 60)
+            print(f"ritmo: ~{ppm:.0f} palavras por minuto em português (alvo: 130 a 155; o dono lê a ~146)")
+            if ppm > 165:
+                erro(f"texto denso demais: ~{ppm:.0f} palavras por minuto (alvo: 130 a 155): corte informação ou ponha pausas")
+            elif ppm > 155:
+                aviso(f"texto um pouco denso: ~{ppm:.0f} palavras por minuto (alvo: 130 a 155)")
+            elif ppm < 115:
+                aviso(f"ritmo lento demais: ~{ppm:.0f} palavras por minuto")
+    # cenas: variedade
+    if len(B) >= 30:
+        uso = Counter(b.get("cena") for b in B if b.get("cena") not in ("titulo", "capitulo"))
+        for cena, n in uso.most_common():
+            if n > 0.25 * len(B):
+                erro(f"a cena {cena} está em {n} de {len(B)} batidas: o vídeo fica repetitivo (no máximo 1 de cada 5)")
+            elif n > 0.2 * len(B):
+                aviso(f"a cena {cena} está em {n} de {len(B)} batidas (no máximo 1 de cada 5)")
+    def quadro(b):                         # o que muda o desenho (câmera e etiquetas não contam)
+        return json.dumps({k: v for k, v in (b.get("params") or {}).items() if k not in ("etiquetas", "zoom", "pan")}, sort_keys=True)
+    seguidas = 1
+    for i in range(1, len(B) + 1):
+        if i < len(B) and B[i].get("cena") == B[i - 1].get("cena"):
+            seguidas += 1
+            continue
+        if seguidas >= 3:
+            trecho = B[i - seguidas:i]
+            iguais = any(quadro(trecho[k]) == quadro(trecho[k + 1]) == quadro(trecho[k + 2]) for k in range(len(trecho) - 2))
+            if seguidas >= 5 or iguais:
+                aviso(f"batidas {i - seguidas} a {i - 1}: a mesma cena ({trecho[0].get('cena')}) {seguidas} vezes seguidas"
+                      + (" com o mesmo desenho" if iguais else ""))
+        seguidas = 1
 
 
 def linha_do_tempo(r, idioma):
@@ -221,7 +460,7 @@ def linha_do_tempo(r, idioma):
         d = len(fala) / LETRAS_POR_S[idioma]
         ws = palavras(b["fala"][idioma])
         pals.append([{"w": x, "t": d * k / max(1, len(ws)), "d": d / max(1, len(ws))} for k, x in enumerate(ws)])
-        fim = t + d + float(b.get("respiro", 0.12))
+        fim = t + d + float(b.get("respiro", 0.5 if (r.get("voz") or {}).get("ritmo") == "natural" else 0.12))
         tl.append((t, fim))
         t = fim
     tl[-1] = (tl[-1][0], t + float(r.get("cauda", 0.5)))

@@ -12,7 +12,9 @@ Câmera: p["zoom"] = [1.0, 1.05] (aproxima devagar, com paralaxe nas paisagens),
 
 Catálogo:
   mar_navio     mar em corte (céu de papel, água turquesa com peixes e raios de luz) e o galeão indo para a ilha;
-                tempestade=True (céu escuro, chuva, relâmpagos), fumaca=x (coluna de fumaça na ilha), navio=False
+                tempestade=True (céu escuro, chuva, relâmpagos), fumaca=x (coluna de fumaça na ilha), navio=False;
+                inclina=[0, 14, 6] (o navio deitando de lado, graus ao longo da batida) e afunda=[0, 0.3, 1] (o navio
+                descendo para o fundo, fração da altura, com bolhas subindo), desde 10/11/2026
   frota         vários galeões: a Armada (bandeira), navios presos no porto (parados=True) ou batalha=True
   mapa          cartão de mapa antigo (contornos reais do Natural Earth), rota pontilhada com o navio, rosa dos ventos
   calendario    folha de calendário: dia e mês fixos, as folhas dos anos virando
@@ -557,6 +559,22 @@ def _notas(q, t, u, de=(0.95, 0.80), ate=(0.55, 0.30), n=7, cor=(0.98, 0.94, 0.8
         FX.linha(q, (x + s * 0.48, y - s * 2.0), (x + s * 1.05, y - s * 1.45), largura=2.6 * u, cor=cor, forca=a)
 
 
+def no_tempo(v, f):
+    """Valor ao longo da batida: um número fixo, ou uma lista de valores do começo ao fim (passagem suave entre eles)."""
+    if v is None:
+        return 0.0
+    if isinstance(v, (int, float)):
+        return float(v)
+    v = [float(x) for x in v]
+    if len(v) == 1:
+        return v[0]
+    x = min(max(f, 0.0), 1.0) * (len(v) - 1)
+    i = min(int(x), len(v) - 2)
+    k = x - i
+    k = k * k * (3 - 2 * k)
+    return v[i] * (1 - k) + v[i + 1] * k
+
+
 def _mar(q, t, dur, p, ctx, navios):
     """Mar em corte. navios: [{"x": (x0, x1) em fração, "tam": 0.4, "nacao", "espelho", "fundo": 0..1 (longe = menor e
     mais claro), "balanco": 1.0}]. p: tempestade, fumaca (x da coluna), ilha, ilha_x, sol."""
@@ -600,15 +618,26 @@ def _mar(q, t, dur, p, ctx, navios):
         pn = 0.32 - 0.2 * longe
         bal = float(nv_p.get("balanco", 1.0)) * (3.0 if tormenta else 1.0)
         fase = (int(t * 8) + 5 * k) % 24
-        nv = navio(int(H * nv_p.get("tam", 0.40) * cam.escala(pn)), fase, nv_p.get("nacao", "inglaterra"), bool(nv_p.get("espelho")))
-        nv = nv.rotate(math.sin(t * 1.1 + k * 1.7) * 1.6 * bal, resample=Image.BICUBIC, expand=True)
+        nv0 = navio(int(H * nv_p.get("tam", 0.40) * cam.escala(pn)), fase, nv_p.get("nacao", "inglaterra"), bool(nv_p.get("espelho")))
+        frac = t / max(dur, 1e-6)
+        incl = no_tempo(nv_p.get("inclina"), frac)                       # o navio deitando de lado (graus)
+        afund = min(1.0, max(0.0, no_tempo(nv_p.get("afunda"), frac)))   # descendo para o fundo (fração da altura)
+        ang = math.sin(t * 1.1 + k * 1.7) * 1.6 * bal * (1 - afund) + incl
+        nv = nv0.rotate(ang, resample=Image.BICUBIC, expand=True)
         xs, ys = cam.ponto(xw, nivel, pn)
-        ys += math.sin(t * 1.3 + k) * 5 * u * bal
+        ys += math.sin(t * 1.3 + k) * 5 * u * bal * (1 - afund)
         a = np.asarray(nv, np.float32) / 255.0
         if longe > 0:                                                    # longe: mais claro (ar entre nós e o navio)
             ceu = np.asarray((0.93, 0.87, 0.78) if not tormenta else (0.40, 0.42, 0.46), np.float32)
             a[..., :3] = a[..., :3] * (1 - 0.45 * longe) + ceu * 0.45 * longe
-        r = colar(q, a, xs - nv.width / 2, ys - nv.height * 0.76)
+        if incl or afund:                       # gira em volta da linha d'água (não do meio do desenho) e afunda
+            ys += afund * nv0.height * 0.95
+            r_ = math.radians(ang)
+            d = 0.26 * nv0.height
+            r = colar(q, a, xs - nv.width / 2 - d * math.sin(r_), ys - nv.height / 2 - d * math.cos(r_))
+            nv_p = dict(nv_p, _afund=afund, _xs=xs, _larg=nv0.width, _alt=nv0.height)
+        else:
+            r = colar(q, a, xs - nv.width / 2, ys - nv.height * 0.76)
         if r:
             cascos.append((r, nv_p))
     agua = dict(AGUA_DIA)
@@ -622,7 +651,14 @@ def _mar(q, t, dur, p, ctx, navios):
         m = (sub[..., 3] * (yy > tras[None, :]) * 0.42)[..., None]
         reg = q[Y0:Y0 + sub.shape[0], X0:X0 + sub.shape[1]]
         reg[:] = reg * (1 - m) + sub[..., :3] * m
-        if nv_p.get("parado"):
+        if nv_p.get("_afund", 0) > 0.02:                                # afundando: bolhas subindo do casco
+            s = np.random.default_rng(11).random((40, 4))
+            subida = (t * (60 + 50 * s[:, 2]) * u + s[:, 1] * 400 * u) % (380 * u)
+            bx = nv_p["_xs"] + (s[:, 0] - 0.5) * nv_p["_larg"] * 0.7 + 6 * u * np.sin(t * 3 + s[:, 3] * 6)
+            fundo_b = nivel + 40 * u + nv_p["_afund"] * nv_p["_alt"] * 0.8
+            FX.particulas(q, bx, fundo_b - subida, (2.0 + 4.0 * s[:, 3]) * u, np.tile([[0.85, 0.97, 0.98]], (40, 1)),
+                          0.55 * min(1.0, nv_p["_afund"] * 4) * (subida / (380 * u)))
+        if nv_p.get("parado") or nv_p.get("_afund", 0) > 0.3:
             continue
         lado = -1 if nv_p.get("espelho") else 1
         bx = X0 + sub.shape[1] * (0.93 if lado > 0 else 0.07)          # espuma na proa
@@ -671,7 +707,8 @@ def _mar(q, t, dur, p, ctx, navios):
 def mar_navio(q, t, dur, p, ctx):
     navios = []
     if p.get("navio", True):
-        navios.append({"x": p.get("x", [0.14, 0.46]), "tam": p.get("tam_navio", 0.40), "nacao": p.get("nacao", "inglaterra")})
+        navios.append({"x": p.get("x", [0.14, 0.46]), "tam": p.get("tam_navio", 0.40), "nacao": p.get("nacao", "inglaterra"),
+                       "inclina": p.get("inclina"), "afunda": p.get("afunda")})
     _mar(q, t, dur, p, ctx, navios)
 
 
@@ -1076,7 +1113,8 @@ def entalhe(q, t, dur, p, ctx):
 
 def cruz(q, t, dur, p, ctx):
     """Cartão pregado na madeira com o sinal combinado. risco_t: quando a cruz é riscada (None = não risca);
-    texto: o nome do lugar embaixo e a cruz em cima, que aparece em cruz_t."""
+    texto: o nome do lugar embaixo e a cruz em cima, que aparece em cruz_t. sinal=False (10/11/2026): sem a cruz, só
+    o texto grande no meio do cartão (e o risco por cima dele), para quando a história não tem o sinal de Roanoke."""
     H, W = q.shape[:2]
     u = H / 1080
     tf = t / max(dur, 1e-6)
@@ -1087,7 +1125,20 @@ def cruz(q, t, dur, p, ctx):
     texto = L(p.get("texto"), ctx["idioma"]) if p.get("texto") else ""
     cx, cy, r = (cw + 20) / 2, (cw + 20) / 2, cw * 0.3
     esc = 1.0
-    if texto:
+    if texto and not p.get("sinal", True):                               # só o texto, quebrado em até 3 linhas
+        palavras, linhas = texto.split(), []
+        for w_ in palavras:
+            if linhas and len(linhas[-1]) + len(w_) + 1 <= 11:
+                linhas[-1] += " " + w_
+            else:
+                linhas.append(w_)
+        tam = int(cw * (0.15 if max(len(x) for x in linhas) <= 8 else 0.12))
+        f = fonte("Black", tam)
+        for j, ln in enumerate(linhas):
+            d.text((cx, cy + (j - (len(linhas) - 1) / 2) * tam * 1.15), ln, font=f, fill=TINTA, anchor="mm")
+        r = cw * 0.3
+        esc = 0.0
+    elif texto:
         f = fonte("Black", int(cw * 0.085))
         d.text((cx, cy + r * 0.95), texto, font=f, fill=TINTA, anchor="mm")
         cy, r = cy - r * 0.32, r * 0.62

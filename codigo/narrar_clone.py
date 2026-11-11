@@ -18,6 +18,10 @@ refeita até 3 vezes se sair estranha. As falas prontas ficam na release privada
 do texto, do motor e da referência): se a geração cair no meio, a próxima rodada continua de onde parou, e mudar
 uma fala só gera ela de novo.
 
+Ritmo natural (desde 10/11/2026, "voz": {..., "ritmo": "natural"}): frase por frase, com o trecho da gravação que
+combina com o tom de cada fala, as pausas que o dono faz quando lê e o Whisper conferindo cada frase (ver
+narrar_natural e canal/ouvido.py).
+
 Uso: python canal/narrar_clone.py ROTEIRO IDIOMA SAIDA [--verificar]   (--verificar: só diz se falta alguma fala)
 """
 import hashlib
@@ -299,10 +303,10 @@ def aparar(a, sr, limiar_db=-45.0, folga=0.06):
     return a[i0:i1]
 
 
-def avaliar(a, sr, texto):
+def avaliar(a, sr, texto, minimo=1.0):
     """Problemas da fala gerada (duração fora do esperado, pausa longa demais) e uma nota (menor = melhor)."""
     dur = len(a) / sr
-    esperado = max(1.0, len(texto) / LETRAS_POR_SEGUNDO)
+    esperado = max(minimo, len(texto) / LETRAS_POR_SEGUNDO)
     razao = dur / esperado
     env, passo = _envelope(a, sr)
     fala = env > max(10 ** (-40 / 20), 0.06 * float(np.percentile(env, 95)))
@@ -343,6 +347,263 @@ def finalizar(a, sr, destino, tempo=1.0):
     bruto.unlink(missing_ok=True)
 
 
+# ------------------------------------------------------------------ ritmo natural (10/11/2026)
+# O dono do canal achou a voz linear, sem pausa e corrida: o clone falava a ~176 palavras por minuto com 19 % de
+# silêncio, e ele lê a ~146 contando as pausas. No roteiro: "voz": {..., "ritmo": "natural"} e, em cada batida,
+# "tom": narra (padrão) | tenso | impacto | leve; frase que termina em "?" ganha o tom de pergunta sozinha.
+# Cada frase é gerada sozinha, com o trecho da gravação que combina com o tom (o Whisper acha as frases da gravação,
+# canal/ouvido.py), e o Whisper confere o que a voz disse: tentativa errada é descartada e, entre as certas, fica a
+# de tom mais variado. As frases se juntam com as pausas que o dono faz quando lê (medidas na gravação).
+VERSAO_NATURAL = "n1"                      # mude para gerar de novo todas as falas do ritmo natural
+TONS = {"narra": {"ref": "viva", "exaggeration": 0.6, "cfg_weight": 0.4, "temperature": 0.8},
+        "tenso": {"ref": "tensa", "exaggeration": 0.5, "cfg_weight": 0.3, "temperature": 0.75, "tempo": 0.96},
+        "impacto": {"ref": "viva", "exaggeration": 0.85, "cfg_weight": 0.3, "temperature": 0.8},
+        "leve": {"ref": "viva", "exaggeration": 0.75, "cfg_weight": 0.45, "temperature": 0.9},
+        "pergunta": {"ref": "pergunta", "exaggeration": 0.65, "cfg_weight": 0.4, "temperature": 0.8}}
+TONS_DO_ROTEIRO = ("narra", "tenso", "impacto", "leve")
+ALVO_TOM = float(os.environ.get("VOZ_ALVO_TOM") or 2.1)   # semitons: abaixo disso a frase soa reta (tenta mais uma)
+# (o clone fica em ~2,0 a 2,3 quase sempre, então tentar de novo atrás de mais tom quase não adianta: o que deixa a
+# voz viva é o realce, feito depois; a segunda tentativa fica para as frases bem retas)
+SEMELHANCA_MIN = 0.88                      # o Whisper precisa ouvir pelo menos isso do texto (1 = igual)
+PAUSA_FIM = {".": 1.0, "?": 1.25, "!": 1.1, "…": 1.45}   # pausa depois da frase, vezes a pausa típica do dono
+FOLGA = 0.06                               # aparar() deixa 60 ms de silêncio em cada ponta da frase
+
+
+# Realce do tom (10/11/2026): o clone sai com o tom quase reto (desvio de ~2 semitons nas falas do Vasa; a voz nativa
+# em inglês tem ~4). Com "voz": {..., "realce": 3.0}, cada fala tem as subidas e descidas do tom esticadas até o alvo
+# (no máximo 1,8 vez), sem mexer no tremido fino da voz nem na duração (PSOLA do Praat). É feito ao pegar a fala (do
+# cache ou recém-gerada), então mudar o alvo não gera a voz de novo. O tom da batida ajusta o alvo e o tenso fica um
+# semitom mais grave.
+REALCE_TOM = {"narra": 0.0, "tenso": -0.4, "impacto": 0.4, "leve": 0.3}
+SEMITOM_TOM = {"tenso": -1.0}
+
+
+def realcar_tom(a, sr, alvo, semitons=0.0, maximo=1.8, janela=0.15):
+    """Devolve (áudio, fator): o contorno do tom (média de ~150 ms) esticado em volta do tom mediano até o desvio
+    chegar em `alvo` semitons; a variação fina em volta do contorno fica como estava."""
+    import parselmouth
+    from parselmouth.praat import call
+    import ouvido as O
+    t = O.tom(a, sr)
+    if t["dp"] <= 0 or t["hz"] <= 0 or (t["dp"] >= alvo and abs(semitons) < 0.05):
+        return a, 1.0
+    snd = parselmouth.Sound(np.asarray(a, np.float64), sampling_frequency=sr)
+    man = call(snd, "To Manipulation", 0.01, 65, 420)
+    tier = call(man, "Extract pitch tier")
+    n = int(call(tier, "Get number of points"))
+    if n < 5:
+        return a, 1.0
+    ts = np.array([call(tier, "Get time from index", i) for i in range(1, n + 1)])
+    lg = np.log2([call(tier, "Get value at index", i) for i in range(1, n + 1)])
+    med = math.log2(t["hz"])
+    bom = np.abs(12 * (lg - med)) < 9                   # pulos de oitava do detector ficam de fora (o Praat interpola)
+    ts, lg = ts[bom], lg[bom]
+    if len(ts) < 5:
+        return a, 1.0
+    suave = np.array([lg[np.abs(ts - x) <= janela / 2].mean() for x in ts])
+    v_suave, v_fino = float(np.var(suave - med)), float(np.var(lg - suave))
+    parte = v_suave / max(1e-9, v_suave + v_fino)        # quanto da variação é contorno (o resto é tremido fino)
+    # desvio depois ≈ dp · raiz(parte·k² + 1 − parte): acha o k que leva ao alvo
+    k = math.sqrt(max(0.0, (alvo / t["dp"]) ** 2 - (1 - parte)) / parte) if parte > 0.05 else 1.0
+    k = min(maximo, max(1.0, k))
+    if k < 1.03 and abs(semitons) < 0.05:
+        return a, 1.0
+    novo = 2 ** (med + (suave - med) * k + (lg - suave) + semitons / 12)
+    nt = call("Create PitchTier", "realce", snd.xmin, snd.xmax)
+    for x, f in zip(ts, novo):
+        call(nt, "Add point", float(x), float(min(450.0, max(55.0, f))))
+    call([nt, man], "Replace pitch tier")
+    out = call(man, "Get resynthesis (overlap-add)")
+    return np.asarray(out.values[0], np.float32)[: len(a)], k
+
+
+def realcar_arquivo(arq, alvo, tom="narra"):
+    """Realce do tom numa fala pronta (wav de finalizar), no lugar. Devolve (desvio antes, desvio depois, fator)."""
+    import soundfile as sf
+    import ouvido as O
+    a, sr = sf.read(str(arq), dtype="float32")
+    antes = O.tom(a, sr)["dp"]
+    b, k = realcar_tom(a, sr, alvo + REALCE_TOM.get(tom, 0.0), SEMITOM_TOM.get(tom, 0.0))
+    depois = O.tom(b, sr)["dp"]
+    if k > 1.0 and depois < antes:              # fala curta com o tom mal medido: o realce piorou, fica a original
+        return antes, antes, 1.0
+    pico = float(np.abs(b).max()) or 1.0
+    if pico > 0.98:
+        b = b * (0.98 / pico)
+    sf.write(str(arq), b, sr, subtype="PCM_16")
+    return antes, depois, k
+
+
+def gravacao_original():
+    """A gravação do dono como veio (o hash dela entra na chave das falas: não muda com versão do ffmpeg)."""
+    refs = Path(os.environ.get("REFS", AQUI / "vozes" / "ref"))
+    nome = os.environ.get("REF", "joao")
+    gravs = sorted(p for p in refs.glob(f"{nome}.*") if p.suffix.lower() != ".txt")
+    if not gravs:
+        sys.exit(f"não achei a gravação {nome}.* em {refs}")
+    return gravs[0]
+
+
+def dividir_frases(texto):
+    return [x.strip() for x in re.split(r"(?<=[.?!…])\s+", texto.strip()) if x.strip()]
+
+
+def tom_da_frase(frase, tom_batida):
+    if frase.rstrip().endswith("?") and tom_batida in ("narra", "leve"):
+        return "pergunta"
+    return tom_batida
+
+
+def chave_natural(motor, h_grav, idioma, tom, falado):
+    return hashlib.sha1(f"{VERSAO_NATURAL}|{motor}|{h_grav}|{idioma}|{tom}|{falado}".encode()).hexdigest()[:16]
+
+
+def pausa_depois(frase, tipica, rng):
+    """Silêncio a inserir depois da frase (sem contar as folgas que aparar() já deixou)."""
+    alvo = tipica * PAUSA_FIM.get(frase.rstrip()[-1:], 1.0) * rng.uniform(0.88, 1.12)
+    return max(0.12, alvo - 2 * FOLGA)
+
+
+def preparar_tons(est, pasta):
+    """Acha as frases da gravação com o Whisper, corta um trecho por tom e mede as pausas do dono.
+    Grava est["refs_tom"] ({tom: wav}) e est["pausas"] ({"frase": s, "virgula": s})."""
+    import ouvido as O
+    est["refs_tom"], est["pausas"] = {}, {"frase": 0.5, "virgula": 0.2}
+    if not O.disponivel():
+        _log("sem o Whisper: todos os tons usam o trecho de sempre, com pausas de 0,5 s")
+        return est
+    t0 = time.time()
+    frases, virgulas, dur = O.frases_da_gravacao(est["ref_longa"], "pt")
+    for nome, w in O.escolher_referencias(frases, dur).items():
+        est["refs_tom"][nome] = O.cortar(est["ref_longa"], w["ini"], w["fim"], pasta / f"ref-{nome}.wav")
+        _log(f"referência '{nome}': frases {w['de']} a {w['ate']} ({w['fim'] - w['ini']:.1f}s), tom {w['dp']:.1f} st, "
+             f"{w['letras_s']:.1f} letras/s")
+    est["pausas"] = O.pausas_da_gravacao(frases, virgulas)
+    _log(f"gravação ouvida em {time.time() - t0:.0f}s: {len(frases)} frases, tom típico "
+         f"{float(np.median([f['dp'] for f in frases] or [0])):.1f} st, pausa depois de frase {est['pausas']['frase']:.2f}s, "
+         f"depois de vírgula {est['pausas']['virgula']:.2f}s")
+    return est
+
+
+def carregar_chatterbox():
+    import torch
+    torch.set_num_threads(os.cpu_count() or 2)
+    carregar_ = torch.load
+    torch.load = lambda *a, **k: carregar_(*a, **{**k, "map_location": "cpu"})
+    from chatterbox.mtl_tts import ChatterboxMultilingualTTS
+    t0 = time.time()
+    m = ChatterboxMultilingualTTS.from_pretrained(device="cpu")
+    _log(f"carregou o Chatterbox em {time.time() - t0:.0f}s")
+
+    def gerar(texto, semente, tom, est, idioma):
+        t = TONS[tom]
+        ref = est["refs_tom"].get(t["ref"]) or est["refs_tom"].get("viva") or est["ref_curta"]
+        torch.manual_seed(semente)
+        wav = m.generate(texto, language_id=idioma, audio_prompt_path=ref, exaggeration=t["exaggeration"],
+                         cfg_weight=t["cfg_weight"], temperature=t["temperature"])
+        return wav.squeeze(0).detach().cpu().numpy().astype(np.float32), m.sr
+    return gerar
+
+
+def melhor_frase(gerar, frase, tom, semente, est, idioma, ouvir):
+    """Até 3 tentativas da frase: fica a certa (duração, pausas e o Whisper) de tom mais variado."""
+    import ouvido as O
+    melhor = None
+    for tentativa in range(3):
+        a, sr = gerar(frase, semente + tentativa, tom, est, idioma)
+        a = aparar(a, sr, folga=FOLGA)
+        problemas, nota = avaliar(a, sr, frase, minimo=0.5)
+        sem = O.semelhanca(frase, O.texto(O.ouvir(a, sr, idioma)), idioma) if ouvir else None
+        if sem is not None and sem < SEMELHANCA_MIN:
+            problemas.append(f"o Whisper ouviu {sem:.0%} do texto")
+        t = O.tom(a, sr)
+        nota += len(problemas) + 4.0 * max(0.0, 0.97 - (1.0 if sem is None else sem)) - 0.3 * min(t["dp"], 4.0)
+        if melhor is None or nota < melhor["nota"]:
+            melhor = {"a": a, "sr": sr, "nota": nota, "sem": sem, "dp": t["dp"], "problemas": problemas}
+        if not problemas and (t["dp"] >= ALVO_TOM or tentativa >= 1):
+            break
+        motivo = "; ".join(problemas) or f"tom reto ({t['dp']:.1f} st)"
+        _log(f"   frase refeita ({motivo})")
+    melhor["tentativas"] = tentativa + 1
+    return melhor
+
+
+def narrar_natural(r, cfg, idioma, motor, est, tmp, verificar):
+    """O ritmo natural (só com o Chatterbox): uma fala por batida, feita de frases com pausas e tom."""
+    import random
+    import ouvido as O
+    h_grav = hashlib.sha1(gravacao_original().read_bytes()).hexdigest()[:12]
+    cache = Cache(f"canal-narracao-{r['slug']}")
+    if int(os.environ.get("VOZ_FALAS") or 0):
+        r["batidas"] = r["batidas"][:int(os.environ["VOZ_FALAS"])]
+    tons = [b.get("tom") or "narra" for b in r["batidas"]]
+    ruins = sorted({t for t in tons if t not in TONS_DO_ROTEIRO})
+    if ruins:
+        sys.exit(f"tom desconhecido: {', '.join(ruins)} (há {', '.join(TONS_DO_ROTEIRO)})")
+    chaves = [chave_natural(motor, h_grav, idioma, t, falado_de(r, b, idioma)) for b, t in zip(r["batidas"], tons)]
+    if verificar:
+        faltam = [i for i, k in enumerate(chaves) if f"{k}.wav" not in cache.ativos]
+        _log(f"ritmo natural: faltam {len(faltam)} de {len(chaves)} falas")
+        sys.exit(10 if faltam else 0)
+    _log(f"voz {motor}, ritmo natural (frases com pausas e tom por batida)")
+    gerar, ouvir, relatorio, novas, t_ini = None, False, [], 0, time.time()
+    realce = float(os.environ.get("VOZ_REALCE") or cfg.get("realce") or 0)
+
+    def realcar(i, destino, tom_b):
+        if not realce:
+            return
+        try:
+            antes, depois, k = realcar_arquivo(destino, realce, tom_b)
+            _log(f"[{i:02d}] tom realçado: {antes:.1f} → {depois:.1f} st ({k:.2f}×)")
+        except ImportError as ex:                            # sem o Praat nesta máquina: segue sem o realce
+            _log(f"[{i:02d}] sem realce do tom ({ex.name} não instalado)")
+
+    for i, (b, tom_b, chave) in enumerate(zip(r["batidas"], tons, chaves)):
+        destino = tmp / f"b{i:02d}.wav"
+        if cache.baixar(chave, destino):
+            _log(f"[{i:02d}] guardada")
+            realcar(i, destino, tom_b)
+            continue
+        if gerar is None:
+            preparar_tons(est, tmp / "ref")
+            ouvir = O.disponivel()
+            gerar = carregar_chatterbox()
+        falado = falado_de(r, b, idioma)
+        frases = dividir_frases(falado)
+        rng = random.Random(1000 * i + 7)
+        t0, pedacos, medidas, sr = time.time(), [], [], 24000
+        for k, fr in enumerate(frases):
+            tom_f = tom_da_frase(fr, tom_b)
+            m = melhor_frase(gerar, fr, tom_f, 1000 * i + 10 * k, est, idioma, ouvir)
+            sr = m["sr"]
+            pedacos.append(m["a"])
+            pausa = pausa_depois(fr, est["pausas"]["frase"], rng) if k < len(frases) - 1 else 0.0
+            if pausa:
+                pedacos.append(np.zeros(int(sr * pausa), np.float32))
+            medidas.append({"tom": tom_f, "s": round(len(m["a"]) / sr, 2), "pausa": round(pausa + 2 * FOLGA, 2) if pausa else 0,
+                            "semelhanca": None if m["sem"] is None else round(m["sem"], 3), "dp": m["dp"],
+                            "tentativas": m["tentativas"], "problemas": m["problemas"]})
+        a = np.concatenate(pedacos)
+        fala_s = sum(x["s"] for x in medidas)
+        razao = fala_s / max(1.0, len(falado) / LETRAS_POR_SEGUNDO)
+        tempo = TONS[tom_b].get("tempo", 1.0)
+        if razao < RAPIDA:                                   # ainda corrida: desacelera a fala inteira
+            tempo *= max(0.85, razao)
+            _log(f"[{i:02d}] desacelerada para {tempo:.2f}×")
+        finalizar(a, sr, destino, tempo)
+        cache.subir(chave, destino)                          # o cache guarda a fala sem o realce
+        realcar(i, destino, tom_b)
+        novas += 1
+        relatorio.append({"batida": i, "tom": tom_b, "frases": medidas, "tempo": round(tempo, 3)})
+        dps = ", ".join(f"{x['dp']:.1f}" for x in medidas)
+        _log(f"[{i:02d}] {len(a) / sr:.1f}s ({len(frases)} frases, tom {dps} st) em {time.time() - t0:.0f}s")
+    if relatorio:
+        arq = tmp.parent / "voz-relatorio.json"
+        antigo = json.loads(arq.read_text(encoding="utf-8")) if arq.exists() else []
+        arq.write_text(json.dumps(antigo + relatorio, ensure_ascii=False, indent=1), encoding="utf-8")
+    _log(f"pronto: {len(chaves)} falas ({novas} novas) em {(time.time() - t_ini) / 60:.0f} min")
+
+
 def main():
     roteiro, idioma, saida = Path(sys.argv[1]), sys.argv[2], Path(sys.argv[3])
     verificar = "--verificar" in sys.argv[4:]
@@ -356,6 +617,9 @@ def main():
     ref.mkdir(parents=True, exist_ok=True)
     VC.preparar(ref)
     est = json.loads((ref / "estado.json").read_text(encoding="utf-8"))
+    if cfg.get("ritmo") == "natural" and motor == "chatterbox":
+        narrar_natural(r, cfg, idioma, motor, est, tmp, verificar)
+        return
     if (os.environ.get("VOZ_ESTILO") or cfg.get("estilo")) == "viva":
         est["ref_curta"] = trecho_vivo(est["ref_longa"], ref / "ref-viva.wav")
     if (os.environ.get("VOZ_ESTILO") or cfg.get("estilo")) == "solta":

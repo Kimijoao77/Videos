@@ -9,7 +9,7 @@ O roteiro (versão 2) tem "batidas": cada uma é uma frase da narração com a c
    "transicao": "corte|zoom|flash|fade",                    como esta batida entra (padrão: zoom)
    "sons": [{"nome": "impacto", "em": 0.4}],                efeitos de sons.py, em fração da batida
    "trilha": {"tipo": "corte", "em": 0.4, "dur": 1.2},      a trilha some (ou "tensao" até "ate" batidas depois)
-   "respiro": 0.15}                                         pausa depois da fala (segundos)
+   "respiro": 0.15}                                         pausa depois da fala (segundos; padrão em respiro_padrao)
 Textos {...} podem ser {"pt": ..., "en": ...} ou um texto só. Parâmetros de cena com {"pt", "en"} também.
 
 Sai em <saida>/<slug>/<idioma>/: short.mp4, capa.jpg (um quadro da cena com o título), meta.json.
@@ -330,14 +330,21 @@ def mixar(batidas, tl, total, vozes, saida):
 
 
 # ------------------------------------------------------------------ montagem
-def narrar(batidas, idioma, tmp, offline, voz_cfg):
+def respiro_padrao(r):
+    """Pausa depois de cada fala quando a batida não diz: 0,5 s no ritmo natural (10/11/2026: o dono achou o vídeo sem
+    pausa; com 0,12 s as falas ficavam coladas), 0,12 s nos roteiros de antes."""
+    return 0.5 if (r.get("voz") or {}).get("ritmo") == "natural" else 0.12
+
+
+def narrar(batidas, idioma, tmp, offline, voz_cfg, pronuncia=None):
     """voz_cfg (do roteiro): {"motor": "edge|kokoro", "pt": "nome da voz", "en": "...", "velocidade": 1.0}."""
     duracoes, palavras, vozes, origens = [], [], [], set()
     voz_cfg = voz_cfg or {}
     for i, b in enumerate(batidas):
         texto = L(b["fala"], idioma)
         dur, pal, origem = V.narrar(texto, idioma, tmp, f"b{i:02d}", offline, motor=voz_cfg.get("motor", "edge"),
-                                    voz=voz_cfg.get(idioma), velocidade=float(voz_cfg.get("velocidade", 1.0)))
+                                    voz=voz_cfg.get(idioma), velocidade=float(voz_cfg.get("velocidade", 1.0)),
+                                    trocas=(pronuncia or {}).get(idioma))
         origens.add(origem)
         duracoes.append(dur)
         palavras.append(pal)
@@ -540,10 +547,10 @@ def main():
         tmp = pasta / "_tmp"
         tmp.mkdir(parents=True, exist_ok=True)
         print(f"[{idioma}] narração…", flush=True)
-        duracoes, palavras, vozes, origens = narrar(r["batidas"], idioma, tmp, a.offline, r.get("voz"))
+        duracoes, palavras, vozes, origens = narrar(r["batidas"], idioma, tmp, a.offline, r.get("voz"), r.get("pronuncia"))
         tl, t = [], 0.0
         for b, d in zip(r["batidas"], duracoes):
-            dur = d + float(b.get("respiro", 0.12))
+            dur = d + float(b.get("respiro", respiro_padrao(r)))
             tl.append((t, t + dur))
             t += dur
         total = t + float(r.get("cauda", 0.5))
