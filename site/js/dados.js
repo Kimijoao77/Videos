@@ -14,6 +14,8 @@ async function gh(caminho, tipo = "json") {
   if (!r.ok) throw new Error(`GitHub respondeu ${r.status}`);
   return tipo === "raw" ? r : r.json();
 }
+/** Lista uma pasta do repositório (nome e caminho de cada arquivo); pasta que não existe = lista vazia. */
+export async function listar(caminho) { const r = await gh(caminho); return Array.isArray(r) ? r.map(x => ({ nome: x.name, caminho: x.path, tipo: x.type })) : []; }
 export async function baixarTexto(caminho) { const r = await gh(caminho, "raw"); return r ? r.text() : null; }
 export async function baixarBinario(caminho) { const r = await gh(caminho, "raw"); return r ? r.blob() : null; }
 function base64(texto) {

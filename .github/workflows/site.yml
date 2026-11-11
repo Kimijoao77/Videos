@@ -49,7 +49,7 @@ jobs:
         run: |
           set -e
           rm -rf _site && mkdir -p _site/js _site/fontes
-          cp -r site/index.html site/pc.js site/pc.css site/js _site/
+          cp -r site/index.html site/pc.js site/pc.css site/js site/investimentos.html site/inv.js site/inv.css _site/
           cp privado/app/www/estilo.css _site/
           cp privado/app/www/js/maquina.js privado/app/www/js/ui.js _site/js/
           cp privado/app/www/fontes/*.woff2 _site/fontes/
