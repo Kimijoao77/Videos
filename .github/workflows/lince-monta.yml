@@ -1,0 +1,169 @@
+# Lince Lunar — Short "passo a passo" (11/11/2026): a narração sai primeiro (Speechify), e o tempo de cada fala manda
+# na cena 3D: cada peça aparece quando a voz diz "então você...". 1) voz  2) 20 máquinas renderizam os quadros
+# (minutos grátis do repositório público)  3) a última junta, põe legenda, zooms, trilha e efeitos e manda o vídeo para a
+# Release privada "lince-lunar". Nada é postado.
+name: Lince passo a passo
+
+on:
+  workflow_dispatch:
+    inputs:
+      roteiro:
+        description: "Roteiro em canal/lince/roteiros"
+        required: false
+        default: "geladeira-monta.json"
+      cena:
+        description: "Script da cena em canal/lince"
+        required: false
+        default: "cena_monta.py"
+      nome:
+        description: "Nome do vídeo na Release"
+        required: false
+        default: "lince-geladeira-inventar"
+      largura:
+        description: "Largura do render 3D (a altura é 16:9 em pé)"
+        required: false
+        default: "720"
+      amostras:
+        description: "Amostras do Cycles"
+        required: false
+        default: "20"
+
+permissions:
+  contents: read
+
+env:
+  CANAL_REPO: Kimijoao77/Engfy
+  PARTES: "20"
+
+jobs:
+  voz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SPEECHIFY_API_KEY: ${{ secrets.SPEECHIFY_API_KEY }}
+    outputs:
+      quadros: ${{ steps.n.outputs.quadros }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CANAL_REPO }}
+          token: ${{ secrets.ENGFY_TOKEN }}
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            canal/lince
+            canal/voz.py
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+          pip install -q numpy requests
+      - name: Narração
+        run: python canal/lince/narrar_seq.py canal/lince/roteiros/${{ inputs.roteiro }} voz
+      - id: n
+        run: echo "quadros=$(python -c "import json,math;print(math.ceil(json.load(open('voz/marcas.json'))['dur']*24))")" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: voz
+          path: |
+            voz/voz.wav
+            voz/tempos.json
+            voz/marcas.json
+          retention-days: 2
+
+  quadros:
+    needs: voz
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        parte: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CANAL_REPO }}
+          token: ${{ secrets.ENGFY_TOKEN }}
+          persist-credentials: false
+          sparse-checkout: canal/lince
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Blender (como módulo Python)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg libxrender1 libxxf86vm1 libxfixes3 libxi6 libxkbcommon0 libsm6 libgl1 > /dev/null
+          pip install -q bpy==4.2.0
+      - uses: actions/download-artifact@v4
+        with:
+          name: voz
+          path: voz
+      - name: Renderizar o trecho
+        run: |
+          total=${{ needs.voz.outputs.quadros }}
+          ini=$(( total * ${{ matrix.parte }} / PARTES ))
+          fim=$(( total * (${{ matrix.parte }} + 1) / PARTES ))
+          echo "quadros $ini a $fim de $total"
+          MARCAS=$PWD/voz/marcas.json python canal/lince/${{ inputs.cena }} "$PWD/q" ${{ inputs.largura }} ${{ inputs.amostras }} "trecho:$ini-$fim" > render.log 2>&1 || (tail -40 render.log; exit 1)
+          grep -c "Saved:" render.log
+          ffmpeg -v error -y -framerate 24 -start_number $ini -i q/f%05d.png -c:v libx264 -preset medium -crf 14 -pix_fmt yuv420p \
+            trecho-$(printf %02d ${{ matrix.parte }}).mp4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: trecho-${{ matrix.parte }}
+          path: trecho-*.mp4
+          retention-days: 2
+
+  juntar:
+    needs: [voz, quadros]
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      GH_TOKEN: ${{ secrets.ENGFY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CANAL_REPO }}
+          token: ${{ secrets.ENGFY_TOKEN }}
+          persist-credentials: false
+          sparse-checkout: canal/lince
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Blender, cairo e a fonte
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg libxrender1 libxxf86vm1 libxfixes3 libxi6 libxkbcommon0 libsm6 libgl1 libcairo2-dev pkg-config > /dev/null
+          pip install -q bpy==4.2.0 pycairo numpy pillow scipy
+          mkdir -p ~/.local/share/fonts && cp canal/lince/fontes/*.ttf ~/.local/share/fonts/ && fc-cache -f > /dev/null
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: trecho-*
+          path: trechos
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: voz
+          path: voz
+      - name: Closes dos círculos de zoom
+        run: |
+          zs=$(python -c "import json;print(' '.join('zoom:'+z[2] for z in json.load(open('voz/marcas.json'))['zooms']))")
+          MARCAS=$PWD/voz/marcas.json python canal/lince/${{ inputs.cena }} "$PWD/zooms" 1000 48 $zs > zoom.log 2>&1 || (tail -30 zoom.log; exit 1)
+      - name: Juntar, legendar, trilha e efeitos
+        run: |
+          ls trechos | sort | sed "s|^|file 'trechos/|; s|$|'|" > lista.txt
+          ffmpeg -v error -y -f concat -safe 0 -i lista.txt -c copy mudo.mp4
+          dur=$(python -c "import json;print(json.load(open('voz/marcas.json'))['dur'])")
+          python canal/lince/legendas.py mudo.mp4 zooms legendado.mp4 voz/tempos.json voz/marcas.json
+          python canal/lince/trilha.py $dur voz/tempos.json trilha.wav 112 7 voz/marcas.json
+          ffmpeg -v error -y -i voz/voz.wav -i trilha.wav -filter_complex \
+            "[1:a]volume=0.32[m];[m][0:a]sidechaincompress=threshold=0.04:ratio=5:attack=15:release=350[md];[0:a][md]amix=inputs=2:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=9[a]" \
+            -map "[a]" -ar 44100 audio.wav
+          mkdir -p envio
+          ffmpeg -v error -y -i legendado.mp4 -i audio.wav -map 0:v -map 1:a -c:v copy -c:a aac -b:a 192k -shortest -movflags +faststart envio/${{ inputs.nome }}.mp4
+          cp voz/marcas.json envio/${{ inputs.nome }}-marcas.json
+          ffprobe -v error -show_entries format=duration -of csv=p=0 envio/${{ inputs.nome }}.mp4
+      - name: Mandar para a Release privada do canal
+        run: |
+          for i in 1 2 3; do gh release upload lince-lunar -R "$CANAL_REPO" envio/* --clobber && break; sleep 10; done
