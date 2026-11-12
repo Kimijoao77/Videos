@@ -8,7 +8,7 @@ VOZ = {"pt": "pt-BR-AntonioNeural", "en": "en-US-AndrewNeural"}
 
 
 def _sh(*cmd):
-    r = subprocess.run([str(c) for c in cmd], capture_output=True, text=True)
+    r = subprocess.run([str(c) for c in cmd], capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=300)   # nunca fica esperando o teclado
     if r.returncode:
         raise RuntimeError(r.stderr[-1500:])
     return r.stdout

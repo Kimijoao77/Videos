@@ -273,9 +273,37 @@ def id_do_canal_robos(cfg, arq):
         print("Circuit Cabin: canal", r["id"])
 
 
+def canal_ytdlp(cid):
+    """Sem chave da API (12/11/2026: o fluxo roda no repositório público Videos, que não tem a chave): os números
+    públicos pela página do canal, com o yt-dlp. Os Shorts mostram as views quase na hora (a API atrasa em canal novo)."""
+    import subprocess
+    out = {"nome": "", "handle": "", "inscritos": None, "views": 0, "videos": 0, "por_video": {}}
+    for aba in ("videos", "shorts", "streams"):
+        try:
+            r = subprocess.run(["yt-dlp", "--flat-playlist", "--dump-single-json", "--playlist-end", "300",
+                                f"https://www.youtube.com/channel/{cid}/{aba}"], capture_output=True, text=True, timeout=240)
+            j = json.loads(r.stdout or "{}") or {}
+        except Exception as e:  # noqa: BLE001
+            print(f"yt-dlp {cid}/{aba}: {type(e).__name__}")
+            continue
+        if not j:                                   # canal sem essa aba (sem Shorts, sem lives)
+            continue
+        out["nome"] = out["nome"] or j.get("channel") or j.get("uploader") or ""
+        out["handle"] = out["handle"] or (j.get("uploader_id") or "")
+        if j.get("channel_follower_count") is not None:
+            out["inscritos"] = int(j["channel_follower_count"])
+        for e in j.get("entries") or []:
+            if e.get("id") and e["id"] not in out["por_video"]:
+                out["por_video"][e["id"]] = int(e.get("view_count") or 0)
+    out["videos"] = len(out["por_video"])
+    out["views"] = sum(out["por_video"].values())
+    return out
+
+
 def numeros():
     """Inscritos, views e vídeos de cada canal (canal/dados/canais-youtube.json), 1 unidade de cota.
-    pt e en são os Dragões; desde 0.95.0 também lince (Lince Lunar) e robos (Circuit Cabin)."""
+    pt e en são os Dragões; desde 0.95.0 também lince (Lince Lunar) e robos (Circuit Cabin).
+    Sem YOUTUBE_API_KEY (desde 12/11/2026 roda no repositório público Videos), usa o yt-dlp (canal_ytdlp)."""
     arq = DADOS / "canais-youtube.json"
     if not arq.exists():
         return
@@ -287,8 +315,23 @@ def numeros():
     ids = {i: cfg[i]["id"] for i in ("pt", "en", "lince", "robos") if isinstance(cfg.get(i), dict) and cfg[i].get("id")}
     if not ids:
         return
-    itens = {c["id"]: c for c in get("channels", part="snippet,statistics", id=",".join(ids.values())).get("items", [])}
     res = {"atualizado": agora().strftime("%Y-%m-%dT%H:%M:%SZ"), "canais": {}}
+    publico = {}
+    if not CHAVE:
+        try:
+            velho = json.loads((DADOS / "canal-numeros.json").read_text(encoding="utf-8")).get("canais") or {}
+        except (OSError, ValueError):
+            velho = {}
+        for idioma, cid in ids.items():
+            publico[cid] = canal_ytdlp(cid)
+            if publico[cid]["inscritos"] is None:          # a página nem sempre mostra: fica o último número conhecido
+                publico[cid]["inscritos"] = (velho.get(idioma) or {}).get("inscritos")
+        itens = {cid: {"snippet": {"title": p["nome"] or cfg[i].get("nome"), "customUrl": p["handle"]},
+                       "statistics": {"subscriberCount": p["inscritos"] or 0, "hiddenSubscriberCount": p["inscritos"] is None,
+                                      "viewCount": p["views"], "videoCount": p["videos"]}}
+                 for i, cid in ids.items() for p in [publico[cid]] if p["por_video"] or p["inscritos"] is not None}
+    else:
+        itens = {c["id"]: c for c in get("channels", part="snippet,statistics", id=",".join(ids.values())).get("items", [])}
     for idioma, cid in ids.items():
         c = itens.get(cid)
         if not c:
@@ -316,7 +359,16 @@ def numeros():
     except (OSError, ValueError):
         pass
     vids = sorted(vids)
-    if vids:
+    if vids and not CHAVE:
+        todos = {k: v for p in publico.values() for k, v in p["por_video"].items()}
+        antigo_v = {}
+        try:
+            antigo_v = json.loads((DADOS / "canal-numeros.json").read_text(encoding="utf-8")).get("videos") or {}
+        except (OSError, ValueError):
+            pass
+        res["videos"] = {v: {"views": todos[v], "curtidas": (antigo_v.get(v) or {}).get("curtidas", 0),
+                             "comentarios": (antigo_v.get(v) or {}).get("comentarios", 0)} for v in vids if v in todos}
+    elif vids:
         res["videos"] = {}
         for k in range(0, len(vids), 50):
             for it in get("videos", part="statistics", id=",".join(vids[k:k + 50])).get("items", []):
@@ -550,7 +602,7 @@ def storyboard(vid, pasta, max_folhas=12):
 
 
 if __name__ == "__main__":
-    if not CHAVE:  # sem chave ainda: avisa e sai sem erro (para o GitHub não mandar e-mail de falha todo dia)
+    if not CHAVE and (sys.argv[1:2] or ["nichos"])[0] != "numeros":  # os números funcionam sem chave (yt-dlp); o resto não: avisa e sai sem erro (para o GitHub não mandar e-mail de falha todo dia)
         print("falta o segredo YOUTUBE_API_KEY no GitHub (Settings > Secrets and variables > Actions); nada pesquisado")
         sys.exit(0)
     {"nichos": nichos, "temas": temas, "consultas": consultas, "canais": canais, "referencias": referencias, "numeros": numeros}[sys.argv[1] if len(sys.argv) > 1 else "nichos"]()

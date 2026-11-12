@@ -185,8 +185,12 @@ def acesso(refresh: str) -> str:
                                    "(e confira se o app do Google está em produção, não em teste)") from None
             raise RuntimeError(f"o Google recusou o refresh token ({desc or 'invalid_grant'}): copie de novo o campo Refresh "
                                "token inteiro do Playground e troque o segredo") from None
-        if "invalid_client" in e.corpo or "unauthorized_client" in e.corpo:
-            raise RuntimeError("o Google não reconheceu o app: confira os segredos YT_CLIENT_ID e YT_CLIENT_SECRET") from None
+        if "unauthorized_client" in e.corpo:      # 12/11: o refresh token foi gerado com outro cliente
+            raise RuntimeError("o refresh token foi gerado com outro app (unauthorized_client): no Playground, na engrenagem, marque "
+                               "Use your own OAuth credentials com o ID e a chave secreta deste cliente e gere o token de novo") from None
+        if "invalid_client" in e.corpo:
+            raise RuntimeError("o Google não reconheceu o app (invalid_client): o ID ou a chave secreta do cliente está errado, ou a "
+                               "chave é de outro cliente; confira os segredos YT_CLIENT_ID e YT_CLIENT_SECRET") from None
         raise RuntimeError(f"o Google recusou a chave ({e.codigo})") from None
     dados = json.loads(texto)
     global VALIDADE
