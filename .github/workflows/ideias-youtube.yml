@@ -3,6 +3,8 @@
 # Segredos deste repositório: GEMINI_KEY (a chave do Gemini) e ENGFY_TOKEN (já existe). A lista de vídeos vem do yt-dlp.
 # 11/11: todo dia de madrugada. Primeiro os vídeos novos dos canais; depois, com o que sobrar do limite do dia do
 # Gemini, os antigos. Os novos vão para o Engfy assim que são assistidos (o Claude das 5h já acha).
+# 12/11: uma vez por semana também procura canais novos (português, inglês e espanhol) e testa 3 vídeos de cada um
+# (ideias/youtube/descobrir.py). O app manda descobrir=1 para procurar na hora.
 name: Ideias do YouTube
 
 on:
@@ -12,6 +14,10 @@ on:
         description: "Até quantos vídeos o Gemini assiste nesta rodada (para antes se acabar o limite do dia)"
         required: false
         default: "60"
+      descobrir:
+        description: "Procurar canais novos agora (sem esperar a semana)"
+        required: false
+        default: "0"
   schedule:
     - cron: "17 4 * * *"   # 01:17 em Brasília, todo dia: às 5h a leitura do Claude dá o veredito dos que têm potencial
 
@@ -45,6 +51,7 @@ jobs:
         env:
           GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
           SALVAR_PARCIAL: "1"
+          DESCOBRIR: ${{ inputs.descobrir || '0' }}
           TEMPO_MAX_MIN: "150"
         run: |
           git config user.name "Kimijoao77"
