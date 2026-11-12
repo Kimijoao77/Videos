@@ -1,0 +1,51 @@
+# Estudo de um canal de referência (12/11/2026): lista os vídeos, baixa as capas e o Gemini assiste alguns e explica a
+# estrutura (canal/lince/estudo_canal.py). O resultado volta para o Engfy em canal/lince/estudos/<nome>/.
+name: Estudo de canal
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "Link do canal (youtube.com/@nome)"
+        required: true
+      nome:
+        description: "Nome curto da pasta (ex.: fauna-code)"
+        required: true
+      assistir:
+        description: "Quantos vídeos o Gemini assiste"
+        required: false
+        default: "4"
+
+permissions:
+  contents: read
+
+jobs:
+  estudo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: Kimijoao77/Engfy
+          token: ${{ secrets.ENGFY_TOKEN }}
+          sparse-checkout: canal/lince
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: denoland/setup-deno@v2
+        continue-on-error: true
+        with:
+          deno-version: v2.x
+      - run: pip install -q requests "yt-dlp[default]"
+      - name: Estudar o canal
+        env:
+          GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
+        run: python canal/lince/estudo_canal.py "${{ inputs.url }}" "${{ inputs.nome }}" "${{ inputs.assistir }}"
+      - name: Guardar no Engfy
+        if: always()
+        run: |
+          git config user.name Kimijoao77
+          git config user.email leclercjoao3@gmail.com
+          git add canal/lince/estudos
+          git commit -q -m "Lince: estudo do canal ${{ inputs.nome }}" || exit 0
+          for i in 1 2 3 4; do git pull -q --rebase origin main && git push -q origin HEAD:main && break; sleep 7; done
