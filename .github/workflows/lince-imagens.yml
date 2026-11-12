@@ -1,0 +1,46 @@
+# Lince Lunar: gera as imagens de cena pelo Gemini (modelo de imagem) com a ficha do mascote como referência
+# (canal/lince/imagens/gerar_gemini.py) e devolve para o Engfy em canal/lince/imagens/<pasta>/. Segredo: GEMINI_KEY.
+name: Lince imagens
+
+on:
+  workflow_dispatch:
+    inputs:
+      prompts:
+        description: "Arquivo de prompts em canal/lince/imagens"
+        required: true
+        default: "teste-prompts.txt"
+      pasta:
+        description: "Pasta de saída em canal/lince/imagens"
+        required: true
+        default: "teste"
+      modelo:
+        description: "Modelo de imagem (vazio = o primeiro que a chave tiver)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  gerar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: Kimijoao77/Engfy
+          token: ${{ secrets.ENGFY_TOKEN }}
+          sparse-checkout: canal/lince
+      - run: pip install -q requests
+      - name: Gerar
+        env:
+          GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
+        run: python canal/lince/imagens/gerar_gemini.py "canal/lince/imagens/${{ inputs.prompts }}" "canal/lince/imagens/${{ inputs.pasta }}" ${{ inputs.modelo }}
+      - name: Guardar no Engfy
+        if: always()
+        run: |
+          git config user.name Kimijoao77
+          git config user.email leclercjoao3@gmail.com
+          git add canal/lince/imagens
+          git commit -q -m "Lince: imagens de cena (${{ inputs.pasta }})" || exit 0
+          for i in 1 2 3 4; do git pull -q --rebase origin main && git push -q origin HEAD:main && break; sleep 7; done
