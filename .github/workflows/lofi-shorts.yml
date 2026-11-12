@@ -1,0 +1,88 @@
+# Lince Lofi: Shorts de divulgação de um vídeo longo (12/11/2026). Pega a cena em laço e as faixas do vídeo longo (a
+# lista fica na Release "lince-lofi" do Engfy), faz N Shorts de 30 s em pé (canal/pixel/shorts_lofi.py), manda os
+# vídeos para a mesma Release e registra cada um em canal/pixel/dados/canal.json ("shorts"), com a capa em
+# canal/pixel/shorts/. O Nexus mostra na aba Lofi, com Postar agora e Agendar. Roda aqui pelos minutos grátis.
+name: Lince Lofi shorts
+
+on:
+  workflow_dispatch:
+    inputs:
+      nome:
+        description: "Vídeo longo (o slug, ex.: lince-lofi-manha)"
+        required: false
+        default: "lince-lofi-manha"
+      laco:
+        description: "Laço da cena (arquivo em canal/pixel/lince)"
+        required: false
+        default: "laco-manha.mp4"
+      quantos:
+        description: "Quantos Shorts"
+        required: false
+        default: "3"
+
+permissions:
+  contents: read
+
+env:
+  CANAL_REPO: Kimijoao77/Engfy
+
+concurrency:
+  group: lofi-shorts
+  cancel-in-progress: false
+
+jobs:
+  shorts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      GH_TOKEN: ${{ secrets.ENGFY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CANAL_REPO }}
+          token: ${{ secrets.ENGFY_TOKEN }}
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            canal/pixel
+            canal/fontes
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+          pip install -q numpy scipy pillow soundfile
+      - name: Fazer os Shorts
+        run: |
+          gh release download lince-lofi -R "$CANAL_REPO" -p "${{ inputs.nome }}-faixas.json" -D /tmp --clobber
+          titulo=$(python3 -c "import json,sys;d=json.load(open('canal/pixel/dados/canal.json'));print(next(v['titulo'] for v in d['videos'] if v['slug']=='${{ inputs.nome }}'))")
+          python3 canal/pixel/shorts_lofi.py "canal/pixel/lince/${{ inputs.laco }}" "/tmp/${{ inputs.nome }}-faixas.json" envio "${{ inputs.nome }}" "$titulo" "${{ inputs.quantos }}"
+          ls -la envio
+      - name: Mandar para a Release e registrar no app
+        run: |
+          for f in envio/*.mp4; do for i in 1 2 3; do gh release upload lince-lofi -R "$CANAL_REPO" "$f" --clobber && break; sleep 10; done; done
+          mkdir -p canal/pixel/shorts
+          cp envio/*.jpg canal/pixel/shorts/
+          python3 - <<'PY'
+          import json, datetime as dt
+          from pathlib import Path
+          arq = Path("canal/pixel/dados/canal.json")
+          C = json.loads(arq.read_text(encoding="utf-8"))
+          novos = json.loads(Path("envio/shorts.json").read_text(encoding="utf-8"))
+          antigos = {s["slug"]: s for s in C.get("shorts", [])}
+          for s in novos:
+              velho = antigos.get(s["slug"], {})
+              if velho.get("youtube_id"):
+                  continue                                  # já postado: não mexe
+              s.update(de="${{ inputs.nome }}", capa=f"canal/pixel/shorts/{s.pop('capa_arquivo')}",
+                       release="https://github.com/Kimijoao77/Engfy/releases/tag/lince-lofi", estado="pronto",
+                       gerado_em=dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
+              antigos[s["slug"]] = s
+          C["shorts"] = sorted(antigos.values(), key=lambda s: s["slug"])
+          arq.write_text(json.dumps(C, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+          print(len(C["shorts"]), "Shorts registrados")
+          PY
+          git config user.name Kimijoao77
+          git config user.email leclercjoao3@gmail.com
+          git add canal/pixel/dados/canal.json canal/pixel/shorts
+          git commit -q -m "Lince Lofi: Shorts de divulgação de ${{ inputs.nome }}" || exit 0
+          for i in 1 2 3 4; do git pull -q --rebase origin main && git push -q origin HEAD:main && break; sleep 7; done
