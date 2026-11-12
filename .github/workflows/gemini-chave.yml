@@ -1,0 +1,41 @@
+# Aba Gemini do Nexus (0.99.0): confere a cópia da chave do Gemini guardada AQUI (segredo GEMINI_KEY, usada pelos vídeos
+# das ideias) sem gastar o limite do dia, e grava ideias/gemini/chave-videos.json no repositório Engfy. O registro
+# público só mostra "funcionando" ou o tipo de erro: a chave nunca aparece.
+name: Chave do Gemini
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 9 * * *"    # 06:17 em Brasília
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gemini-chave
+  cancel-in-progress: false
+
+jobs:
+  conferir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: Kimijoao77/Engfy
+          token: ${{ secrets.ENGFY_TOKEN }}
+          sparse-checkout: ideias/gemini
+      - name: Conferir a chave
+        env:
+          GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
+          ORIGEM: videos
+        run: |
+          python3 -c "import requests" 2>/dev/null || pip install -q requests
+          python3 ideias/gemini/conferir.py
+      - name: Guardar no Engfy
+        run: |
+          git config user.name Kimijoao77
+          git config user.email leclercjoao3@gmail.com
+          git add ideias/gemini
+          git commit -q -m "Chave do Gemini: conferida (Videos)" || exit 0
+          for i in 1 2 3 4; do git pull -q --rebase origin main && git push -q origin HEAD:main && break; sleep 7; done
