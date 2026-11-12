@@ -1,0 +1,44 @@
+# Números dos canais (12/11/2026, antes no repositório privado Engfy, que tem só 2.000 minutos grátis por mês): a cada
+# 3 h e pelo botão Atualizar números do Nexus. Sem chave nenhuma: os números públicos vêm da página de cada canal pelo
+# yt-dlp (canal/pesquisa.py numeros) e voltam para canal/dados/canal-numeros.json no Engfy.
+name: Canal números
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "37 */3 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: canal-numeros
+  cancel-in-progress: true
+
+jobs:
+  numeros:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: Kimijoao77/Engfy
+          token: ${{ secrets.ENGFY_TOKEN }}
+          sparse-checkout: canal
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: denoland/setup-deno@v2
+        continue-on-error: true
+        with:
+          deno-version: v2.x
+      - run: pip install -q requests "yt-dlp[default]"
+      - name: Buscar os números
+        run: python3 canal/pesquisa.py numeros
+      - name: Salvar no Engfy
+        run: |
+          git config user.name Kimijoao77
+          git config user.email leclercjoao3@gmail.com
+          git add canal/dados/canal-numeros.json canal/dados/canais-youtube.json
+          git commit -q -m "Canal: números dos canais" || exit 0
+          for i in 1 2 3 4; do git pull -q --rebase origin main && git push -q origin HEAD:main && break; sleep 7; done
