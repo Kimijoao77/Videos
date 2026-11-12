@@ -1,0 +1,84 @@
+# Lince Lunar — teste do vídeo longo (12/11/2026): os primeiros ~2 min do ep. 1 (o caju) em duas versões com as mesmas
+# 24 imagens: A (só imagens com zoom lento, como o Fauna) e C (as mesmas imagens com animação por código: cartões com os
+# números, troca com empurrão, tremor nos sustos). A narração sai primeiro (Speechify) e o tempo de cada fala manda na
+# troca das imagens. Os dois vídeos vão para a Release privada "lince-lunar" do Engfy. Nada é postado.
+name: Lince longo (teste A e C)
+
+on:
+  workflow_dispatch:
+    inputs:
+      pasta:
+        description: "Pasta do episódio em canal/lince/longo"
+        required: false
+        default: "ep01-caju"
+      roteiro:
+        description: "Roteiro dentro da pasta"
+        required: false
+        default: "roteiro-teste.json"
+      nome:
+        description: "Nome dos vídeos na Release"
+        required: false
+        default: "lince-ep01-teste"
+
+permissions:
+  contents: read
+
+env:
+  CANAL_REPO: Kimijoao77/Engfy
+
+jobs:
+  longo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      SPEECHIFY_API_KEY: ${{ secrets.SPEECHIFY_API_KEY }}
+      GH_TOKEN: ${{ secrets.ENGFY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CANAL_REPO }}
+          token: ${{ secrets.ENGFY_TOKEN }}
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            canal/lince
+            canal/voz.py
+            canal/fontes
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: ffmpeg, cairo e bibliotecas
+        run: |
+          instalar() { timeout 90 sudo apt-get install -y -qq --no-install-recommends "$@" > /dev/null 2>&1 && return 0; timeout 120 sudo apt-get update -qq > /dev/null 2>&1; timeout 150 sudo apt-get install -y -qq --no-install-recommends "$@" > /dev/null 2>&1; }
+          instalar ffmpeg libcairo2-dev pkg-config || echo "::warning::apt-get falhou"
+          pip install -q numpy requests pillow scipy pycairo
+          if ! command -v ffprobe > /dev/null; then
+            curl -sSfL -o /tmp/ff.tar.xz https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz
+            mkdir -p /tmp/ff && tar -xJf /tmp/ff.tar.xz -C /tmp/ff --strip-components=1
+            sudo cp /tmp/ff/bin/ffmpeg /tmp/ff/bin/ffprobe /usr/local/bin/
+          fi
+      - name: Narração
+        run: python canal/lince/narrar_seq.py "canal/lince/longo/${{ inputs.pasta }}/${{ inputs.roteiro }}" voz
+      - name: Trilha (baixinha, sem os efeitos dos Shorts)
+        run: |
+          echo "[]" > vazio.json
+          dur=$(python -c "import json;print(json.load(open('voz/marcas.json'))['dur'])")
+          python canal/lince/trilha.py $dur vazio.json trilha.wav 92 5 voz/marcas.json
+      - name: Montar A e C
+        run: |
+          dur=$(python -c "import json;print(json.load(open('voz/marcas.json'))['dur'])")
+          img="canal/lince/longo/${{ inputs.pasta }}/img"
+          python canal/lince/longo/montar_longo.py "$img" voz/marcas.json $dur mudo-A.mp4 A &
+          python canal/lince/longo/montar_longo.py "$img" voz/marcas.json $dur mudo-C.mp4 C &
+          wait
+          mkdir -p envio
+          for v in A C; do
+            ffmpeg -v error -y -i mudo-$v.mp4 -i voz/voz.wav -i trilha.wav -filter_complex \
+              "[2:a]volume=0.22[m];[m][1:a]sidechaincompress=threshold=0.04:ratio=6:attack=20:release=400[md];[1:a][md]amix=inputs=2:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=9[a]" \
+              -map 0:v -map "[a]" -c:v copy -c:a aac -b:a 192k -shortest -movflags +faststart envio/${{ inputs.nome }}-$v.mp4
+            ffprobe -v error -show_entries format=duration -of csv=p=0 envio/${{ inputs.nome }}-$v.mp4
+          done
+          cp voz/marcas.json envio/${{ inputs.nome }}-marcas.json
+      - name: Mandar para a Release privada do canal
+        run: |
+          for i in 1 2 3; do gh release upload lince-lunar -R "$CANAL_REPO" envio/* --clobber && break; sleep 10; done
