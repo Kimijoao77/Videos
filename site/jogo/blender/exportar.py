@@ -4,6 +4,8 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import bpy
+
 import kit
 import personagens as P
 
@@ -25,7 +27,7 @@ if "cartas" in QUAIS:
     kit.COR_TIME = AZUL
     # carta: (modelo, [posições dos bonecos], alvo, distância, azimute, elevação)
     CARTAS = {
-        "dragao": ("dragao", [(0, 0)], (0, -0.1, 0.8), 5.6, -38, 8),
+        "dragao": ("dragao", [(0, 0)], (0, 0.0, 1.0), 7.4, -34, 6),
         "bola_fogo": ("bola_fogo", [(0, 0)], (0, 0.3, 0.5), 3.9, -62, 6),
     }
     for carta, (modelo, onde, alvo, dist, az, el) in CARTAS.items():
@@ -33,5 +35,9 @@ if "cartas" in QUAIS:
         for (x, y) in onde:
             raiz = getattr(P, modelo)().montar()
             raiz.location = (x, y, 0)
+        if carta == "dragao":                          # na carta, as asas abertas para cima
+            import math
+            bpy.data.objects["asa_e"].rotation_euler = (0, math.radians(-32), 0)
+            bpy.data.objects["asa_d"].rotation_euler = (0, math.radians(32), 0)
         kit.foto(JOGO / "cartas" / f"{carta}.png", alvo=alvo, dist=dist, az=az, el=el, larg=512, alt=512, amostras=48, transparente=True)
         print("carta", carta, flush=True)
