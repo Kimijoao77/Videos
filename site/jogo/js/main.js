@@ -279,8 +279,10 @@ function confete() {
 
 // ------------------------------------------------------------------ troféus, nível, baralho e recordes
 // arenas: a que aparece no fundo do menu (dá para espiar as bloqueadas) e a que vale para jogar (só as liberadas)
-const liberadas = () => ARENAS.filter(a => prog().trofeus >= a.min).length;
-const arenaJogo = () => { const n = liberadas(), a = prog().arena; return a != null && a < n ? a : n - 1; };
+// versão de teste: tudo liberado (todas as arenas para jogar). Para voltar a liberar por troféus, mude para false.
+const TUDO_LIBERADO = true;
+const liberadas = () => TUDO_LIBERADO ? ARENAS.length : ARENAS.filter(a => prog().trofeus >= a.min).length;
+const arenaJogo = () => { const n = liberadas(), a = prog().arena; return a != null && a < n ? a : TUDO_LIBERADO ? 0 : n - 1; };
 let arenaVer = arenaJogo();
 function mostrarTrofeus() {
   const p = prog(), a = arenaDe(p.trofeus), prox = proximaArena(p.trofeus);
