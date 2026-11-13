@@ -46,15 +46,15 @@ export function pensar(bot, s, dt) {
     const forca = ameacas.reduce((t, e) => t + CARTAS[e.k].custo / CARTAS[e.k].n, 0);
     if (defesa * 2.5 < forca || meu(a.y) < 9) {
       const voa = CARTAS[a.k].voa, muitos = ameacas.length >= 3, tanque = a.k === "gigante";
-      const ordem = voa ? ["besteiros", "mago", "dragao", "balista"]
+      const ordem = voa ? ["besteiros", "mago", "dragao", "catapulta"]
         : muitos ? ["mago", "dragao", "cavaleiro", "bandidos", "besteiros"]
-        : tanque ? ["bandidos", "balista", "cavaleiro", "besteiros", "mago", "dragao"]
-        : ["cavaleiro", "bandidos", "besteiros", "balista", "mago", "dragao"];
+        : tanque ? ["bandidos", "catapulta", "cavaleiro", "besteiros", "mago", "dragao"]
+        : ["cavaleiro", "bandidos", "besteiros", "catapulta", "mago", "dragao"];
       for (const carta of ordem) {
         if (!tem(carta)) continue;
         const longe = CARTAS[carta].alc > 2;
-        const x = carta === "balista" ? (a.x < 9 ? 6 : 12) : a.x + (longe ? (a.x < 9 ? 2 : -2) : 0);
-        const yy = carta === "balista" ? 9 : Math.max(2, meu(a.y) - (longe ? 4 : 2));
+        const x = carta === "catapulta" ? (a.x < 9 ? 6 : 12) : a.x + (longe ? (a.x < 9 ? 2 : -2) : 0);
+        const yy = carta === "catapulta" ? 9 : Math.max(2, meu(a.y) - (longe ? 4 : 2));
         if (soltar(carta, x, yy)) return;
       }
     }
@@ -74,9 +74,9 @@ export function pensar(bot, s, dt) {
     if (Math.random() < 0.3) bot.pista = bot.pista < 9 ? 14.5 : 3.5;
     const fracas = s.ent.filter(e => e.k === "torre" && e.lado !== lado).sort((a, b) => a.hp - b.hp);
     if (fracas.length && fracas[0].hp < 1800) bot.pista = fracas[0].x;
-    for (const carta of ["gigante", "cavaleiro", "dragao", "mago", "besteiros", "bandidos", "balista"]) {
+    for (const carta of ["gigante", "cavaleiro", "dragao", "mago", "besteiros", "bandidos", "catapulta"]) {
       if (!tem(carta)) continue;
-      const yy = carta === "gigante" ? 3 : carta === "balista" ? 10 : en >= 9.5 ? 13 : 6;
+      const yy = carta === "gigante" ? 3 : carta === "catapulta" ? 10 : en >= 9.5 ? 13 : 6;
       if (soltar(carta, bot.pista + (Math.random() - 0.5), yy)) return;
     }
   }

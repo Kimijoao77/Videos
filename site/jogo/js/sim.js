@@ -21,15 +21,15 @@ export const CARTAS = {
     texto: "Três bandidos rápidos e fracos. Bons para cercar." },
   dragao: { nome: "Dragão", custo: 4, tipo: "tropa", n: 1, hp: 1000, dano: 135, cad: 1.5, vel: 1.5, alc: 3.5, raio: 0.6, visao: 5.5, ar: true, voa: true, proj: "fogo", area: 1.2, massa: 5,
     texto: "Voa por cima do rio e cospe fogo em área." },
-  balista: { nome: "Balista", custo: 3, tipo: "predio", n: 1, hp: 800, dano: 130, cad: 0.9, vel: 0, alc: 5.5, raio: 0.65, visao: 5.5, ar: true, proj: "virote", vida: 30, massa: 999,
-    texto: "Construção de defesa. Dura 30 segundos." },
+  catapulta: { nome: "Catapulta", custo: 3, tipo: "predio", n: 1, hp: 800, dano: 130, cad: 0.9, vel: 0, alc: 5.5, raio: 0.65, visao: 5.5, ar: true, proj: "pedra", vida: 30, massa: 999,
+    texto: "Torre de defesa que atira pedras. Dura 30 segundos." },
   bola_fogo: { nome: "Bola de Fogo", custo: 4, tipo: "magia", dano: 570, area: 2.5, danoTorre: 0.35,
     texto: "Dano em área em qualquer lugar da arena." },
 };
-export const BARALHO = ["cavaleiro", "besteiros", "gigante", "mago", "bandidos", "dragao", "balista", "bola_fogo"];
+export const BARALHO = ["cavaleiro", "besteiros", "gigante", "mago", "bandidos", "dragao", "catapulta", "bola_fogo"];
 const TORRE = { hp: 2600, dano: 105, cad: 0.8, alc: 7.5, raio: 1.3, ar: true, proj: "flecha", massa: 999 };
 const REI = { hp: 4200, dano: 105, cad: 1.0, alc: 7.0, raio: 1.85, ar: true, proj: "flecha", massa: 999 };
-const VEL_PROJ = { flecha: 14, magia: 10, fogo: 9, virote: 16 };
+const VEL_PROJ = { flecha: 14, magia: 10, fogo: 9, virote: 16, pedra: 12 };
 const T_NASCER = 1.0;
 
 // gerador de números da partida (a mesma semente dá o mesmo embaralhamento)
@@ -152,7 +152,7 @@ function escolherAlvo(s, e) {
     }
     if (melhor) return melhor;
   }
-  if (e.fixa || e.predio) {                                 // torre e balista também atiram em construção ao alcance
+  if (e.fixa || e.predio) {                                 // torre e catapulta também atiram em construção ao alcance
     for (const o of s.ent) {
       if (o.lado === e.lado || o.hp <= 0 || o.tn > 0 || !o.predio || o.fixa) continue;
       const d = Math.hypot(o.x - e.x, o.y - e.y) - o.c.raio - c.raio;

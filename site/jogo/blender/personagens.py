@@ -187,42 +187,82 @@ def campones():
 
 
 def dragao():
+    """Dragão de faces retas (low-poly), no estilo dos personagens do pacote: pescoço, focinho, chifres, placas nas
+    costas, quatro patas com garras, asas de morcego com dedos e cauda com ponta de flecha."""
     m = Modelo("dragao", 1.0)
-    V, V2, CREME = "#5CBF4A", "#3F9A38", "#F5E6B0"
+    V, V2, CREME, OSSO = "#4FA65B", "#3B8A4E", "#F0DFA8", "#F3EAD2"
+    F = dict(liso=False)
     m.peca("corpo", (0, 0, 0.55))
-    m.peca("cabeca", (0, -0.36, 0.72), "corpo")
-    m.peca("asa_d", (-0.24, 0.02, 0.8), "corpo")
-    m.peca("asa_e", (0.24, 0.02, 0.8), "corpo")
-    m.peca("cauda", (0, 0.38, 0.52), "corpo")
-    m.add("corpo", tr(esfera(1, 20, 12), (0, 0, 0.56), esc=(0.37, 0.47, 0.37)), V, (0.75, 1.08))
-    m.add("corpo", tr(esfera(1, 18, 10), (0, -0.06, 0.47), esc=(0.28, 0.37, 0.27)), CREME, (0.85, 1.05))
-    for lado in (-1, 1):                              # patinhas
-        m.add("corpo", tr(esfera(1, 12, 8), (0.2 * lado, -0.22, 0.26), esc=(0.09, 0.11, 0.12)), V2, (0.85, 1.05))
-        m.add("corpo", tr(esfera(1, 12, 8), (0.22 * lado, 0.2, 0.25), esc=(0.1, 0.12, 0.13)), V2, (0.85, 1.05))
-    for k, y in enumerate((-0.12, 0.08, 0.26)):       # espinhos nas costas
-        m.add("corpo", tr(cone(0.07, 0.17, 8), (0, y, 0.89 - 0.035 * k * k), rot=(-12 - 14 * k, 0, 0)), TIME, (0.9, 1.1))
-    # cabeça grande, focinho e olhos
-    m.add("cabeca", tr(esfera(0.27, 20, 12), (0, -0.52, 0.84), esc=(1, 1, 0.93)), V, (0.8, 1.08))
-    m.add("cabeca", tr(esfera(1, 16, 10), (0, -0.73, 0.77), esc=(0.17, 0.16, 0.125)), V, (0.85, 1.08))
+    m.peca("cabeca", (0, -0.6, 1.02), "corpo")
+    m.peca("asa_d", (-0.2, 0.0, 0.82), "corpo")
+    m.peca("asa_e", (0.2, 0.0, 0.82), "corpo")
+    m.peca("cauda", (0, 0.42, 0.55), "corpo")
+
+    def placa(peca, y, z, tam, inc=0):                 # placa triangular nas costas (fina em x)
+        m.add(peca, tr(prisma([(-0.5 * tam, 0), (0.5 * tam, 0), (0.22 * tam, 1.05 * tam)], 0.035, 0.008), (0, y, z), rot=(inc, 0, 90)), TIME, (0.85, 1.15), **F)
+
+    # tronco, peito e barriga clara
+    m.add("corpo", tr(esfera(1, 10, 6), (0, 0.02, 0.56), esc=(0.31, 0.5, 0.3)), V, (0.72, 1.08), **F)
+    m.add("corpo", tr(esfera(1, 10, 6), (0, -0.24, 0.6), esc=(0.29, 0.3, 0.3)), V, (0.75, 1.08), **F)
+    m.add("corpo", tr(esfera(1, 10, 6), (0, -0.08, 0.47), esc=(0.25, 0.46, 0.24)), CREME, (0.82, 1.05), **F)
+    # pescoço (com a faixa clara na frente)
+    m.add("corpo", tubo([(0, -0.36, 0.7), (0, -0.52, 0.88), (0, -0.6, 1.04)], [0.19, 0.15, 0.135], 8), V, (0.8, 1.06), **F)
+    m.add("corpo", tubo([(0, -0.43, 0.63), (0, -0.585, 0.83), (0, -0.665, 1.0)], [0.14, 0.11, 0.095], 8), CREME, (0.85, 1.05), **F)
+    for (y, z, t, inc) in ((-0.42, 0.9, 0.13, -30), (-0.2, 0.86, 0.17, 0), (0.02, 0.86, 0.19, 0), (0.24, 0.82, 0.17, 12), (0.42, 0.74, 0.13, 25)):
+        placa("corpo", y, z, t, inc)
+    # patas com garras (penduradas, porque ele voa)
     for lado in (-1, 1):
-        m.add("cabeca", tr(esfera(0.022, 8, 6), (0.06 * lado, -0.875, 0.8)), PRETO, (1, 1))
-        m.add("cabeca", tr(esfera(0.078, 14, 10), (0.115 * lado, -0.715, 0.93)), BRANCO, (0.95, 1.05))
-        m.add("cabeca", tr(esfera(0.042, 10, 8), (0.125 * lado, -0.775, 0.945)), PRETO, (1, 1))
-        m.add("cabeca", tr(esfera(0.014, 8, 6), (0.112 * lado, -0.81, 0.965)), BRANCO, (1, 1))
-        m.add("cabeca", tr(cone(0.055, 0.2, 10), (0.14 * lado, -0.42, 1.04), rot=(-32, 22 * lado, 0)), CREME, (0.9, 1.05))
-        m.add("cabeca", tr(cone(0.02, 0.05, 6), (0.07 * lado, -0.845, 0.7), rot=(180, 0, 0)), BRANCO, (1, 1))   # dentinhos
-    # asas de morcego (membrana do time)
-    borda = [(0, 0.13), (0.32, 0.22), (0.66, 0.12), (0.76, -0.04), (0.6, -0.1), (0.5, -0.32), (0.36, -0.15), (0.22, -0.36), (0.07, -0.16)]
-    for lado, p in ((-1, "asa_d"), (1, "asa_e")):
-        c = [(x * lado, z) for x, z in borda]
-        if lado < 0:
-            c = list(reversed(c))
-        m.add(p, tr(prisma(c, 0.03, 0.01), (0.22 * lado, 0.02, 0.8), rot=(90, -16 * lado, 0)), TIME, (1, 1))
-        m.add(p, tubo([(0.22 * lado, 0.02 - 0.13, 0.8), (0.52 * lado, -0.19, 0.89), (0.84 * lado, -0.1, 1.0), (0.94 * lado, 0.06, 1.02)], [0.05, 0.04, 0.03, 0.02], 8), V2, (1, 1))
-    # cauda com ponta
-    m.add("cauda", tubo([(0, 0.36, 0.52), (0, 0.62, 0.44), (0, 0.86, 0.46), (0, 1.05, 0.58)], [0.15, 0.11, 0.075, 0.045], 10), V, (0.85, 1.05))
-    m.add("cauda", tr(cone(0.1, 0.2, 4), (0, 1.03, 0.57), rot=(-55, 0, 0), esc=(1, 0.5, 1)), TIME, (1, 1.1))
-    m.alt = 1.15
+        for (y, z, g) in ((-0.26, 0.36, 0.9), (0.24, 0.38, 1.12)):
+            m.add("corpo", tr(esfera(1, 8, 5), (0.21 * lado, y, z), esc=(0.105 * g, 0.13 * g, 0.16 * g)), V2, (0.78, 1.05), **F)
+            m.add("corpo", tr(esfera(1, 8, 5), (0.22 * lado, y - 0.07 * g, z - 0.17 * g), esc=(0.085 * g, 0.12 * g, 0.06 * g)), V2, (0.8, 1.05), **F)
+            for k in (-1, 0, 1):
+                m.add("corpo", tr(cone(0.022 * g, 0.09 * g, 5), ((0.22 + 0.05 * k) * lado, y - 0.17 * g, z - 0.19 * g), rot=(115, 0, 0)), OSSO, (1, 1), **F)
+
+    # cabeça: crânio, focinho comprido, mandíbula, olhos bravos, chifres
+    m.add("cabeca", tr(caixa(0.36, 0.36, 0.3, 0.08, 1), (0, -0.7, 1.14)), V, (0.82, 1.08), **F)
+    m.add("cabeca", tr(caixa(0.27, 0.36, 0.17, 0.05, 1), (0, -0.98, 1.1), rot=(-4, 0, 0)), V, (0.85, 1.08), **F)
+    m.add("cabeca", tr(caixa(0.23, 0.34, 0.07, 0.025, 1), (0, -0.95, 0.975), rot=(9, 0, 0)), CREME, (0.9, 1.05), **F)
+    m.add("cabeca", tr(caixa(0.3, 0.2, 0.1, 0.03, 1), (0, -0.7, 0.99)), CREME, (0.9, 1.05), **F)
+    for lado in (-1, 1):
+        m.add("cabeca", tr(esfera(0.026, 6, 4), (0.075 * lado, -1.15, 1.17)), PRETO, (1, 1), **F)                      # narinas
+        m.add("cabeca", tr(caixa(0.09, 0.1, 0.06, 0.02, 1), (0.075 * lado, -1.1, 1.185)), V2, (1, 1), **F)
+        m.add("cabeca", tr(esfera(1, 8, 6), (0.17 * lado, -0.79, 1.19), esc=(0.045, 0.075, 0.07)), "#FFE27A", (1.0, 1.1))  # olho amarelo
+        m.add("cabeca", tr(esfera(1, 6, 5), (0.2 * lado, -0.8, 1.19), esc=(0.025, 0.025, 0.06)), PRETO, (1, 1))          # pupila em fenda
+        m.add("cabeca", tr(caixa(0.07, 0.24, 0.06, 0.02, 1), (0.175 * lado, -0.78, 1.275), rot=(-16, 0, 0)), V2, (1, 1), **F)   # sobrancelha brava
+        m.add("cabeca", tr(cone(0.065, 0.34, 6), (0.12 * lado, -0.6, 1.26), rot=(-58, 0, -14 * lado)), OSSO, (0.85, 1.05), **F)  # chifre
+        m.add("cabeca", tr(cone(0.04, 0.17, 5), (0.185 * lado, -0.6, 1.1), rot=(-80, 0, -40 * lado)), OSSO, (0.9, 1.05), **F)   # espinho da bochecha
+        for y in (-1.1, -1.0, -0.9):                                                                                    # dentes
+            m.add("cabeca", tr(cone(0.02, 0.06, 4), (0.115 * lado, y, 1.025), rot=(180, 0, 0)), BRANCO, (1, 1), **F)
+    placa("cabeca", -0.64, 1.27, 0.12, -20)
+
+    # asas: braço, três dedos e a membrana do time entre eles
+    def asa(lado):
+        P = lambda x, y, z: (x * lado, y, z)                                 # noqa: E731
+        ombro, pulso = P(0.2, 0.0, 0.82), P(0.62, -0.14, 1.16)
+        d1, d2, d3, tras = P(1.28, -0.22, 1.1), P(1.16, 0.3, 0.94), P(0.82, 0.56, 0.78), P(0.22, 0.4, 0.7)
+        meio = lambda a, b, q=0.24: tuple((a[i] + b[i]) / 2 * (1 - q) + pulso[i] * q for i in range(3))     # noqa: E731
+        borda = [d1, meio(d1, d2), d2, meio(d2, d3), d3, meio(d3, tras, 0.12), tras]
+        vs = [pulso, ombro] + borda
+        fs = [(0, k + 2, k + 3) for k in range(len(borda) - 1)] + [(1, 0, len(vs) - 1)]
+        baixo = [(x, y, z - 0.02) for x, y, z in vs]
+        n = len(vs)
+        faces = fs + [tuple(reversed([i + n for i in f])) for f in fs]
+        forma = (vs + baixo, faces if lado > 0 else [tuple(reversed(f)) for f in faces])
+        peca = "asa_e" if lado > 0 else "asa_d"
+        m.add(peca, forma, TIME, (0.7, 1.12), **F)
+        m.add(peca, tubo([ombro, pulso], [0.06, 0.045], 6), V2, (1, 1), **F)
+        for d in (d1, d2, d3):
+            m.add(peca, tubo([pulso, d], [0.04, 0.015], 5), V2, (1, 1), **F)
+        m.add(peca, tr(cone(0.035, 0.13, 5), pulso, rot=(-30, 0, -25 * lado)), OSSO, (1, 1), **F)             # garra do pulso
+    asa(1)
+    asa(-1)
+
+    # cauda com placas e ponta de flecha
+    m.add("cauda", tubo([(0, 0.38, 0.55), (0, 0.7, 0.5), (0, 0.98, 0.56), (0, 1.2, 0.7)], [0.21, 0.145, 0.09, 0.05], 8), V, (0.8, 1.06), **F)
+    placa("cauda", 0.62, 0.64, 0.12, 14)
+    placa("cauda", 0.84, 0.62, 0.1, -8)
+    m.add("cauda", tr(prisma([(-0.16, 0), (0, 0.1), (0.16, 0), (0, -0.26)], 0.04, 0.01), (0, 1.3, 0.76), rot=(-58, 0, 90)), TIME, (0.9, 1.15), **F)
+    m.alt = 1.45
     return m
 
 
@@ -346,16 +386,22 @@ def ruina():
 
 
 def bola_fogo():
+    """Meteoro de fogo: miolo branco-amarelo na frente e línguas de fogo compridas para trás (voa para -Y)."""
     m = Modelo("bola_fogo", 1.0)
     m.peca("corpo", (0, 0, 0.5))
-    m.add("corpo", tr(esfera(0.34, 16, 10), (0, 0, 0.5)), "#FF8A1E", (1.0, 1.25))
-    m.add("corpo", tr(esfera(0.27, 14, 8), (0, -0.14, 0.48)), "#FFE066", (1.2, 1.4))
-    random.seed(3)
-    for k in range(9):                                # línguas de fogo para trás
-        a = random.uniform(0, 2 * math.pi)
-        r = random.uniform(0.08, 0.24)
-        m.add("corpo", tr(cone(random.uniform(0.09, 0.16), random.uniform(0.3, 0.6), 8), (r * math.cos(a), 0.12, 0.5 + r * math.sin(a)), rot=(-90 + random.uniform(-20, 20), 0, random.uniform(-20, 20))),
-              random.choice(["#FF5A1F", "#FF8A1E", "#FFB52E"]), (1.0, 1.2))
+    F = dict(liso=False)
+    m.add("corpo", tr(esfera(0.3, 8, 5), (0, 0.04, 0.5)), "#FF7A1A", (1.0, 1.2), **F)
+    m.add("corpo", tr(esfera(0.24, 8, 5), (0, -0.1, 0.5)), "#FFC83D", (1.1, 1.3), **F)
+    m.add("corpo", tr(esfera(0.15, 8, 5), (0, -0.22, 0.5)), "#FFF6C8", (1.3, 1.4), **F)
+    random.seed(5)
+    for k in range(16):                               # línguas de fogo: em volta e para trás
+        a = 2 * math.pi * k / 16 + random.uniform(-0.15, 0.15)
+        r = random.uniform(0.14, 0.27)
+        comp = random.uniform(0.45, 0.95)
+        m.add("corpo", tr(cone(random.uniform(0.09, 0.15), comp, 5), (r * math.cos(a), 0.1, 0.5 + r * math.sin(a)),
+                          rot=(-90 + 26 * math.sin(a) * (r / 0.27), 0, -26 * math.cos(a) * (r / 0.27))),
+              ["#E8421A", "#FF7A1A", "#FFA52E"][k % 3], (1.0, 1.25), **F)
+    m.add("corpo", tr(cone(0.2, 1.1, 6), (0, 0.15, 0.5), rot=(-90, 0, 0)), "#FFC83D", (1.1, 1.3), **F)
     m.alt = 1.0
     return m
 
@@ -439,6 +485,7 @@ def flecha():
 
 
 # cavaleiro, besteiro, gigante, mago e bandido vêm do pacote KayKit (kaykit.py); os de cima ficam como reserva
-TROPAS = ["dragao", "balista"]
-PREDIOS = ["torre", "castelo", "ruina"]
-OBJETOS = ["bola_fogo", "flecha", "arvore", "pinheiro", "pedra", "arbusto", "ponte", "cerca"]
+TROPAS = ["dragao"]
+# torres, castelo, catapulta, ruína e árvores vêm do pacote KayKit Medieval Hexagon (hexagono.py)
+PREDIOS = []
+OBJETOS = ["bola_fogo", "flecha", "ponte"]

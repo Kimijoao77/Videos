@@ -316,6 +316,12 @@ def foto(arq, alvo=(0, 0, 0.8), dist=4.2, az=-28, el=18, larg=420, alt=520, fund
     sol = bpy.data.objects.new("_foto_sol", sd)
     sol.rotation_euler = (math.radians(48), 0, math.radians(az - 35))
     cena.collection.objects.link(sol)
+    cd_ = bpy.data.lights.new("_foto_contra", "SUN")       # luz de trás, para destacar o contorno
+    cd_.energy = 2.2
+    cd_.color = (0.75, 0.88, 1.0)
+    contra = bpy.data.objects.new("_foto_contra", cd_)
+    contra.rotation_euler = (math.radians(-62), 0, math.radians(az + 150))
+    cena.collection.objects.link(contra)
     if not transparente:
         bpy.ops.mesh.primitive_plane_add(size=60, location=(0, 0, 0))
         chao = bpy.context.object

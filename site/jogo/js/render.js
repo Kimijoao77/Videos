@@ -9,7 +9,9 @@ import { CARTAS, L, C, RIO0, RIO1, PONTES } from "./sim.js";
 const AZUL = new THREE.Color("#2F7BFF"), VERMELHO = new THREE.Color("#F0463C");
 // modelos do pacote KayKit (com esqueleto e animações): altura no jogo, em casas
 const KAYKIT = { cavaleiro: 2.2, besteiro: 1.9, gigante: 3.6, mago: 2.2, bandido: 1.7 };
-const MEUS = ["dragao", "balista", "torre", "castelo", "ruina", "bola_fogo", "flecha", "arvore", "pinheiro", "pedra", "arbusto", "ponte", "cerca"];
+const MEUS = ["dragao", "bola_fogo", "flecha", "ponte"];                      // modelados por código no Blender
+// do pacote KayKit Medieval Hexagon: um arquivo azul e um vermelho, ou um só (neutros)
+const PREDIOS_TIME = ["torre", "castelo", "catapulta"], NEUTROS = ["ruina", "pedra_cat", "arvore", "pinheiro", "pedra", "bosque"];
 const ALT_VOO = 1.9;
 
 export class Cena {
@@ -46,7 +48,7 @@ export class Cena {
   // ------------------------------------------------------------ carregar os modelos
   async carregar(base, progresso) {
     const loader = new GLTFLoader();
-    const nomes = [...Object.keys(KAYKIT), ...MEUS];
+    const nomes = [...Object.keys(KAYKIT), ...MEUS, ...NEUTROS, ...PREDIOS_TIME.flatMap(n => [`${n}_azul`, `${n}_vermelho`])];
     let feitos = 0;
     await Promise.all(nomes.map(async (n) => {
       const g = await loader.loadAsync(`${base}modelos/${n}.glb`);
@@ -66,6 +68,9 @@ export class Cena {
       });
     }
     for (const n of MEUS) this.prepararMeu(n);
+    const leve = (g) => { g.scene.traverse(o => { if (o.isMesh) o.material = new THREE.MeshLambertMaterial({ map: o.material.map }); }); return g.scene; };
+    for (const n of NEUTROS) { const cena = leve(this.modelos[n]); this.modelos[n].porTime = [cena, cena]; }
+    for (const n of PREDIOS_TIME) this.modelos[n] = { porTime: [leve(this.modelos[`${n}_azul`]), leve(this.modelos[`${n}_vermelho`])] };
     this.montarArena();
   }
 
@@ -136,14 +141,14 @@ export class Cena {
     // árvores, pedras e arbustos em volta (sempre nos mesmos lugares)
     let s = 7;
     const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
-    for (let k = 0; k < 70; k++) {
-      const lado = k % 2 ? 1 : -1, x = lado * (L / 2 + 1.6 + rnd() * 7), z = (rnd() - 0.5) * (C + 14);
-      const tipo = ["arvore", "pinheiro", "arvore", "arbusto", "pedra"][Math.floor(rnd() * 5)];
-      const o = this.novo(tipo); const e = 0.9 + rnd() * 0.7;
-      o.position.set(x, 0, z); o.scale.setScalar(e); o.rotation.y = rnd() * 6.28; this.cena.add(o);
+    for (let k = 0; k < 64; k++) {
+      const lado = k % 2 ? 1 : -1, x = lado * (L / 2 + 1.8 + rnd() * 7), z = (rnd() - 0.5) * (C + 14);
+      const tipo = ["arvore", "pinheiro", "arvore", "bosque", "pedra", "pinheiro"][Math.floor(rnd() * 6)];
+      const o = this.novo(tipo); const e = 0.85 + rnd() * 0.6;
+      o.position.set(x + (tipo === "bosque" ? lado * 2 : 0), 0, z); o.scale.setScalar(e); o.rotation.y = rnd() * 6.28; this.cena.add(o);
     }
-    for (let k = 0; k < 16; k++) {
-      const o = this.novo(k % 3 ? "pinheiro" : "arvore"); o.position.set((rnd() - 0.5) * 26, 0, -(C / 2 + 2.5 + rnd() * 5)); o.scale.setScalar(1 + rnd() * 0.6); this.cena.add(o);
+    for (let k = 0; k < 14; k++) {
+      const o = this.novo(k % 3 ? "pinheiro" : "bosque"); o.position.set((rnd() - 0.5) * 26, 0, -(C / 2 + 3 + rnd() * 5)); o.scale.setScalar(1 + rnd() * 0.5); this.cena.add(o);
     }
     // zona proibida (aparece quando o jogador escolhe uma carta) e a marca de onde vai cair
     this.zonas = new THREE.Group(); this.zonas.visible = false; this.cena.add(this.zonas);
@@ -256,7 +261,7 @@ export class Cena {
     else if (t === "morte") {
       const fixa = d === "torre" || d === "rei";
       this.fumaca(this.X(b), this.Z(c), fixa ? 22 : 7, fixa ? 2.2 : 0.7, fixa ? 0xd8d2c4 : 0xffffff);
-      if (fixa) { this.tremor = 0.7; this.ruina(this.X(b), this.Z(c), d === "rei" ? 1.35 : 1); }
+      if (fixa) { this.tremor = 0.7; this.ruina(this.X(b), this.Z(c), d === "rei" ? 1.5 : 1); }
       this.aoSom && this.aoSom(fixa ? "torre" : "morte");
     } else if (t === "explode") { this.explosao(this.X(a), this.Z(b), c, d); this.aoSom && this.aoSom(d ? "impacto" : "explosao"); if (!d) this.tremor = 0.35; }
     else if (t === "dano") { const o = this.bonecos.get(a); o && o.apanhar(); }
@@ -348,13 +353,13 @@ class Boneco {
     } else {
       this.pecas = {};
       this.m.traverse(o => { this.pecas[o.name] = o; });
-      this.altura = this.fixa ? (k === "rei" ? 6.0 : 5.2) : this.voa ? ALT_VOO + 1.5 : 1.5;
-      if (!this.fixa) this.esc = 1.3;
+      this.altura = this.fixa ? (k === "rei" ? 6.7 : 5.1) : this.voa ? ALT_VOO + 1.9 : 2.7;
+      if (k === "dragao") this.esc = 1.3;
     }
     this.m.scale.setScalar(this.esc);
     this.g.position.set(c.X(x), 0, c.Z(y));
     this.ang = this.fixa ? 0 : c.giro(a);               // torres e castelos sempre de frente para a câmera
-    this.m.rotation.y = this.ang;
+    this.m.rotation.y = this.predio ? 0 : this.ang;
     if (this.voa) this.m.position.y = ALT_VOO;
     // disco do time no chão
     if (!this.fixa) {
@@ -430,7 +435,7 @@ class Boneco {
     const c = this.c, p = this.g.position;
     const k = 1 - Math.exp(-dt * 13);
     p.x += (c.X(this.tx) - p.x) * k; p.z += (c.Z(this.ty) - p.z) * k;
-    if (!this.fixa && this.angAlvo != null && this.k !== "balista") {
+    if (!this.predio && this.angAlvo != null) {
       let d = this.angAlvo - this.ang; d = Math.atan2(Math.sin(d), Math.cos(d));
       this.ang += d * (1 - Math.exp(-dt * 12));
       this.m.rotation.y = this.ang;
@@ -451,13 +456,13 @@ class Boneco {
       if (P.cabeca) P.cabeca.rotation.x = -golpe * 0.5;
       this.m.position.y = ALT_VOO + Math.sin(agora * 2.4 + this.id) * 0.14 - bate * 0.05;
       this.m.rotation.x = 0.12;
-    } else if (this.k === "balista") {
-      if (P.topo && this.angAlvo != null) {
+    } else if (this.k === "catapulta") {
+      if (P.catapult_turret && this.angAlvo != null) {            // a catapulta gira no topo da torre e o braço dá o golpe
         let d = this.angAlvo - this.ang; d = Math.atan2(Math.sin(d), Math.cos(d));
         this.ang += d * (1 - Math.exp(-dt * 10));
-        P.topo.rotation.y = this.ang - this.m.rotation.y;
-        P.topo.position.z = -golpe * 0.18;
+        P.catapult_turret.rotation.y = this.ang;
       }
+      if (P.catapult_arm) P.catapult_arm.rotation.x = -golpe * 1.3;
     }
   }
 
@@ -469,13 +474,14 @@ class Projetil {
   constructor(c, p) {
     this.c = c; this.tipo = p[1];
     const time = p[5] === c.visao ? 0 : 1;
-    if (this.tipo === "bola") { this.o = c.novo("bola_fogo"); this.o.scale.setScalar(1.7); }
+    if (this.tipo === "bola") { this.o = c.novo("bola_fogo"); this.o.scale.setScalar(1.9); }
+    else if (this.tipo === "pedra") { this.o = c.novo("pedra_cat"); }
     else if (this.tipo === "flecha" || this.tipo === "virote") { this.o = c.novo("flecha"); this.o.scale.setScalar(this.tipo === "virote" ? 1.5 : 1.25); }
     else {
       const cor = this.tipo === "magia" ? (time === 0 ? 0x7fefff : 0xff9df0) : 0xff8a1e;
       this.o = new THREE.Mesh(new THREE.SphereGeometry(this.tipo === "magia" ? 0.24 : 0.3, 12, 8), new THREE.MeshBasicMaterial({ color: cor }));
     }
-    this.h0 = this.tipo === "bola" ? 4 : p[4] ? 3.6 : this.tipo === "fogo" ? ALT_VOO + 0.6 : 1.1;
+    this.h0 = this.tipo === "bola" ? 4 : p[4] ? 3.6 : this.tipo === "fogo" ? ALT_VOO + 0.9 : this.tipo === "pedra" ? 2.6 : 1.3;
     this.h1 = p[6] ? ALT_VOO + 0.5 : 0.9;
     this.x = p[2]; this.y = p[3];
     this.o.position.set(c.X(this.x), this.h0, c.Z(this.y));
@@ -491,11 +497,12 @@ class Projetil {
     const antes = o.position.clone();
     this.x += (this.tx - this.x) * k; this.y += (this.ty - this.y) * k;
     const q = this.q || 0;
-    const h = this.tipo === "bola" ? 1.2 + Math.sin(Math.PI * q) * 7 + (1 - q) * 2.5 : this.h0 + (this.h1 - this.h0) * q + Math.sin(Math.PI * q) * 0.7;
+    const h = this.tipo === "bola" ? 1.2 + Math.sin(Math.PI * q) * 7 + (1 - q) * 2.5 : this.h0 + (this.h1 - this.h0) * q + Math.sin(Math.PI * q) * (this.tipo === "pedra" ? 1.8 : 0.7);
     o.position.set(c.X(this.x), h, c.Z(this.y));
     const v = o.position.clone().sub(antes);
     if (v.lengthSq() > 1e-6) o.lookAt(o.position.clone().add(v));
     if (this.tipo === "bola") o.rotateZ(dt * 9);
+    if (this.tipo === "pedra") o.rotateX(this.giro = (this.giro || 0) + dt * 9);
   }
   sair() { this.c.cena.remove(this.o); }
 }

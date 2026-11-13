@@ -25,14 +25,13 @@ if "cartas" in QUAIS:
     kit.COR_TIME = AZUL
     # carta: (modelo, [posições dos bonecos], alvo, distância, azimute, elevação)
     CARTAS = {
-        "dragao": ("dragao", [(0, 0)], (0, -0.1, 0.72), 3.9, -34, 10),
-        "balista": ("balista", [(0, 0)], (0, 0, 0.5), 3.7, -40, 22),
-        "bola_fogo": ("bola_fogo", [(0, 0)], (0, 0.1, 0.5), 2.6, -55, 8),
+        "dragao": ("dragao", [(0, 0)], (0, -0.1, 0.8), 5.6, -38, 8),
+        "bola_fogo": ("bola_fogo", [(0, 0)], (0, 0.3, 0.5), 3.9, -62, 6),
     }
     for carta, (modelo, onde, alvo, dist, az, el) in CARTAS.items():
         kit.limpar()
         for (x, y) in onde:
             raiz = getattr(P, modelo)().montar()
             raiz.location = (x, y, 0)
-        kit.foto(JOGO / "cartas" / f"{carta}.png", alvo=alvo, dist=dist, az=az, el=el, larg=256, alt=256, amostras=40, transparente=True)
+        kit.foto(JOGO / "cartas" / f"{carta}.png", alvo=alvo, dist=dist, az=az, el=el, larg=512, alt=512, amostras=48, transparente=True)
         print("carta", carta, flush=True)

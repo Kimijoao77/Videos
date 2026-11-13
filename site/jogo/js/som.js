@@ -31,7 +31,7 @@ export function tocar(nome, extra) {
     case "erro": tom(220, 150, 0.16, "square", 0.08); break;
     case "nasce": tom(300, 620, 0.14, "triangle", 0.16); ruido(0.12, 900, 0.1); break;
     case "atq":
-      if (extra === "torre" || extra === "rei" || extra === "besteiros" || extra === "balista") { ruido(0.07, 3200, 0.07, 3); tom(900, 500, 0.06, "triangle", 0.04); }
+      if (extra === "torre" || extra === "rei" || extra === "besteiros" || extra === "catapulta") { ruido(0.07, 3200, 0.07, 3); tom(900, 500, 0.06, "triangle", 0.04); }
       else if (extra === "mago") tom(900, 1500, 0.14, "sine", 0.07);
       else if (extra === "dragao") ruido(0.22, 700, 0.1, 0.7);
       else { ruido(0.06, 1800, 0.1, 2); tom(180, 90, 0.08, "triangle", 0.1); }

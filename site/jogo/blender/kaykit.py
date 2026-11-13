@@ -74,7 +74,7 @@ for saida, (arq, manter, anims, pose) in QUEM.items():
             tr.mute = True
         bpy.context.scene.frame_set(pose[1])
         alt = medidas[saida]
-        kit.foto(JOGO / "cartas" / f"{saida}.png", alvo=(0, 0, alt * 0.52), dist=alt * 2.35, az=-30, el=10, larg=256, alt=256, amostras=40, transparente=True)
+        kit.foto(JOGO / "cartas" / f"{saida}.png", alvo=(0, 0, alt * 0.52), dist=alt * 2.35, az=-30, el=10, larg=512, alt=512, amostras=48, transparente=True)
         for o in list(bpy.data.objects):
             if o.name.startswith("_foto"):
                 bpy.data.objects.remove(o)
