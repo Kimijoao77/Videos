@@ -1,0 +1,58 @@
+# Lince Lunar — só a narração (13/11/2026): grava a voz de um roteiro (Speechify, narrar_seq.py) e manda a pasta inteira
+# (voz.wav, tempos.json, marcas.json e cada fala separada) num .zip para a Release privada "lince-lunar" do Engfy.
+# Serve para os vídeos longos, que são montados fora daqui com os clipes do Flow. Nada é postado.
+name: "Lince: só a narração"
+
+on:
+  workflow_dispatch:
+    inputs:
+      roteiro:
+        description: "Roteiro dentro de canal/lince (ex.: longo/submarino/narracao.json)"
+        required: true
+        default: "longo/submarino/narracao.json"
+      nome:
+        description: "Nome do .zip na Release"
+        required: true
+        default: "lince-submarino-voz"
+
+permissions:
+  contents: read
+
+env:
+  CANAL_REPO: Kimijoao77/Engfy
+
+jobs:
+  voz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SPEECHIFY_API_KEY: ${{ secrets.SPEECHIFY_API_KEY }}
+      GH_TOKEN: ${{ secrets.ENGFY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CANAL_REPO }}
+          token: ${{ secrets.ENGFY_TOKEN }}
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            canal/lince
+            canal/voz.py
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: |
+          instalar() { timeout 90 sudo apt-get install -y -qq --no-install-recommends "$@" > /dev/null 2>&1 && return 0; timeout 120 sudo apt-get update -qq > /dev/null 2>&1; timeout 150 sudo apt-get install -y -qq --no-install-recommends "$@" > /dev/null 2>&1; }
+          instalar ffmpeg || echo "::warning::apt-get falhou (espelho do Ubuntu lento)"
+          pip install -q numpy requests
+          if ! command -v ffprobe > /dev/null; then
+            curl -sSfL -o /tmp/ff.tar.xz https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz
+            mkdir -p /tmp/ff && tar -xJf /tmp/ff.tar.xz -C /tmp/ff --strip-components=1
+            sudo cp /tmp/ff/bin/ffmpeg /tmp/ff/bin/ffprobe /usr/local/bin/
+          fi
+      - name: Narração
+        run: python canal/lince/narrar_seq.py "canal/lince/${{ inputs.roteiro }}" voz
+      - name: Mandar para a Release privada
+        run: |
+          cd voz && zip -qr "../${{ inputs.nome }}.zip" . && cd ..
+          for i in 1 2 3; do gh release upload lince-lunar -R "$CANAL_REPO" "${{ inputs.nome }}.zip" --clobber && break; sleep 10; done
