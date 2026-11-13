@@ -1,6 +1,6 @@
 // Arena dos Reinos: guarda o jogo no aparelho para abrir rápido e jogar contra o computador sem internet.
 // Primeiro tenta a rede (para pegar as atualizações) e, sem rede, usa a cópia guardada.
-const VERSAO = "arena-202611131314";
+const VERSAO = "arena-202611131317";
 const ARQUIVOS = [
 "./",
 "index.html",
@@ -72,5 +72,5 @@ self.addEventListener("fetch", (ev) => {
   const pesado = /\.(glb|png|woff2)$/.test(url.pathname);
   ev.respondWith(pesado
     ? caches.match(ev.request).then(r => r || fetch(ev.request).then(resp => { const cp = resp.clone(); caches.open(VERSAO).then(c => c.put(ev.request, cp)); return resp; }))
-    : fetch(ev.request).then(resp => { const cp = resp.clone(); caches.open(VERSAO).then(c => c.put(ev.request, cp)); return resp; }).catch(() => caches.match(ev.request, { ignoreSearch: true })));
+    : fetch(ev.request, { cache: "no-cache" }).then(resp => { const cp = resp.clone(); caches.open(VERSAO).then(c => c.put(ev.request, cp)); return resp; }).catch(() => caches.match(ev.request, { ignoreSearch: true })));
 });

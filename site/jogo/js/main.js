@@ -428,7 +428,16 @@ window.addEventListener("pagehide", () => { if (rede) rede.fechar(); });
 let pedidoInstalar = null;
 window.addEventListener("beforeinstallprompt", (ev) => { ev.preventDefault(); pedidoInstalar = ev; mostrar("instalar"); });
 clique("instalar", async () => { if (!pedidoInstalar) return; pedidoInstalar.prompt(); await pedidoInstalar.userChoice.catch(() => {}); pedidoInstalar = null; mostrar("instalar", false); });
-if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+if ("serviceWorker" in navigator && location.protocol === "https:") {
+  // quando sai versão nova do jogo, o aparelho baixa sozinho e recarrega (só se estiver no menu, para não cortar partida)
+  const tinha = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.register("sw.js").then(r => { r.update().catch(() => {}); setInterval(() => r.update().catch(() => {}), 5 * 60 * 1000); }).catch(() => {});
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!tinha) return;
+    const tentar = () => { if (modo === "demo") location.reload(); else setTimeout(tentar, 3000); };
+    tentar();
+  });
+}
 
 // ------------------------------------------------------------------ quadro a quadro
 function quadro() {
