@@ -1,0 +1,92 @@
+/* Arena dos Reinos: interface do jogo. Azul-noite, dourado nos botões e roxo na energia. */
+@font-face { font-family: "Lilita One"; src: url("vendor/LilitaOne.woff2") format("woff2"); font-display: swap; unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2013-2014, U+2018-201D, U+2026; }
+@font-face { font-family: "Lilita One"; src: url("vendor/LilitaOne-ext.woff2") format("woff2"); font-display: swap; unicode-range: U+0100-024F; }
+:root {
+  --noite: #0E1B33; --painel: #16294D; --painel2: #1F3866; --borda: #0A1326; --texto: #F4F1E6; --fraco: #AFC0E0;
+  --ouro: #FFC83D; --ouro2: #E39A00; --azul: #2F7BFF; --vermelho: #F0463C; --energia: #C45BFF; --energia2: #7B2BD6;
+  --titulo: "Lilita One", "Trebuchet MS", system-ui, sans-serif;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; background: #060C18; color: var(--texto); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overscroll-behavior: none; }
+body { display: flex; justify-content: center; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
+#palco { position: relative; height: 100dvh; width: min(100vw, calc(100dvh * 0.6)); background: var(--noite); overflow: hidden; }
+#tela { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+[hidden] { display: none !important; }
+h1, h2 { font-family: var(--titulo); font-weight: 400; margin: 0; letter-spacing: 0.01em; }
+
+/* barra de cima */
+#topo { position: absolute; top: 0; left: 0; right: 0; display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; gap: 8px; padding: calc(8px + env(safe-area-inset-top)) 52px 0 10px; pointer-events: none; }
+.jogador { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.jogador.eu { align-items: flex-end; }
+.jogador .nome { font-family: var(--titulo); font-size: 15px; padding: 2px 10px; border-radius: 999px; background: var(--vermelho); border: 2px solid var(--borda); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jogador.eu .nome { background: var(--azul); }
+.coroas { display: inline-flex; gap: 5px; padding: 2px 4px; }
+.coroa { width: 22px; height: 18px; background: rgba(10,19,38,0.75); clip-path: polygon(8% 100%, 0 22%, 27% 58%, 50% 0, 73% 58%, 100% 22%, 92% 100%); }
+.coroa.tem { background: var(--ouro); }
+.coroas.grande .coroa { width: 34px; height: 29px; }
+.relogio { font-family: var(--titulo); font-size: 24px; line-height: 1; padding: 6px 14px 5px; border-radius: 14px; background: var(--painel); border: 3px solid var(--borda); text-align: center; font-variant-numeric: tabular-nums; }
+.relogio small { display: block; font-family: system-ui, sans-serif; font-size: 10px; font-weight: 700; color: var(--ouro); letter-spacing: 0.04em; }
+.relogio.pressa { background: #7A1F2B; }
+.redondo { position: absolute; top: calc(8px + env(safe-area-inset-top)); right: 8px; width: 36px; height: 36px; border-radius: 50%; border: 3px solid var(--borda); background: var(--painel); color: var(--texto); font-size: 15px; font-weight: 700; cursor: pointer; padding: 0; }
+#botaoSair { top: calc(50px + env(safe-area-inset-top)); }
+#botaoSom::before { content: "♪"; font-size: 18px; }
+#botaoSom.mudo { opacity: 0.55; text-decoration: line-through; }
+
+/* a mão de cartas e a energia */
+#mao { position: absolute; left: 0; right: 0; bottom: 0; padding: 10px 8px calc(8px + env(safe-area-inset-bottom)); background: linear-gradient(180deg, rgba(14,27,51,0) 0, rgba(14,27,51,0.92) 18%, #0E1B33 100%); }
+.cartas { display: grid; grid-template-columns: 0.62fr 4fr; gap: 8px; align-items: end; }
+#cartas { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.proxima { text-align: center; }
+.proxima small { display: block; font-size: 10px; font-weight: 700; color: var(--fraco); margin-bottom: 3px; }
+.carta { position: relative; aspect-ratio: 5 / 6; border-radius: 12px; border: 3px solid var(--borda); background: linear-gradient(180deg, #3E6BC4 0%, #24427E 100%); box-shadow: 0 4px 0 var(--borda); cursor: pointer; transition: transform 0.12s ease, filter 0.15s ease; overflow: hidden; touch-action: none; }
+.carta img { position: absolute; inset: 4% 4% 14%; width: 92%; height: 82%; object-fit: contain; pointer-events: none; -webkit-user-drag: none; }
+.carta .nomeCarta { position: absolute; left: 0; right: 0; bottom: 0; padding: 2px 2px 3px; font-family: var(--titulo); font-size: clamp(9px, 2.9vw, 13px); text-align: center; background: rgba(10,19,38,0.72); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.carta .custo { position: absolute; top: -3px; left: -3px; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 0 0 14px 0; background: linear-gradient(180deg, var(--energia), var(--energia2)); border: 3px solid var(--borda); font-family: var(--titulo); font-size: 17px; }
+.carta.cara { filter: grayscale(0.85) brightness(0.62); }
+.carta.sel { transform: translateY(-14px); border-color: var(--ouro); box-shadow: 0 4px 0 var(--ouro2), 0 0 18px rgba(255,200,61,0.55); }
+.carta.nao { animation: nao 0.28s; }
+.carta.mini { aspect-ratio: 5 / 6; border-width: 2px; box-shadow: none; cursor: default; }
+.carta.mini .custo { width: 20px; height: 20px; font-size: 12px; border-width: 2px; }
+.carta.mini .nomeCarta { display: none; }
+.carta.mini img { inset: 6%; width: 88%; height: 88%; }
+@keyframes nao { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+.energia { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+.gota { width: 34px; height: 34px; flex: none; display: grid; place-items: center; border-radius: 50% 50% 50% 50% / 62% 62% 42% 42%; background: linear-gradient(180deg, var(--energia), var(--energia2)); border: 3px solid var(--borda); font-family: var(--titulo); font-size: 18px; }
+.barra { position: relative; flex: 1; height: 20px; border-radius: 10px; background: #081226; border: 3px solid var(--borda); overflow: hidden; }
+#energiaCheia { height: 100%; width: 50%; background: linear-gradient(180deg, #E08BFF, var(--energia) 45%, var(--energia2)); }
+.marcas { position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0, transparent calc(10% - 2px), rgba(8,18,38,0.75) calc(10% - 2px), rgba(8,18,38,0.75) 10%); }
+
+/* painéis */
+.painel { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(88%, 380px); max-height: 92%; overflow-y: auto; padding: 22px 20px 20px; border-radius: 22px; background: rgba(22,41,77,0.94); border: 4px solid var(--borda); box-shadow: 0 10px 0 rgba(6,12,24,0.55); text-align: center; display: flex; flex-direction: column; gap: 12px; touch-action: pan-y; }
+.logo { font-size: clamp(34px, 11vw, 46px); line-height: 0.95; color: var(--ouro); -webkit-text-stroke: 2px var(--borda); paint-order: stroke fill; text-shadow: 0 4px 0 var(--borda); }
+.painel h2 { font-size: 30px; color: var(--ouro); text-shadow: 0 3px 0 var(--borda); }
+.painel p { margin: 0; color: var(--fraco); font-size: 15px; line-height: 1.4; }
+.sub { font-size: 16px !important; }
+.botao { font-family: var(--titulo); font-size: 19px; color: var(--texto); padding: 13px 14px; border-radius: 14px; border: 3px solid var(--borda); background: var(--painel2); box-shadow: 0 5px 0 var(--borda); cursor: pointer; transition: transform 0.08s; }
+.botao:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--borda); }
+.botao.principal { background: linear-gradient(180deg, #FFD964, var(--ouro) 55%, var(--ouro2)); color: #3A2500; }
+.botao.fino { background: transparent; box-shadow: none; border-color: transparent; color: var(--fraco); font-size: 16px; padding: 6px; }
+.botao.pequeno { font-size: 15px; padding: 8px 12px; box-shadow: 0 3px 0 var(--borda); }
+.botao:focus-visible, .carta:focus-visible, input:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+.campo { display: flex; flex-direction: column; gap: 4px; text-align: left; font-size: 13px; font-weight: 700; color: var(--fraco); }
+input { font: inherit; font-size: 17px; font-weight: 600; color: var(--texto); background: #0B1630; border: 3px solid var(--borda); border-radius: 12px; padding: 10px 12px; width: 100%; user-select: text; -webkit-user-select: text; }
+.link { display: flex; gap: 6px; }
+.link input { font-size: 13px; }
+.carga { height: 18px; border-radius: 9px; background: #081226; border: 3px solid var(--borda); overflow: hidden; }
+#cargaCheia { height: 100%; width: 0; background: linear-gradient(180deg, #FFD964, var(--ouro2)); transition: width 0.2s; }
+.passos { margin: 0; padding-left: 20px; text-align: left; color: var(--texto); font-size: 14.5px; line-height: 1.4; display: grid; gap: 6px; }
+#listaCartas { display: grid; gap: 6px; text-align: left; }
+.linhaCarta { display: grid; grid-template-columns: 46px 1fr; gap: 10px; align-items: center; background: rgba(10,19,38,0.5); border-radius: 12px; padding: 5px 8px; }
+.linhaCarta img { width: 46px; height: 46px; object-fit: contain; }
+.linhaCarta b { font-family: var(--titulo); font-weight: 400; font-size: 16px; }
+.linhaCarta b i { font-style: normal; color: #E08BFF; margin-left: 6px; }
+.linhaCarta span { display: block; font-size: 12.5px; color: var(--fraco); line-height: 1.3; }
+.placar { display: flex; justify-content: center; align-items: center; gap: 16px; font-family: var(--titulo); font-size: 26px; }
+.placar small { display: block; font-family: system-ui, sans-serif; font-size: 12px; font-weight: 700; color: var(--fraco); margin-top: 4px; }
+
+#contagem { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--titulo); font-size: 120px; color: var(--ouro); -webkit-text-stroke: 4px var(--borda); paint-order: stroke fill; text-shadow: 0 8px 0 var(--borda); pointer-events: none; }
+#contagem.pulo { animation: pulo 0.5s ease-out; }
+@keyframes pulo { 0% { transform: scale(1.7); opacity: 0; } 40% { opacity: 1; } 100% { transform: scale(1); } }
+#faixa { position: absolute; left: 0; right: 0; top: 36%; padding: 10px; text-align: center; font-family: var(--titulo); font-size: 30px; color: var(--ouro); background: rgba(10,19,38,0.8); border-block: 3px solid var(--borda); pointer-events: none; animation: pulo 0.4s ease-out; }
+#aviso { position: absolute; left: 50%; bottom: 31%; transform: translateX(-50%); padding: 8px 14px; border-radius: 12px; background: rgba(10,19,38,0.92); border: 2px solid var(--borda); font-size: 14px; font-weight: 600; white-space: nowrap; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .carta, .botao { transition: none; } #contagem.pulo, #faixa, .carta.nao { animation: none; } }

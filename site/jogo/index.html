@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0E1B33">
+<title>Arena dos Reinos</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="img/icone-192.png">
+<link rel="stylesheet" href="estilo.css">
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
+<script src="vendor/peerjs.min.js"></script>
+</head>
+<body>
+<div id="palco">
+  <canvas id="tela" aria-label="Arena do jogo"></canvas>
+
+  <div id="topo" hidden>
+    <div class="jogador inimigo"><span class="nome" id="nomeInimigo">Adversário</span><span class="coroas" id="coroasInimigo"></span></div>
+    <div class="relogio" id="relogio"><span id="tempo">3:00</span><small id="avisoTempo"></small></div>
+    <div class="jogador eu"><span class="coroas" id="coroasEu"></span><span class="nome" id="nomeEu">Você</span></div>
+  </div>
+
+  <div id="mao" hidden>
+    <div class="cartas">
+      <div class="proxima"><small>Próxima</small><div class="carta mini" id="proxima"></div></div>
+      <div id="cartas"></div>
+    </div>
+    <div class="energia"><div class="gota" id="energiaNum">5</div><div class="barra"><div id="energiaCheia"></div><div class="marcas"></div></div></div>
+  </div>
+
+  <div id="contagem" hidden></div>
+  <div id="faixa" hidden></div>
+  <button id="botaoSom" class="redondo" aria-label="Ligar ou desligar o som" hidden></button>
+  <button id="botaoSair" class="redondo" aria-label="Sair da partida" hidden>✕</button>
+
+  <section id="carregando" class="painel">
+    <h1 class="logo">Arena dos Reinos</h1>
+    <div class="carga"><div id="cargaCheia"></div></div>
+    <p id="cargaTexto">Carregando a arena…</p>
+  </section>
+
+  <section id="menu" class="painel" hidden>
+    <h1 class="logo">Arena dos Reinos</h1>
+    <p class="sub">Derrube as torres do adversário em 3 minutos.</p>
+    <label class="campo"><span>Seu nome</span><input id="nome" maxlength="14" autocomplete="off" placeholder="Jogador"></label>
+    <button id="entrarSala" class="botao principal" hidden></button>
+    <button id="jogarBot" class="botao principal">Jogar contra o computador</button>
+    <button id="criarSala" class="botao">Jogar com um amigo</button>
+    <button id="verComo" class="botao fino">Como jogar</button>
+  </section>
+
+  <section id="como" class="painel" hidden>
+    <h2>Como jogar</h2>
+    <ol class="passos">
+      <li>A <b>energia</b> enche sozinha. Cada carta gasta a quantidade do número roxo.</li>
+      <li>Toque numa carta e depois toque no <b>seu lado</b> da arena, ou arraste a carta até lá.</li>
+      <li>As tropas andam e lutam sozinhas. Derrubar o <b>castelo</b> ganha na hora.</li>
+      <li>Acabou o tempo? Ganha quem derrubou mais torres.</li>
+    </ol>
+    <div id="listaCartas"></div>
+    <button id="fecharComo" class="botao principal">Entendi</button>
+  </section>
+
+  <section id="sala" class="painel" hidden>
+    <h2>Sala <span id="codigoSala"></span></h2>
+    <p id="estadoSala">Abrindo a sala…</p>
+    <div class="link" id="caixaLink" hidden><input id="linkSala" readonly><button id="copiarLink" class="botao pequeno">Copiar</button></div>
+    <button id="mandarLink" class="botao principal" hidden>Mandar o link</button>
+    <button id="sairSala" class="botao fino">Voltar</button>
+  </section>
+
+  <section id="fim" class="painel" hidden>
+    <h2 id="tituloFim">Vitória!</h2>
+    <div class="placar"><div><span id="fimCoroasEu" class="coroas grande"></span><small id="fimNomeEu">Você</small></div><b>×</b><div><span id="fimCoroasInimigo" class="coroas grande"></span><small id="fimNomeInimigo">Adversário</small></div></div>
+    <p id="textoFim"></p>
+    <button id="deNovo" class="botao principal">Jogar de novo</button>
+    <button id="paraMenu" class="botao fino">Voltar ao início</button>
+  </section>
+
+  <div id="aviso" hidden></div>
+</div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
