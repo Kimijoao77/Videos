@@ -69,6 +69,8 @@ img { -webkit-user-drag: none; user-select: none; }
 .carta.cara { filter: grayscale(0.85) brightness(0.62); }
 .carta.sel { transform: translateY(-14px) scale(1.04); border-color: var(--ouro); box-shadow: inset 0 0 0 2px #FFF2B0, 0 4px 0 var(--ouro2), 0 0 22px rgba(255,200,61,0.7); }
 .carta.nao { animation: nao 0.28s; }
+.carta.nova { animation: chegaCarta 0.35s cubic-bezier(.2,1.3,.5,1); }
+@keyframes chegaCarta { from { transform: translate(-60%, 30%) scale(0.45); opacity: 0.2; } }
 .carta.mini { aspect-ratio: 5 / 6.2; border-width: 2px; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--r1) 70%, #fff 30%); cursor: default; }
 .carta.mini .custo { width: 18px; height: 20px; font-size: 11px; border-width: 1.5px; }
 .carta.mini .nomeCarta, .carta.mini .nv { display: none; }

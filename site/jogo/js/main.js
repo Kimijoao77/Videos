@@ -39,6 +39,7 @@ function niveisBot(baralho, nv) {
 
 function novaPartida(m, semente = (Math.random() * 1e9) | 0) {
   cena.demo = m === "demo";
+  maoAntes = [];
   modo = m; acabou = false; sel = null; arrasto = null; maoTexto = ""; atual = null; evLocal = []; evRemoto = []; acc = 0; rodando = false; posTorre = {}; jaJogou = false;
   cena.limpar();
   cena.visao = lado = m === "convidado" ? 1 : 0;
@@ -176,10 +177,14 @@ function torreCaiu(id, ladoDela) {
 
 function faixa(texto) { const fx = $("faixa"); fx.textContent = texto; fx.hidden = false; clearTimeout(faixa.t); faixa.t = setTimeout(() => { fx.hidden = true; }, 1800); }
 
+let maoAntes = [];
 function montarMao(f) {
   const cx = $("cartas");
   const nv = (k) => modo === "convidado" ? carta(k).n : (nivMeus[k] || 1);
-  cx.innerHTML = f.mao.map((k, i) => `<div class="${classeCarta(k)}${sel === i ? " sel" : ""}" data-i="${i}" data-carta="${k}" role="button" aria-label="${CARTAS[k].nome}, custa ${CARTAS[k].custo}">${htmlCarta(k, { nivel: nv(k) })}</div>`).join("");
+  // a carta que acabou de entrar na mão chega deslizando (vem do "Próxima")
+  const nova = (i) => maoAntes.length === 4 && maoAntes[i] !== f.mao[i] ? " nova" : "";
+  cx.innerHTML = f.mao.map((k, i) => `<div class="${classeCarta(k)}${sel === i ? " sel" : ""}${nova(i)}" data-i="${i}" data-carta="${k}" role="button" aria-label="${CARTAS[k].nome}, custa ${CARTAS[k].custo}">${htmlCarta(k, { nivel: nv(k) })}</div>`).join("");
+  maoAntes = f.mao.slice();
   const px = $("proxima");
   px.className = f.prox ? `${classeCarta(f.prox)} mini` : "carta mini";
   px.innerHTML = f.prox ? htmlCarta(f.prox, { nome: false }) : "";
