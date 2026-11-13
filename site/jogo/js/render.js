@@ -4,7 +4,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "../vendor/GLTFLoader.js";
 import * as SkeletonUtils from "../vendor/SkeletonUtils.js";
-import { CARTAS, L, C, RIO0, RIO1, PONTES } from "./sim.js";
+import { CARTAS, L, C, RIO0, RIO1, PONTES, lugaresDe } from "./sim.js";
 import { montarCenario } from "./cenario.js";
 
 const AZUL = new THREE.Color("#2F7BFF"), VERMELHO = new THREE.Color("#F0463C");
@@ -62,8 +62,20 @@ export class Cena {
     this.texBrilho = texturaBrilho();
     this.geoBolinha = new THREE.SphereGeometry(1, 8, 6);
     this.qual = { soma: 0, n: 0, razao: Math.min(window.devicePixelRatio || 1, 2) };
+    this.qualidadeAlta = true;
+    this.matGelo = new THREE.MeshLambertMaterial({ color: 0xbff0ff, emissive: 0x2a8fd0, emissiveIntensity: 0.35, transparent: true, opacity: 0.5, depthWrite: false });
+    this.matEstrela = new THREE.SpriteMaterial({ map: this.texBrilho, color: 0xffe066, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
     this.matBarra = { fundo: new THREE.SpriteMaterial({ color: 0x10182b, depthTest: false }), 0: new THREE.SpriteMaterial({ color: 0x4d9bff, depthTest: false }),
       1: new THREE.SpriteMaterial({ color: 0xff5a4f, depthTest: false }) };
+  }
+
+  // qualidade: sombras e resolução cheia (ou leve, para aparelho fraco)
+  altaQualidade(v) {
+    this.qualidadeAlta = v;
+    this.sol.castShadow = v;
+    this.qual.razao = v ? Math.min(window.devicePixelRatio || 1, 2) : 1;
+    this.r.setPixelRatio(this.qual.razao);
+    this.ajustar();
   }
 
   // ------------------------------------------------------------ carregar os modelos
@@ -247,8 +259,7 @@ export class Cena {
     if (!c || c.tipo === "magia") return;
     const g = new THREE.Group(), modelo = c.modelo || carta, mats = [];
     const dir = this.visao === 0 ? 1 : -1;      // para a frente, visto do jogador
-    const lugares = c.n === 1 ? [[0, 0]] : c.n === 2 ? [[-0.55, 0], [0.55, 0]] : [[0, 0.5], [-0.6, -0.35], [0.6, -0.35]];
-    for (const [dx, dy] of lugares) {
+    for (const [dx, dy] of lugaresDe(c.n, 1)) {
       const o = this.novo(modelo, 0);
       if (KAYKIT[modelo]) {
         o.scale.setScalar(KAYKIT[modelo] / this.modelos[modelo].altura);
@@ -294,11 +305,12 @@ export class Cena {
     this.ultima = f;
     const vistos = new Set();
     for (const e of f.ent) {
-      const [id, k, lado, x, y, hp, hpMax, est, a, tn] = e;
+      const [id, k, lado, x, y, hp, hpMax, est, a, tn, para] = e;
       vistos.add(id);
       let b = this.bonecos.get(id);
       if (!b) { b = new Boneco(this, id, k, lado, x, y, hpMax, a); this.bonecos.set(id, b); }
       b.alvo(x, y, hp, est, a, tn);
+      b.parar(para || 0);
     }
     for (const [id, b] of this.bonecos) if (!vistos.has(id)) { b.sair(); this.bonecos.delete(id); }
     const pv = new Set();
@@ -323,7 +335,13 @@ export class Cena {
       this.fumaca(this.X(b), this.Z(c), fixa ? 22 : 7, fixa ? 2.2 : 0.7, fixa ? 0xd8d2c4 : 0xffffff);
       if (fixa) { this.tremor = 0.7; this.ruina(this.X(b), this.Z(c), d === "rei" ? 1.5 : 1); }
       this.aoSom && this.aoSom(fixa ? "torre" : "morte");
-    } else if (t === "explode") { this.explosao(this.X(a), this.Z(b), c, d); this.aoSom && this.aoSom(d ? "impacto" : "explosao"); if (!d) this.tremor = 0.35; }
+    } else if (t === "explode") {
+      this.explosao(this.X(a), this.Z(b), c, d);
+      const especial = d === "relampago" ? "raio" : d === "gelo" ? "gelo" : d === "cura" ? "cura" : null;
+      this.aoSom && this.aoSom(especial || (d ? "impacto" : "explosao"));
+      if (!d) this.tremor = 0.35; else if (d === "relampago") this.tremor = 0.25;
+    }
+    else if (t === "curou") { const o = this.bonecos.get(a); if (o) this.poeira(o.g.position.x, o.g.position.z, 0x7dff9a, o.raio + 0.4); }
     else if (t === "dano") { const o = this.bonecos.get(a); o && o.apanhar(); }
     else if (t === "magia") this.aoSom && this.aoSom("magia");
   }
@@ -377,6 +395,9 @@ export class Cena {
     this.efeito(g, 0.7 + raio * 0.15, (q) => { for (const [m, vx, vy, vz] of bolas) { m.position.set(vx * q, vy * q, vz * q); m.scale.setScalar(1 + q * 1.2); } mat.opacity = 0.9 * (1 - q * q); });
   }
   explosao(X, Z, raio, tipo) {
+    if (tipo === "relampago") return this.relampago(X, Z, raio);
+    if (tipo === "gelo") return this.geloArea(X, Z, raio);
+    if (tipo === "cura") return this.curaArea(X, Z, raio);
     if (tipo === "flechas") {                      // chuva de flechas: poeira e flechas fincadas que somem
       this.poeira(X, Z, 0xe8d7a8, raio);
       const g = new THREE.Group(); g.position.set(X, 0, Z);
@@ -394,6 +415,56 @@ export class Cena {
     this.efeito(bola, 0.38, (q) => { bola.scale.setScalar(raio * (0.3 + q * 0.8)); bola.material.opacity = 0.85 * (1 - q); });
     this.poeira(X, Z, tipo === "magia" ? 0xbff6ff : 0xffd98a, raio * 1.1);
     if (!tipo) this.fumaca(X, Z, 12, raio * 0.8, 0x6a6a6a);
+  }
+
+  // relâmpago: três raios em zigue-zague caindo do céu, clarão e anel amarelo no chão
+  relampago(X, Z, raio) {
+    const mat = new THREE.MeshBasicMaterial({ color: 0xfff7b0, transparent: true, opacity: 1, depthWrite: false, blending: THREE.AdditiveBlending });
+    const g = new THREE.Group(); g.position.set(X, 0, Z);
+    for (let k = 0; k < 3; k++) {
+      const a = Math.random() * 6.28, d = k === 0 ? 0 : raio * (0.35 + Math.random() * 0.45);
+      const x0 = Math.cos(a) * d, z0 = Math.sin(a) * d, pts = [];
+      for (let j = 0; j <= 7; j++) pts.push(new THREE.Vector3(x0 + (j && j < 7 ? (Math.random() - 0.5) * 1.1 : 0), 15 - j * 15 / 7, z0 + (j && j < 7 ? (Math.random() - 0.5) * 1.1 : 0)));
+      const tubo = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, false, "catmullrom", 0), 28, k === 0 ? 0.16 : 0.1, 6), mat);
+      g.add(tubo);
+    }
+    const flash = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.texBrilho, color: 0xfff2a0, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    flash.position.y = 1; flash.scale.setScalar(raio * 3.2); g.add(flash);
+    this.efeito(g, 0.42, (q) => { mat.opacity = q < 0.15 ? 1 : Math.max(0, 1 - (q - 0.15) / 0.85) * (0.6 + 0.4 * Math.sin(q * 60)); flash.material.opacity = 1 - q; });
+    this.poeira(X, Z, 0xffe680, raio);
+    this.fumaca(X, Z, 6, raio * 0.5, 0x8a8a8a);
+  }
+  // gelo: cúpula azul que cresce e some, anel e floquinhos caindo
+  geloArea(X, Z, raio) {
+    const mat = new THREE.MeshLambertMaterial({ color: 0xcff6ff, emissive: 0x3aa6e0, emissiveIntensity: 0.5, transparent: true, opacity: 0.55, depthWrite: false });
+    const cup = new THREE.Mesh(new THREE.SphereGeometry(1, 28, 14, 0, Math.PI * 2, 0, Math.PI / 2), mat);
+    cup.position.set(X, 0, Z);
+    this.efeito(cup, 0.9, (q) => { const e = raio * (0.3 + 0.75 * Math.min(1, q * 2.4)); cup.scale.set(e, e * 0.55, e); mat.opacity = 0.55 * (1 - Math.max(0, q - 0.4) / 0.6); });
+    this.poeira(X, Z, 0xbff6ff, raio * 1.05);
+    const flocos = new THREE.Group(); flocos.position.set(X, 0, Z);
+    const mf = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, depthWrite: false });
+    const lista = [];
+    for (let k = 0; k < 26; k++) {
+      const m = new THREE.Mesh(this.geoBolinha, mf), a = Math.random() * 6.28, d = Math.sqrt(Math.random()) * raio;
+      m.scale.setScalar(0.07 + Math.random() * 0.06); lista.push([m, Math.cos(a) * d, Math.sin(a) * d, 2.5 + Math.random() * 3]); flocos.add(m);
+    }
+    this.efeito(flocos, 1.2, (q) => { for (const [m, x, z, h] of lista) m.position.set(x + Math.sin(q * 9 + h) * 0.15, h * (1 - q), z); mf.opacity = 0.95 * (1 - q * q); });
+  }
+  // cura: coluna verde, anel e brilhinhos subindo
+  curaArea(X, Z, raio) {
+    const mat = new THREE.MeshBasicMaterial({ color: 0x6dff96, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+    const col = new THREE.Mesh(new THREE.CylinderGeometry(raio, raio, 3.2, 32, 1, true), mat);
+    col.position.set(X, 1.6, Z);
+    this.efeito(col, 1.0, (q) => { mat.opacity = 0.35 * Math.sin(Math.PI * Math.min(1, q * 1.3)); col.scale.set(1, 0.4 + q, 1); });
+    this.poeira(X, Z, 0x7dff9a, raio);
+    const g = new THREE.Group(); g.position.set(X, 0, Z);
+    const lista = [];
+    for (let k = 0; k < 18; k++) {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.texBrilho, color: 0x8dffa8, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+      const a = Math.random() * 6.28, d = Math.sqrt(Math.random()) * raio;
+      sp.scale.setScalar(0.5); lista.push([sp, Math.cos(a) * d, Math.sin(a) * d, Math.random() * 0.4]); g.add(sp);
+    }
+    this.efeito(g, 1.3, (q) => { for (const [sp, x, z, a0] of lista) { const qq = Math.max(0, q - a0); sp.position.set(x, 0.3 + qq * 4, z); sp.material.opacity = Math.max(0, 1 - qq * 1.4); } });
   }
 
   quadro() {
@@ -477,7 +548,7 @@ class Boneco {
     fundo.renderOrder = 10; this.vida.renderOrder = 11;
     this.barra.add(fundo, this.vida);
     this.barra.position.y = this.altura + 0.45;
-    this.barra.visible = this.fixa;
+    this.barra.visible = this.fixa && !c.demo;
     this.largBarra = larg; this.altBarra = alt;
     this.g.add(this.barra);
     if (this.fixa) {
@@ -539,6 +610,24 @@ class Boneco {
     }
   }
   apanhar() { this.soco = 1; this.pisca = 1; }
+  // 0 normal, 1 tonto (estrelinhas girando), 2 congelado (bloco de gelo e cor azulada)
+  parar(v) {
+    if (v === this.parado) return;
+    this.parado = v;
+    if (v === 1 && !this.estrelas) {
+      this.estrelas = new THREE.Group();
+      for (let k = 0; k < 3; k++) { const e = new THREE.Sprite(this.c.matEstrela); e.scale.setScalar(0.5); this.estrelas.add(e); }
+      this.estrelas.position.y = this.altura + 0.15; this.g.add(this.estrelas);
+    }
+    if (v === 2 && !this.blocoGelo) {
+      const r = this.raio * (this.fixa ? 1.0 : 1.15), h = this.fixa ? this.altura * 0.75 : this.altura * 0.95;
+      this.blocoGelo = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 1.08, h, 7), this.c.matGelo);
+      this.blocoGelo.position.y = h / 2 + (this.voa ? ALT_VOO - 0.6 : 0); this.g.add(this.blocoGelo);
+    }
+    if (this.estrelas) this.estrelas.visible = v === 1;
+    if (this.blocoGelo) this.blocoGelo.visible = v === 2;
+    for (const m of this.mats) if (m.emissive) { if (v === 2) m.emissive.setRGB(0.1, 0.35, 0.6); else m.emissive.setScalar(0); }
+  }
   invocar() {
     const a = this.acoes && this.acoes.invocar;
     if (!a) return;
@@ -557,6 +646,11 @@ class Boneco {
       this.m.rotation.y = this.ang;
     }
     this.soco = Math.max(0, this.soco - dt * 7);
+    if (this.parado) {                                   // tonto ou congelado: não anima
+      if (this.estrelas && this.parado === 1) { const t = agora * 6; this.estrelas.children.forEach((e, k) => e.position.set(Math.cos(t + k * 2.09) * 0.45, Math.sin(t * 2 + k) * 0.06, Math.sin(t + k * 2.09) * 0.45)); }
+      this.m.scale.setScalar(this.esc);
+      return;
+    }
     if (this.pisca > 0) {
       this.pisca = Math.max(0, this.pisca - dt * 6);
       for (const m of this.mats) if (m.emissive) m.emissive.setScalar(this.pisca * 0.45);

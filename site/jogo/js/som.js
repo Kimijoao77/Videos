@@ -51,6 +51,14 @@ export function tocar(nome, extra) {
     case "derrota": [392, 330, 262, 196].forEach((f, i) => tom(f, f * 0.97, 0.34, "triangle", 0.14, i * 0.2)); break;
     case "contagem": tom(440, 440, 0.12, "triangle", 0.14); break;
     case "comeca": tom(660, 990, 0.3, "triangle", 0.18); break;
+    case "moeda": [1320, 1760].forEach((f, i) => tom(f, f, 0.09, "square", 0.05, i * 0.07)); break;
+    case "bau": ruido(0.25, 500, 0.25, 0.7); tom(200, 900, 0.35, "triangle", 0.14); [784, 988, 1175].forEach((f, i) => tom(f, f, 0.18, "triangle", 0.1, 0.15 + i * 0.08)); break;
+    case "nivel": [523, 659, 784, 1047, 1319].forEach((f, i) => tom(f, f * 1.01, 0.2, "triangle", 0.13, i * 0.07)); break;
+    case "epico": [659, 831, 988, 1319].forEach((f, i) => tom(f, f, 0.32, "sine", 0.13, i * 0.09)); ruido(0.5, 4000, 0.06, 2, 0.2); break;
+    case "raio": ruido(0.35, 2600, 0.35, 0.6); tom(1800, 200, 0.3, "sawtooth", 0.08); break;
+    case "gelo": [2100, 2600, 3100].forEach((f, i) => tom(f, f * 0.9, 0.25, "sine", 0.06, i * 0.05)); ruido(0.4, 5000, 0.08, 3); break;
+    case "cura": [523, 784, 1047].forEach((f, i) => tom(f, f * 1.02, 0.4, "sine", 0.09, i * 0.08)); break;
+    case "vs": tom(160, 80, 0.5, "sawtooth", 0.12); ruido(0.4, 300, 0.2, 0.5); break;
   }
 }
 

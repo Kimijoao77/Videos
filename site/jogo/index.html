@@ -15,10 +15,11 @@
 <div id="palco">
   <canvas id="tela" aria-label="Arena do jogo"></canvas>
 
+  <!-- ===================== a batalha ===================== -->
   <div id="topo" hidden>
-    <div class="jogador inimigo"><span class="nome" id="nomeInimigo">Adversário</span><span class="coroas" id="coroasInimigo"></span></div>
-    <div class="relogio" id="relogio"><span id="tempo">3:00</span><small id="avisoTempo"></small></div>
-    <div class="jogador eu"><span class="coroas" id="coroasEu"></span><span class="nome" id="nomeEu">Você</span></div>
+    <div class="jogador inimigo"><span class="nome"><i class="rei" id="reiInimigo">1</i><b id="nomeInimigo">Adversário</b></span><span class="coroas" id="coroasInimigo"></span></div>
+    <div class="relogio" id="relogio"><small>Tempo</small><span id="tempo">3:00</span><em id="avisoTempo"></em></div>
+    <div class="jogador eu"><span class="nome"><b id="nomeEu">Você</b><i class="rei" id="reiEu">1</i></span><span class="coroas" id="coroasEu"></span></div>
   </div>
 
   <div id="mao" hidden>
@@ -26,67 +27,160 @@
       <div class="proxima"><small>Próxima</small><div class="carta mini" id="proxima"></div></div>
       <div id="cartas"></div>
     </div>
-    <div class="energia"><div class="gota" id="energiaNum">5</div><div class="barra"><div id="energiaCheia"></div><div class="marcas"></div></div></div>
+    <div class="energia"><div class="gota" id="energiaNum">5</div><div class="barra"><div id="energiaCheia"></div><div class="marcas"></div></div><b class="dobro" id="dobro" hidden>×2</b></div>
   </div>
 
   <div id="contagem" hidden></div>
   <div id="faixa" hidden></div>
-  <button id="botaoSom" class="redondo" aria-label="Ligar ou desligar o som" hidden></button>
-  <button id="botaoMusica" class="redondo" aria-label="Ligar ou desligar a música" hidden></button>
   <button id="botaoEmote" class="redondo" aria-label="Mandar um emoji" hidden>💬</button>
   <div id="emotes" hidden></div>
   <div id="dica" hidden></div>
   <div id="confete" aria-hidden="true"></div>
   <button id="botaoSair" class="redondo" aria-label="Sair da partida" hidden>✕</button>
 
-  <section id="carregando" class="painel">
-    <h1 class="logo">Arena dos Reinos</h1>
+  <!-- antes da partida: quem contra quem -->
+  <div id="vs" hidden>
+    <div class="vsLado eu"><i class="rei grande" id="vsReiEu">1</i><b id="vsNomeEu">Você</b></div>
+    <div class="vsMeio"><img src="img/ui/espadas.png" alt=""><span>VS</span></div>
+    <div class="vsLado ele"><i class="rei grande vermelho" id="vsReiEle">1</i><b id="vsNomeEle">Computador</b></div>
+    <small id="vsArena"></small>
+  </div>
+
+  <!-- ===================== carregando ===================== -->
+  <section id="carregando" class="tela cheia">
+    <img class="logoImg" src="img/ui/logo.png" alt="Arena dos Reinos">
     <div class="carga"><div id="cargaCheia"></div></div>
     <p id="cargaTexto">Carregando a arena…</p>
   </section>
 
-  <section id="menu" class="painel" hidden>
-    <h1 class="logo">Arena dos Reinos</h1>
-    <div class="trofeus" id="trofeus"></div>
-    <label class="campo"><span>Seu nome</span><input id="nome" maxlength="14" autocomplete="off" placeholder="Jogador"></label>
-    <button id="entrarSala" class="botao principal" hidden></button>
-    <button id="jogarBot" class="botao principal">Jogar contra o computador</button>
-    <div class="niveis" id="niveis" role="radiogroup" aria-label="Nível do computador">
-      <button data-n="0" role="radio">Fácil</button><button data-n="1" role="radio">Normal</button><button data-n="2" role="radio">Difícil</button>
+  <!-- ===================== o lobby (menu com abas) ===================== -->
+  <section id="lobby" class="tela" hidden>
+    <header class="recursos">
+      <button class="perfil" id="abrirPerfil" aria-label="Seu perfil e recordes">
+        <i class="rei grande" id="lobbyRei">1</i>
+        <span><b id="lobbyNome">Jogador</b><span class="xp"><i id="lobbyXp"></i></span><small id="lobbyXpTxt">0/20</small></span>
+      </button>
+      <span class="recurso ouro"><img src="img/ui/moeda.png" alt=""><b id="lobbyOuro">0</b></span>
+      <span class="recurso trofeu"><img src="img/ui/trofeu.png" alt=""><b id="lobbyTrofeus">0</b></span>
+      <button class="engrenagem" id="abrirAjustes" aria-label="Ajustes"><img src="img/ui/engrenagem.png" alt=""></button>
+    </header>
+
+    <div class="abas">
+      <!-- loja -->
+      <div class="aba" id="aba-loja" hidden>
+        <h2 class="tituloAba">Loja</h2>
+        <div class="blocoLoja">
+          <h3>Presente do dia</h3>
+          <button class="presente" id="presente"></button>
+        </div>
+        <div class="blocoLoja">
+          <h3>Ofertas do dia <small id="lojaTempo"></small></h3>
+          <div class="ofertas" id="ofertas"></div>
+        </div>
+        <div class="blocoLoja">
+          <h3>Baús</h3>
+          <div class="ofertas" id="bausLoja"></div>
+        </div>
+      </div>
+
+      <!-- cartas -->
+      <div class="aba" id="aba-cartas" hidden>
+        <h2 class="tituloAba">Baralho de batalha</h2>
+        <p class="info" id="infoBaralho"></p>
+        <div class="grade" id="gradeBaralho"></div>
+        <div class="trocando" id="trocando" hidden><span>Escolha a carta do baralho que vai sair</span><button class="botao pequeno" id="cancelarTroca">Cancelar</button></div>
+        <h2 class="tituloAba menor">Coleção <small id="infoColecao"></small></h2>
+        <div class="grade" id="gradeColecao"></div>
+      </div>
+
+      <!-- batalha -->
+      <div class="aba" id="aba-batalha">
+        <img class="logoImg" src="img/ui/logo.png" alt="Arena dos Reinos">
+        <div class="arenaSel" id="arenaSel">
+          <button type="button" data-a="-1" aria-label="Arena anterior">◀</button>
+          <div><em id="arenaNum">Arena 1</em><b id="arenaNome">Campo de Treino</b><i id="arenaTrava"></i></div>
+          <button type="button" data-a="1" aria-label="Próxima arena">▶</button>
+        </div>
+        <div class="vao"></div>
+        <div class="jogar">
+          <button id="jogarBot" class="botao batalha"><img src="img/ui/espadas.png" alt=""><span>Batalha</span></button>
+          <div class="niveis" id="niveis" role="radiogroup" aria-label="Nível do computador">
+            <button data-n="0" role="radio">Fácil</button><button data-n="1" role="radio">Normal</button><button data-n="2" role="radio">Difícil</button>
+          </div>
+          <button id="entrarSala" class="botao azul" hidden></button>
+          <button id="criarSala" class="botao azul amigo">⚔️ Jogar com um amigo</button>
+        </div>
+        <div class="baus" id="baus"></div>
+      </div>
+
+      <!-- trilha -->
+      <div class="aba" id="aba-trilha" hidden>
+        <h2 class="tituloAba">Trilha de troféus</h2>
+        <div class="trilha" id="trilha"></div>
+      </div>
     </div>
-    <small class="notaNivel" id="notaNivel"></small>
-    <button id="criarSala" class="botao">Jogar com um amigo</button>
-    <div class="linhaBotoes"><button id="verBaralho" class="botao">Baralho</button><button id="verStats" class="botao">Recordes</button></div>
-    <button id="instalar" class="botao" hidden>Instalar o jogo</button>
-    <button id="verComo" class="botao fino">Como jogar</button>
+
+    <nav class="nav" id="nav">
+      <button data-aba="loja"><img src="img/ui/loja.png" alt=""><span>Loja</span><i class="ponto" hidden></i></button>
+      <button data-aba="cartas"><img src="img/ui/cartas.png" alt=""><span>Cartas</span><i class="ponto" hidden></i></button>
+      <button data-aba="batalha" class="ativa"><img src="img/ui/espadas.png" alt=""><span>Batalha</span><i class="ponto" hidden></i></button>
+      <button data-aba="trilha"><img src="img/ui/trilha.png" alt=""><span>Trilha</span><i class="ponto" hidden></i></button>
+    </nav>
   </section>
 
-  <section id="como" class="painel" hidden>
+  <!-- ===================== janelas por cima ===================== -->
+  <div id="fundoModal" hidden></div>
+
+  <section id="detalhe" class="modal" hidden>
+    <button class="fechar" data-fechar aria-label="Fechar">✕</button>
+    <div class="detalheTopo">
+      <div class="carta grande" id="detalheCarta"></div>
+      <div class="detalheInfo"><h2 id="detalheNome"></h2><span class="raridade" id="detalheRar"></span><p id="detalheTexto"></p></div>
+    </div>
+    <div class="nivelBarra" id="detalheNivel"></div>
+    <div class="stats" id="detalheStats"></div>
+    <div class="botoes">
+      <button class="botao azul" id="detalheUsar">Usar</button>
+      <button class="botao verde" id="detalheMelhorar">Melhorar</button>
+    </div>
+  </section>
+
+  <section id="ajustes" class="modal" hidden>
+    <button class="fechar" data-fechar aria-label="Fechar">✕</button>
+    <h2>Ajustes</h2>
+    <label class="campo"><span>Seu nome</span><input id="nome" maxlength="14" autocomplete="off" placeholder="Jogador"></label>
+    <div class="chaves">
+      <button class="chave" id="chaveSom" role="switch"><span>Sons</span><i></i></button>
+      <button class="chave" id="chaveMusica" role="switch"><span>Música</span><i></i></button>
+      <button class="chave" id="chaveSombras" role="switch"><span>Sombras e detalhes</span><i></i></button>
+      <button class="chave" id="chaveVibrar" role="switch"><span>Vibrar</span><i></i></button>
+    </div>
+    <button id="verComo" class="botao azul">Como jogar</button>
+    <button id="instalar" class="botao" hidden>Instalar o jogo</button>
+    <small class="creditos">Modelos: KayKit, de Kay Lousberg (CC0) e feitos no Blender · Three.js · PeerJS · Lilita One</small>
+  </section>
+
+  <section id="perfil" class="modal" hidden>
+    <button class="fechar" data-fechar aria-label="Fechar">✕</button>
+    <h2 id="perfilNome">Jogador</h2>
+    <div class="perfilRei"><i class="rei enorme" id="perfilRei">1</i><div><b>Nível do rei</b><small>Melhorar cartas e vencer dá experiência. Cada nível deixa as suas torres 8% mais fortes.</small></div></div>
+    <div id="listaStats"></div>
+  </section>
+
+  <section id="como" class="modal" hidden>
+    <button class="fechar" data-fechar aria-label="Fechar">✕</button>
     <h2>Como jogar</h2>
     <ol class="passos">
       <li>A <b>energia</b> enche sozinha. Cada carta gasta a quantidade do número roxo.</li>
       <li>Toque numa carta e depois toque no <b>seu lado</b> da arena, ou arraste a carta até lá.</li>
       <li>As tropas andam e lutam sozinhas. Derrubar o <b>castelo</b> ganha na hora.</li>
       <li>Acabou o tempo? Ganha quem derrubou mais torres.</li>
+      <li>Vencer dá <b>baús</b>. Abra os baús para ganhar ouro e cartas e <b>melhore</b> as cartas na aba Cartas.</li>
     </ol>
     <div id="listaCartas"></div>
-    <button id="fecharComo" class="botao principal">Entendi</button>
   </section>
 
-  <section id="baralho" class="painel largo" hidden>
-    <h2>Seu baralho</h2>
-    <p id="infoBaralho"></p>
-    <div id="gradeBaralho"></div>
-    <button id="salvarBaralho" class="botao principal">Salvar baralho</button>
-  </section>
-
-  <section id="stats" class="painel" hidden>
-    <h2>Recordes</h2>
-    <div id="listaStats"></div>
-    <button id="fecharStats" class="botao principal">Voltar</button>
-  </section>
-
-  <section id="sala" class="painel" hidden>
+  <section id="sala" class="modal" hidden>
     <h2>Sala <span id="codigoSala"></span></h2>
     <p id="estadoSala">Abrindo a sala…</p>
     <div class="link" id="caixaLink" hidden><input id="linkSala" readonly><button id="copiarLink" class="botao pequeno">Copiar</button></div>
@@ -94,13 +188,30 @@
     <button id="sairSala" class="botao fino">Voltar</button>
   </section>
 
-  <section id="fim" class="painel" hidden>
-    <h2 id="tituloFim">Vitória!</h2>
-    <div class="placar"><div><span id="fimCoroasEu" class="coroas grande"></span><small id="fimNomeEu">Você</small></div><b>×</b><div><span id="fimCoroasInimigo" class="coroas grande"></span><small id="fimNomeInimigo">Adversário</small></div></div>
+  <section id="fim" class="tela cheia escura" hidden>
+    <h2 id="tituloFim" class="tituloFim">Vitória!</h2>
+    <div class="placar">
+      <div class="lado eu"><span id="fimCoroasEu" class="coroas grande"></span><b id="fimNomeEu">Você</b></div>
+      <div class="lado ele"><span id="fimCoroasInimigo" class="coroas grande"></span><b id="fimNomeInimigo">Adversário</b></div>
+    </div>
     <p id="textoFim"></p>
-    <div class="ganhoTrofeus" id="ganhoTrofeus" hidden></div>
-    <button id="deNovo" class="botao principal">Jogar de novo</button>
-    <button id="paraMenu" class="botao fino">Voltar ao início</button>
+    <div class="ganhos" id="ganhos"></div>
+    <div class="ganhoBau" id="ganhoBau" hidden></div>
+    <div class="botoesFim">
+      <button id="deNovo" class="botao principal">Jogar de novo</button>
+      <button id="paraMenu" class="botao azul">OK</button>
+    </div>
+  </section>
+
+  <!-- abrir baú -->
+  <section id="abrirBau" class="tela cheia escura" hidden>
+    <div class="raios"></div>
+    <h2 id="bauNome">Baú</h2>
+    <div class="premio" id="premio" hidden></div>
+    <div class="resumo" id="resumo" hidden></div>
+    <div class="palcoBau" id="palcoBau"><img id="bauImg" src="img/ui/bau_madeira.png" alt=""></div>
+    <p class="tocar" id="bauTocar">Toque para abrir</p>
+    <small class="restam" id="restam"></small>
   </section>
 
   <div id="aviso" hidden></div>

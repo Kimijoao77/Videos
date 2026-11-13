@@ -6,12 +6,14 @@ import { CARTAS, C, jogar, podeSoltar } from "./sim.js";
 
 const TANQUE = ["gigante", "guerreiro", "cavaleiro"];
 const APOIO = ["mago", "necromante", "dragao", "besteiros"];
-const ENXAME = ["esqueletos", "bandidos"];
+const ENXAME = ["esqueletos", "bandidos", "exercito"];
 const DEFESA_PREDIO = ["catapulta"];
 export const BARALHOS_BOT = [
   ["cavaleiro", "besteiros", "gigante", "mago", "bandidos", "dragao", "catapulta", "bola_fogo"],
   ["guerreiro", "esqueletos", "gigante", "necromante", "besteiros", "dragao", "flechas", "bola_fogo"],
   ["cavaleiro", "esqueletos", "guerreiro", "mago", "bandidos", "necromante", "catapulta", "flechas"],
+  ["gigante", "exercito", "relampago", "mago", "besteiros", "cura", "cavaleiro", "bola_fogo"],
+  ["guerreiro", "dragao", "gelo", "bandidos", "necromante", "relampago", "catapulta", "esqueletos"],
 ];
 
 export function criarBot(lado, nivel = 1) {
@@ -47,6 +49,18 @@ export function pensar(bot, s, dt) {
   for (const magia of mao.filter(k => CARTAS[k].tipo === "magia" && tem(k))) {
     if (nv === 0) break;
     const m = CARTAS[magia];
+    if (m.cura) {                                             // cura: quando tem 2+ tropas minhas machucadas juntas
+      const feridos = meus.filter(e => e.tn <= 0 && e.hp < e.hpMax * 0.55);
+      const a = feridos.find(f => feridos.filter(g => Math.hypot(f.x - g.x, f.y - g.y) < m.area).length >= 2);
+      if (a && jogar(s, lado, mao.indexOf(magia), a.x, a.y)) return;
+      continue;
+    }
+    if (m.congela) {                                          // gelo: segura um ataque grande perto das minhas torres
+      const perto = inimigos.filter(e => meu(e.y) < 11);
+      const a = perto.find(f => perto.filter(g => Math.hypot(f.x - g.x, f.y - g.y) < m.area).reduce((t, g) => t + valor(g), 0) >= 6);
+      if (a && jogar(s, lado, mao.indexOf(magia), a.x, a.y)) return;
+      continue;
+    }
     let melhor = null, ganho = 0;
     for (const a of inimigos) {
       let v = 0;
@@ -68,7 +82,7 @@ export function pensar(bot, s, dt) {
       const voa = CARTAS[a.k].voa, muitos = ameacas.filter(e => Math.hypot(e.x - a.x, e.y - a.y) < 3).length >= 3, tanque = TANQUE.includes(a.k);
       let ordem = voa ? ["besteiros", "mago", "necromante", "dragao", "catapulta"]
         : muitos ? ["guerreiro", "mago", "dragao", "cavaleiro", "necromante", "bandidos", "besteiros"]
-        : tanque ? ["esqueletos", "bandidos", "catapulta", "guerreiro", "cavaleiro", "besteiros", "mago", "necromante", "dragao"]
+        : tanque ? ["exercito", "esqueletos", "bandidos", "catapulta", "guerreiro", "cavaleiro", "besteiros", "mago", "necromante", "dragao"]
         : ["cavaleiro", "guerreiro", "esqueletos", "bandidos", "besteiros", "catapulta", "mago", "dragao", "necromante"];
       if (nv === 0) ordem = ordem.slice().sort(() => Math.random() - 0.5);
       for (const carta of ordem) {

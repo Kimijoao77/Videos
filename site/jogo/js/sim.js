@@ -9,34 +9,64 @@ export const DT = 0.05, T_PARTIDA = 180, T_EXTRA = 60, ENERGIA_MAX = 10, T_ENERG
 // tipo: tropa | predio | magia · n: quantos nascem · cad: segundos entre golpes · vel: casas/s · alc: alcance (borda a
 // borda) · visao: até onde enxerga inimigo · ar: acerta quem voa · soPredio: só ataca construção · area: raio do dano
 export const CARTAS = {
-  cavaleiro: { nome: "Cavaleiro", custo: 3, tipo: "tropa", n: 1, hp: 1450, dano: 165, cad: 1.2, vel: 1.0, alc: 0.5, raio: 0.5, visao: 5.5, massa: 6,
+  cavaleiro: { nome: "Cavaleiro", custo: 3, tipo: "tropa", raridade: "comum", n: 1, hp: 1450, dano: 165, cad: 1.2, vel: 1.0, alc: 0.5, raio: 0.5, visao: 5.5, massa: 6,
     texto: "Forte e barato. Aguenta pancada na frente das outras tropas." },
-  besteiros: { nome: "Besteiros", custo: 3, tipo: "tropa", n: 2, modelo: "besteiro", hp: 300, dano: 105, cad: 1.1, vel: 1.0, alc: 5, raio: 0.4, visao: 5.5, ar: true, proj: "virote", massa: 3,
+  besteiros: { nome: "Besteiros", custo: 3, tipo: "tropa", raridade: "comum", n: 2, modelo: "besteiro", hp: 300, dano: 105, cad: 1.1, vel: 1.0, alc: 5, raio: 0.4, visao: 5.5, ar: true, proj: "virote", massa: 3,
     texto: "Dois atiradores de besta. Acertam de longe, inclusive quem voa." },
-  gigante: { nome: "Gigante", custo: 5, tipo: "tropa", n: 1, hp: 3300, dano: 210, cad: 1.5, vel: 0.75, alc: 0.5, raio: 0.8, visao: 7, soPredio: true, massa: 18,
+  gigante: { nome: "Gigante", custo: 5, tipo: "tropa", raridade: "raro", n: 1, hp: 3300, dano: 210, cad: 1.5, vel: 0.75, alc: 0.5, raio: 0.8, visao: 7, soPredio: true, massa: 18,
     texto: "Muita vida. Ignora as tropas e vai direto nas construções." },
-  mago: { nome: "Mago", custo: 5, tipo: "tropa", n: 1, hp: 600, dano: 235, cad: 1.4, vel: 1.0, alc: 5.5, raio: 0.45, visao: 5.5, ar: true, proj: "magia", area: 1.5, massa: 4,
+  mago: { nome: "Mago", custo: 5, tipo: "tropa", raridade: "raro", n: 1, hp: 600, dano: 235, cad: 1.4, vel: 1.0, alc: 5.5, raio: 0.45, visao: 5.5, ar: true, proj: "magia", area: 1.5, massa: 4,
     texto: "Bolas de energia que acertam todos em volta do alvo." },
-  bandidos: { nome: "Bandidos", custo: 2, tipo: "tropa", n: 3, modelo: "bandido", hp: 190, dano: 85, cad: 1.0, vel: 1.5, alc: 0.5, raio: 0.35, visao: 5.5, massa: 2,
+  bandidos: { nome: "Bandidos", custo: 2, tipo: "tropa", raridade: "comum", n: 3, modelo: "bandido", hp: 190, dano: 85, cad: 1.0, vel: 1.5, alc: 0.5, raio: 0.35, visao: 5.5, massa: 2,
     texto: "Três bandidos rápidos e fracos. Bons para cercar." },
-  dragao: { nome: "Dragão", custo: 4, tipo: "tropa", n: 1, hp: 1000, dano: 135, cad: 1.5, vel: 1.5, alc: 3.5, raio: 0.6, visao: 5.5, ar: true, voa: true, proj: "fogo", area: 1.2, massa: 5,
+  dragao: { nome: "Dragão", custo: 4, tipo: "tropa", raridade: "epico", n: 1, hp: 1000, dano: 135, cad: 1.5, vel: 1.5, alc: 3.5, raio: 0.6, visao: 5.5, ar: true, voa: true, proj: "fogo", area: 1.2, massa: 5,
     texto: "Voa por cima do rio e cospe fogo em área." },
-  catapulta: { nome: "Catapulta", custo: 3, tipo: "predio", n: 1, hp: 800, dano: 130, cad: 0.9, vel: 0, alc: 5.5, raio: 0.65, visao: 5.5, ar: true, proj: "pedra", vida: 30, massa: 999,
+  catapulta: { nome: "Catapulta", custo: 3, tipo: "predio", raridade: "raro", n: 1, hp: 800, dano: 130, cad: 0.9, vel: 0, alc: 5.5, raio: 0.65, visao: 5.5, ar: true, proj: "pedra", vida: 30, massa: 999,
     texto: "Torre de defesa que atira pedras. Dura 30 segundos." },
-  bola_fogo: { nome: "Bola de Fogo", custo: 4, tipo: "magia", dano: 570, area: 2.5, danoTorre: 0.35,
+  bola_fogo: { nome: "Bola de Fogo", custo: 4, tipo: "magia", raridade: "raro", dano: 570, area: 2.5, danoTorre: 0.35,
     texto: "Dano em área em qualquer lugar da arena." },
-  esqueletos: { nome: "Esqueletos", custo: 1, tipo: "tropa", n: 3, modelo: "esqueleto", hp: 75, dano: 70, cad: 1.0, vel: 1.4, alc: 0.5, raio: 0.32, visao: 5.5, massa: 1,
+  esqueletos: { nome: "Esqueletos", custo: 1, tipo: "tropa", raridade: "comum", n: 3, modelo: "esqueleto", hp: 75, dano: 70, cad: 1.0, vel: 1.4, alc: 0.5, raio: 0.32, visao: 5.5, massa: 1,
     texto: "Três esqueletos baratinhos. Distraem e cercam o inimigo." },
-  guerreiro: { nome: "Guerreiro Esqueleto", custo: 4, tipo: "tropa", n: 1, hp: 1500, dano: 190, cad: 1.5, vel: 1.0, alc: 0.6, raio: 0.55, visao: 5.5, giro: 1.6, massa: 7,
+  guerreiro: { nome: "Guerreiro Esqueleto", custo: 4, tipo: "tropa", raridade: "raro", n: 1, hp: 1500, dano: 190, cad: 1.5, vel: 1.0, alc: 0.6, raio: 0.55, visao: 5.5, giro: 1.6, massa: 7,
     texto: "Gira o machado e acerta todo mundo em volta dele." },
-  necromante: { nome: "Necromante", custo: 5, tipo: "tropa", n: 1, hp: 700, dano: 110, cad: 1.6, vel: 1.0, alc: 5, raio: 0.45, visao: 5.5, ar: true, proj: "sombra", massa: 4,
+  necromante: { nome: "Necromante", custo: 5, tipo: "tropa", raridade: "epico", n: 1, hp: 700, dano: 110, cad: 1.6, vel: 1.0, alc: 5, raio: 0.45, visao: 5.5, ar: true, proj: "sombra", massa: 4,
     invoca: { carta: "esqueletos", n: 2, cada: 7 },
     texto: "Atira magia de longe e chama dois esqueletos a cada 7 segundos." },
-  flechas: { nome: "Chuva de Flechas", custo: 3, tipo: "magia", dano: 250, area: 3.8, danoTorre: 0.4,
+  flechas: { nome: "Chuva de Flechas", custo: 3, tipo: "magia", raridade: "comum", dano: 250, area: 3.8, danoTorre: 0.4,
     texto: "Muitas flechas numa área grande. Acaba com tropas fracas." },
+  relampago: { nome: "Relâmpago", custo: 2, tipo: "magia", raridade: "comum", dano: 175, area: 2.3, danoTorre: 0.4, atordoa: 0.6, instante: true,
+    texto: "Cai do céu na hora: dano rápido e deixa todo mundo tonto por um instante." },
+  gelo: { nome: "Gelo", custo: 4, tipo: "magia", raridade: "epico", dano: 95, area: 3.0, danoTorre: 0.4, congela: 4, instante: true,
+    texto: "Congela tropas e torres inimigas por 4 segundos." },
+  cura: { nome: "Poção de Cura", custo: 3, tipo: "magia", raridade: "raro", cura: 520, area: 3.0, instante: true,
+    texto: "Cura as suas tropas que estiverem na área." },
+  exercito: { nome: "Exército de Esqueletos", custo: 3, tipo: "tropa", raridade: "epico", n: 12, modelo: "esqueleto", hp: 75, dano: 70, cad: 1.0, vel: 1.4, alc: 0.5, raio: 0.32, visao: 5.5, massa: 1,
+    texto: "Doze esqueletos de uma vez. Cercam e derrubam qualquer tropa sozinha." },
 };
+// raridades: cor da moldura, cópias e ouro para subir de nível (do nível 1 para o 2, do 2 para o 3...)
+export const RARIDADES = {
+  comum: { nome: "Comum", copias: [2, 4, 10, 20, 50, 100, 200, 400, 800], ouro: [5, 20, 50, 150, 400, 1000, 2000, 4000, 8000] },
+  raro: { nome: "Rara", copias: [2, 4, 10, 20, 50, 100, 150, 200, 300], ouro: [50, 150, 400, 1000, 2000, 4000, 8000, 12000, 16000] },
+  epico: { nome: "Épica", copias: [2, 4, 8, 12, 20, 30, 40, 60, 80], ouro: [400, 1000, 2000, 4000, 8000, 12000, 16000, 20000, 30000] },
+};
+export const NIVEL_MAX = 10;
+// cada nível a mais: +10% de vida e de dano (torres: +8% por nível do rei)
+export const fatorNivel = (n) => Math.pow(1.1, Math.max(1, Math.min(NIVEL_MAX, n | 0 || 1)) - 1);
+export const fatorRei = (n) => Math.pow(1.08, Math.max(1, Math.min(NIVEL_MAX, n | 0 || 1)) - 1);
+// onde nasce cada boneco de uma carta (em volta do ponto, "para a frente" = dir)
+export function lugaresDe(n, dir = 1) {
+  if (n === 1) return [[0, 0]];
+  if (n === 2) return [[-0.55, 0], [0.55, 0]];
+  if (n === 3) return [[0, 0.5 * dir], [-0.6, -0.35 * dir], [0.6, -0.35 * dir]];
+  const r = [];
+  const dentro = Math.min(4, n), fora = n - dentro;
+  for (let k = 0; k < dentro; k++) { const a = 2 * Math.PI * k / dentro + 0.4; r.push([0.62 * Math.cos(a), 0.62 * Math.sin(a)]); }
+  for (let k = 0; k < fora; k++) { const a = 2 * Math.PI * k / fora; r.push([1.35 * Math.cos(a), 1.25 * Math.sin(a)]); }
+  return r;
+}
 export const BARALHO = ["cavaleiro", "besteiros", "gigante", "mago", "bandidos", "dragao", "catapulta", "bola_fogo"];
-export const TODAS = ["cavaleiro", "besteiros", "gigante", "mago", "bandidos", "dragao", "catapulta", "bola_fogo", "esqueletos", "guerreiro", "necromante", "flechas"];
+export const TODAS = ["cavaleiro", "besteiros", "gigante", "mago", "bandidos", "dragao", "catapulta", "bola_fogo", "esqueletos", "guerreiro", "necromante", "flechas",
+  "relampago", "gelo", "cura", "exercito"];
 // um baralho válido tem 8 cartas diferentes que existem; se não, usa o padrão
 export function baralhoValido(b) {
   return Array.isArray(b) && b.length === 8 && new Set(b).size === 8 && b.every(k => CARTAS[k]) ? b.slice() : BARALHO.slice();
@@ -51,10 +81,11 @@ function rng(s) {
   return () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 }
 
-export function criarPartida(semente = 1, baralhos = [BARALHO, BARALHO]) {
+// niveis: [{carta: nível}, {carta: nível}] · reis: [nível do rei de cada lado] (vida e dano das torres)
+export function criarPartida(semente = 1, baralhos = [BARALHO, BARALHO], niveis = [{}, {}], reis = [1, 1]) {
   const r = rng(semente);
   const s = { tk: 0, tempo: T_PARTIDA, fase: "jogo", venc: -1, coroas: [0, 0], energia: [5, 5], ent: [], proj: [], ev: [], prox: 1, r,
-    maos: [[], []], filas: [[], []], reiAtivo: [false, false] };
+    maos: [[], []], filas: [[], []], reiAtivo: [false, false], niv: [niveis[0] || {}, niveis[1] || {}], reis: reis.slice(), cache: [{}, {}] };
   for (const lado of [0, 1]) {
     const b = baralhoValido(baralhos[lado]);
     for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; }
@@ -62,7 +93,8 @@ export function criarPartida(semente = 1, baralhos = [BARALHO, BARALHO]) {
     s.filas[lado] = b.slice(4);
     const y = (v) => lado === 0 ? v : C - v;
     for (const [k, x, yy] of [["torre", 3.5, 6.5], ["torre", 14.5, 6.5], ["rei", 9, 3]]) {
-      const c = k === "rei" ? REI : TORRE;
+      const f = fatorRei(s.reis[lado]), b0 = k === "rei" ? REI : TORRE;
+      const c = { ...b0, hp: Math.round(b0.hp * f), dano: Math.round(b0.dano * f) };
       s.ent.push({ id: s.prox++, k, lado, x, y: y(yy), hp: c.hp, hpMax: c.hp, cd: 0, alvo: 0, est: 1, tn: 0, a: lado === 0 ? 0 : Math.PI, predio: true, fixa: true, c });
     }
   }
@@ -70,6 +102,16 @@ export function criarPartida(semente = 1, baralhos = [BARALHO, BARALHO]) {
 }
 
 export function dadosDe(e) { return e.c; }
+// a carta com o nível de quem jogou (vida, dano e cura sobem 10% por nível)
+export function dados(s, lado, k) {
+  const ch = s.cache[lado];
+  if (ch[k]) return ch[k];
+  const c = CARTAS[k], f = fatorNivel(s.niv[lado][k] || 1), d = { ...c };
+  if (c.hp) d.hp = Math.round(c.hp * f);
+  if (c.dano) d.dano = Math.round(c.dano * f);
+  if (c.cura) d.cura = Math.round(c.cura * f);
+  return (ch[k] = d);
+}
 
 // onde o lado pode soltar a carta (magia vale em qualquer lugar)
 export function podeSoltar(s, lado, carta, x, y) {
@@ -100,6 +142,7 @@ export function jogar(s, lado, i, x, y) {
   s.energia[lado] -= c.custo;
   s.filas[lado].push(carta);
   s.maos[lado][i] = s.filas[lado].shift();
+  if (c.tipo === "magia" && c.instante) { magia(s, lado, carta, x, y); return true; }
   if (c.tipo === "magia") {
     const rei = s.ent.find(e => e.k === "rei" && e.lado === lado) || { x: 9, y: lado === 0 ? 3 : C - 3 };
     const d = Math.hypot(x - rei.x, y - rei.y);
@@ -111,12 +154,29 @@ export function jogar(s, lado, i, x, y) {
   return true;
 }
 
+// magia que acontece na hora (relâmpago, gelo, cura)
+function magia(s, lado, carta, x, y) {
+  const c = dados(s, lado, carta);
+  if (c.cura) {
+    for (const o of s.ent) if (o.lado === lado && !o.fixa && o.hp > 0 && Math.hypot(o.x - x, o.y - y) <= c.area + o.c.raio * 0.6) { o.hp = Math.min(o.hpMax, o.hp + c.cura); s.ev.push(["curou", o.id]); }
+  } else {
+    for (const o of s.ent) {
+      if (o.lado === lado || o.hp <= 0 || o.tn > 0) continue;
+      if (Math.hypot(o.x - x, o.y - y) > c.area + o.c.raio * 0.6) continue;
+      dano(s, o, o.fixa ? c.dano * c.danoTorre : c.dano);
+      if (c.atordoa) { o.para = Math.max(o.para || 0, c.atordoa); o.gelo = false; o.cd = Math.max(o.cd, o.c.cad * 0.5); }
+      if (c.congela) { o.para = Math.max(o.para || 0, c.congela); o.gelo = true; }
+    }
+  }
+  s.ev.push(["magia", lado, x, y]);
+  s.ev.push(["explode", x, y, c.area, carta]);
+}
+
 function nascer(s, carta, lado, x, y, n) {
-  const c = CARTAS[carta], dir = lado === 0 ? 1 : -1;
-  const lugares = n === 1 ? [[0, 0]] : n === 2 ? [[-0.55, 0], [0.55, 0]] : [[0, 0.5 * dir], [-0.6, -0.35 * dir], [0.6, -0.35 * dir]];
-  for (const [dx, dy] of lugares) {
+  const c = dados(s, lado, carta), dir = lado === 0 ? 1 : -1;
+  for (const [dx, dy] of lugaresDe(n, dir)) {
     const e = { id: s.prox++, k: carta, lado, x: Math.min(L - 0.4, Math.max(0.4, x + dx)), y: Math.min(C - 0.4, Math.max(0.4, y + dy)), hp: c.hp, hpMax: c.hp, cd: 0, alvo: 0, est: 0,
-      tn: T_NASCER, a: lado === 0 ? 0 : Math.PI, predio: c.tipo === "predio", fixa: false, c, vida: c.vida || 0, inv: c.invoca ? c.invoca.cada * 0.5 : 0 };
+      tn: T_NASCER, a: lado === 0 ? 0 : Math.PI, predio: c.tipo === "predio", fixa: false, c, vida: c.vida || 0, inv: c.invoca ? c.invoca.cada * 0.5 : 0, para: 0, gelo: false };
     s.ent.push(e);
     s.ev.push(["nasce", e.id]);
   }
@@ -206,6 +266,7 @@ export function passo(s) {
     if (e.tn > 0) { e.tn -= DT; if (e.tn <= 0) e.est = 1; continue; }
     const c = e.c;
     if (e.vida) { e.vida -= DT; e.hp -= e.hpMax * DT / c.vida; if (e.hp <= 0) continue; }
+    if (e.para > 0) { e.para -= DT; if (e.para <= 0) { e.para = 0; e.gelo = false; } continue; }
     e.cd = Math.max(0, e.cd - DT);
     if (c.invoca) {                                         // o necromante chama esqueletos de tempos em tempos
       e.inv -= DT;
@@ -302,7 +363,7 @@ export function passo(s) {
       const q = Math.min(1, p.t / p.dur);
       p.x = p.x0 + (p.tx - p.x0) * q; p.y = p.y0 + (p.ty - p.y0) * q;
       if (q >= 1) {
-        const c = CARTAS[p.carta];
+        const c = dados(s, p.lado, p.carta);
         danoArea(s, p.lado, p.tx, p.ty, c.area, c.dano, true, c.danoTorre);
         s.ev.push(["explode", p.tx, p.ty, c.area, p.carta === "flechas" ? "flechas" : undefined]);
         p.fim = true;
@@ -354,7 +415,7 @@ export function foto(s, lado, ev) {
     tk: s.tk, tempo: Math.max(0, Math.ceil(s.tempo)), fase: s.fase, venc: s.venc, coroas: s.coroas.slice(), energia: Math.round(s.energia[lado] * 100) / 100,
     dobro: s.fase === "extra" || s.tempo <= 60, mao: s.maos[lado].slice(), prox: s.filas[lado][0], rei: s.reiAtivo.slice(),
     ent: s.ent.map(e => [e.id, e.k, e.lado, Math.round(e.x * 100) / 100, Math.round(e.y * 100) / 100, Math.max(0, Math.round(e.hp)), e.hpMax, e.est, Math.round(e.a * 100) / 100,
-      e.tn > 0 ? Math.round(e.tn * 100) / 100 : 0]),
+      e.tn > 0 ? Math.round(e.tn * 100) / 100 : 0, e.para > 0 ? (e.gelo ? 2 : 1) : 0]),
     proj: s.proj.map(p => p.tipo === "bola" ? [p.id, "bola", Math.round(p.x * 100) / 100, Math.round(p.y * 100) / 100, Math.round(Math.min(1, p.t / p.dur) * 100) / 100, p.lado, p.carta,
       Math.round(p.tx * 100) / 100, Math.round(p.ty * 100) / 100]
       : [p.id, p.tipo, Math.round(p.x * 100) / 100, Math.round(p.y * 100) / 100, p.alto, p.lado, p.voaAlvo ? 1 : 0, Math.round(p.tx * 100) / 100, Math.round(p.ty * 100) / 100]),

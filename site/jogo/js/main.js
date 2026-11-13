@@ -1,11 +1,13 @@
-// O jogo em si: telas, cartas, energia e os três jeitos de jogar (contra o computador, criando uma sala ou entrando
-// numa sala pelo link). Quem cria a sala roda as regras; o convidado só recebe as fotos do estado e manda as jogadas.
+// O jogo em si: partidas, cartas na mão, energia, fim de partida e os três jeitos de jogar (contra o computador,
+// criando uma sala ou entrando numa sala pelo link). Quem cria a sala roda as regras; o convidado só recebe as fotos
+// do estado e manda as jogadas. O menu (lobby com abas, baús, loja...) fica em lobby.js.
 import { Cena } from "./render.js";
-import { CARTAS, C, DT, L, RIO0, TODAS, baralhoValido, criarPartida, foto, jogar, passo, podeSoltar } from "./sim.js";
+import { CARTAS, C, DT, L, NIVEL_MAX, RIO0, baralhoValido, criarPartida, foto, jogar, passo, podeSoltar } from "./sim.js";
 import { BARALHOS_BOT, criarBot, pensar } from "./bot.js";
 import { ligar, novoCodigo } from "./rede.js";
-import { alternarMudo, alternarMusica, estaMudo, iniciarMusica, ligarSom, musicaEstaLigada, pararMusica, tocar } from "./som.js";
-import { ARENAS, arenaDe, mudar, prog, proximaArena, registrar } from "./progresso.js";
+import { iniciarMusica, ligarSom, pararMusica, tocar } from "./som.js";
+import { ARENAS, BAUS, carta, mediaNivel, mudar, nivelRei, niveisDoBaralho, prog, registrar } from "./progresso.js";
+import { abrirTelaBau, arenaDoMenu, arenaJogo, atualizarRecursos, aviso, classeCarta, depoisDaPartida, esconderLobby, fecharModais, fmt, htmlCarta, iniciarLobby, mostrarLobby, nomeEu, vibrar } from "./lobby.js";
 
 const $ = (id) => document.getElementById(id);
 const cena = new Cena($("tela"));
@@ -14,27 +16,29 @@ const EMOJIS = ["👍", "😂", "😮", "😡", "👏"];
 let modo = "demo";            // demo (fundo do menu) | bot | dono | convidado
 let lado = 0, s = null, bots = [], rede = null, atual = null, sel = null, arrasto = null, acabou = false, rodando = false;
 let acc = 0, ultimo = 0, evLocal = [], evRemoto = [], ultEnvio = 0, maoTexto = "", energiaTela = 5, nomeInimigo = "Computador", codigo = "";
-let baralhoDele = null, posTorre = {}, tutorial = 0, jaJogou = false;
+let dele = { baralho: null, niveis: {}, rei: 1 }, posTorre = {}, tutorial = 0, jaJogou = false, reiInimigo = 1, nivMeus = {};
 
-const nomeEu = () => ($("nome").value.trim() || "Jogador").slice(0, 14);
 const mostrar = (id, sim = true) => { $(id).hidden = !sim; };
-const paineis = ["carregando", "menu", "como", "sala", "fim", "baralho", "stats"];
-function tela(qual) { for (const p of paineis) mostrar(p, p === qual); }
-function aviso(texto, ms = 1800) { const a = $("aviso"); a.textContent = texto; a.hidden = false; clearTimeout(aviso.t); aviso.t = setTimeout(() => { a.hidden = true; }, ms); }
 function coroas(el, n) { el.innerHTML = [0, 1, 2].map(i => `<i class="coroa${i < n ? " tem" : ""}"></i>`).join(""); }
-const vibrar = (p) => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) { /* ok */ } };
 
 // ------------------------------------------------------------------ começar e parar partidas
 function hud(sim) {
   for (const id of ["topo", "mao", "botaoSair"]) mostrar(id, sim);
   mostrar("botaoEmote", sim); mostrar("emotes", false);
-  mostrar("botaoSom", true); mostrar("botaoMusica", true);
   $("palco").style.setProperty("--altMao", `${$("mao").offsetHeight || 180}px`);
-  cena.margens = sim ? { cima: $("topo").offsetHeight / $("palco").offsetHeight + 0.02, baixo: $("mao").offsetHeight / $("palco").offsetHeight + 0.01 } : { cima: 0.04, baixo: 0.05 };
+  cena.margens = sim ? { cima: $("topo").offsetHeight / $("palco").offsetHeight + 0.02, baixo: $("mao").offsetHeight / $("palco").offsetHeight + 0.01 }
+    : { cima: 0.13, baixo: 0.36 };
   cena.ajustar();
 }
 
+// níveis do computador: perto da média do seu baralho (fácil um a menos, difícil um a mais)
+function niveisBot(baralho, nv) {
+  const base = Math.round(mediaNivel()) + [-1, 0, 1][nv];
+  return Object.fromEntries(baralho.map(k => [k, Math.max(1, Math.min(NIVEL_MAX, base))]));
+}
+
 function novaPartida(m, semente = (Math.random() * 1e9) | 0) {
+  cena.demo = m === "demo";
   modo = m; acabou = false; sel = null; arrasto = null; maoTexto = ""; atual = null; evLocal = []; evRemoto = []; acc = 0; rodando = false; posTorre = {}; jaJogou = false;
   cena.limpar();
   cena.visao = lado = m === "convidado" ? 1 : 0;
@@ -43,9 +47,14 @@ function novaPartida(m, semente = (Math.random() * 1e9) | 0) {
   else {
     const bot = () => BARALHOS_BOT[Math.floor(Math.random() * BARALHOS_BOT.length)];
     const meu = m === "demo" ? bot() : prog().baralho;
-    const dele = m === "dono" ? baralhoValido(baralhoDele) : bot();
-    s = criarPartida(semente, [meu, dele]);
-    bots = m === "bot" ? [criarBot(1, prog().nivel)] : m === "demo" ? [criarBot(0), criarBot(1)] : [];
+    const outro = m === "dono" ? baralhoValido(dele.baralho) : bot();
+    const nv = prog().nivel;
+    nivMeus = m === "demo" ? {} : niveisDoBaralho(meu);
+    const nivDele = m === "dono" ? (dele.niveis || {}) : m === "bot" ? niveisBot(outro, nv) : {};
+    const reiMeu = m === "demo" ? 1 : nivelRei();
+    reiInimigo = m === "dono" ? (dele.rei | 0 || 1) : m === "bot" ? Math.max(1, Math.min(NIVEL_MAX, nivelRei() + [-1, 0, 1][nv])) : 1;
+    s = criarPartida(semente, [meu, outro], [nivMeus, nivDele], [reiMeu, reiInimigo]);
+    bots = m === "bot" ? [criarBot(1, nv)] : m === "demo" ? [criarBot(0), criarBot(1)] : [];
     desenhar(foto(s, 0, []));
   }
   $("relogio").classList.remove("pressa");
@@ -64,34 +73,41 @@ function contagem(depois) {
 }
 
 function comecar(m, semente, arena = arenaJogo()) {
-  tela(null);
+  esconderLobby(); mostrar("fim", false); mostrar("sala", false); mostrar("fundoModal", false);
   cena.trocarCenario(arena);
   novaPartida(m, semente);
   hud(true);
+  const reiEu = nivelRei();
   $("nomeEu").textContent = nomeEu(); $("nomeInimigo").textContent = nomeInimigo;
+  $("reiEu").textContent = reiEu; $("reiInimigo").textContent = reiInimigo;
+  $("vsNomeEu").textContent = nomeEu(); $("vsNomeEle").textContent = nomeInimigo;
+  $("vsReiEu").textContent = reiEu; $("vsReiEle").textContent = reiInimigo;
+  $("vsArena").textContent = ARENAS[arena] ? ARENAS[arena].nome : "";
+  mostrar("vs"); tocar("vs");
   iniciarMusica(true);
   tutorial = m === "bot" && !prog().tutorial ? 1 : 0;
-  contagem(() => {
-    rodando = true; ultimo = performance.now(); acc = 0;
-    if (tutorial === 1) dica("Toque numa carta e depois no seu lado da arena (ou arraste a carta até lá) 👇");
-  });
+  clearTimeout(comecar.t);
+  comecar.t = setTimeout(() => {
+    mostrar("vs", false);
+    contagem(() => {
+      rodando = true; ultimo = performance.now(); acc = 0;
+      if (tutorial === 1) dica("Toque numa carta e depois no seu lado da arena (ou arraste a carta até lá) 👇");
+    });
+  }, 1700);
 }
 
 function paraMenu() {
-  clearTimeout(contagem.t); mostrar("contagem", false);
+  clearTimeout(contagem.t); clearTimeout(comecar.t); mostrar("contagem", false); mostrar("vs", false);
   if (rede) { rede.fechar(); rede = null; }
   hud(false);
-  mostrar("botaoEmote", false);
-  cena.trocarCenario(arenaVer);
+  mostrar("botaoEmote", false); mostrar("fim", false); mostrar("sala", false); mostrar("fundoModal", false);
   novaPartida("demo");
   rodando = true; ultimo = performance.now();
   const sala = P.get("sala");
   $("entrarSala").hidden = !sala;
   if (sala) $("entrarSala").textContent = `Entrar na sala ${sala.toUpperCase()}`;
-  mostrarTrofeus();
-  marcarNivel();
+  mostrarLobby();
   pararMusica(); iniciarMusica(false);
-  tela("menu");
 }
 
 function dica(texto, ms = 0) {
@@ -132,8 +148,9 @@ function desenhar(f) {
   coroas($("coroasEu"), f.coroas[eu]); coroas($("coroasInimigo"), f.coroas[ele]);
   const seg = f.tempo;
   $("tempo").textContent = `${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, "0")}`;
-  $("avisoTempo").textContent = f.fase === "extra" ? "TEMPO EXTRA" : f.dobro ? "ENERGIA EM DOBRO" : "";
+  $("avisoTempo").textContent = f.fase === "extra" ? "TEMPO EXTRA" : "";
   $("relogio").classList.toggle("pressa", f.fase === "extra" || seg <= 10);
+  mostrar("dobro", !!f.dobro);
   if (f.fase === "jogo" && seg <= 10 && seg > 0 && seg !== desenhar.seg) { desenhar.seg = seg; tocar("tique"); }
   if (f.fase === "jogo" && seg === 60) { if (!desenhar.avisou) { desenhar.avisou = true; faixa("Energia em dobro!"); } } else if (seg > 60) desenhar.avisou = false;
   const texto = f.mao.join(",") + "|" + f.prox;
@@ -159,53 +176,52 @@ function torreCaiu(id, ladoDela) {
 
 function faixa(texto) { const fx = $("faixa"); fx.textContent = texto; fx.hidden = false; clearTimeout(faixa.t); faixa.t = setTimeout(() => { fx.hidden = true; }, 1800); }
 
-function htmlCarta(carta) {
-  const c = CARTAS[carta];
-  return `<img src="cartas/${carta}.png" alt="" draggable="false"><span class="custo">${c.custo}</span><span class="nomeCarta">${c.nome}</span>`;
-}
 function montarMao(f) {
   const cx = $("cartas");
-  cx.innerHTML = f.mao.map((carta, i) => `<div class="carta${sel === i ? " sel" : ""}" data-i="${i}" data-carta="${carta}" role="button" aria-label="${CARTAS[carta].nome}, custa ${CARTAS[carta].custo}">${htmlCarta(carta)}</div>`).join("");
-  $("proxima").innerHTML = f.prox ? htmlCarta(f.prox) : "";
+  const nv = (k) => modo === "convidado" ? carta(k).n : (nivMeus[k] || 1);
+  cx.innerHTML = f.mao.map((k, i) => `<div class="${classeCarta(k)}${sel === i ? " sel" : ""}" data-i="${i}" data-carta="${k}" role="button" aria-label="${CARTAS[k].nome}, custa ${CARTAS[k].custo}">${htmlCarta(k, { nivel: nv(k) })}</div>`).join("");
+  const px = $("proxima");
+  px.className = f.prox ? `${classeCarta(f.prox)} mini` : "carta mini";
+  px.innerHTML = f.prox ? htmlCarta(f.prox, { nome: false }) : "";
 }
 
 // ------------------------------------------------------------------ escolher e soltar cartas
 function selecionar(i) {
   sel = i;
   for (const el of $("cartas").children) el.classList.toggle("sel", Number(el.dataset.i) === i);
-  const carta = i != null && atual ? atual.mao[i] : null;
-  if (!carta) { cena.mostrarZonas(false); cena.mostrarMarca(null); return; }
+  const k = i != null && atual ? atual.mao[i] : null;
+  if (!k) { cena.mostrarZonas(false); cena.mostrarMarca(null); return; }
   // torres inimigas caídas abrem o bolsão do lado delas (esquerda/direita como o jogador vê)
   const inim = atual.ent.filter(e => e[1] === "torre" && e[2] !== lado);
   const naEsq = (x) => lado === 0 ? x < 9 : x > 9;
-  cena.mostrarZonas(true, CARTAS[carta].tipo === "magia", !inim.some(e => naEsq(e[3])), !inim.some(e => !naEsq(e[3])));
+  cena.mostrarZonas(true, CARTAS[k].tipo === "magia", !inim.some(e => naEsq(e[3])), !inim.some(e => !naEsq(e[3])));
 }
 
 function estadoParaRegra() {
   if (s) return s;
   return { ent: atual.ent.map(e => ({ k: e[1], lado: e[2], x: e[3], y: e[4], fixa: e[1] === "torre" || e[1] === "rei", c: { raio: e[1] === "rei" ? 1.85 : 1.3 } })) };
 }
-function podeAqui(carta, x, y) { return atual && podeSoltar(estadoParaRegra(), lado, carta, x, y); }
+function podeAqui(k, x, y) { return atual && podeSoltar(estadoParaRegra(), lado, k, x, y); }
 const grade = (v) => Math.round(v * 2) / 2;
 
 function marcar(cx, cy) {
   if (sel == null || !atual) return null;
   const p = cena.apontar(cx, cy);
   if (!p) { cena.mostrarMarca(null); return null; }
-  const carta = atual.mao[sel], x = grade(Math.min(L - 0.5, Math.max(0.5, p[0]))), y = grade(Math.min(C - 0.5, Math.max(0.5, p[1])));
-  const ok = podeAqui(carta, x, y);
-  cena.mostrarMarca(x, y, ok, CARTAS[carta].tipo === "magia" ? CARTAS[carta].area : 0.9, carta);
+  const k = atual.mao[sel], x = grade(Math.min(L - 0.5, Math.max(0.5, p[0]))), y = grade(Math.min(C - 0.5, Math.max(0.5, p[1])));
+  const ok = podeAqui(k, x, y);
+  cena.mostrarMarca(x, y, ok, CARTAS[k].tipo === "magia" ? CARTAS[k].area : 0.9, k);
   return { x, y, ok };
 }
 
 function soltar(cx, cy) {
   const m = marcar(cx, cy);
   if (!m || sel == null) return;
-  const i = sel, carta = atual.mao[i], el = $("cartas").children[i];
+  const i = sel, k = atual.mao[i], el = $("cartas").children[i];
   const nao = (texto) => { tocar("erro"); aviso(texto); if (el) { el.classList.remove("nao"); void el.offsetWidth; el.classList.add("nao"); } };
   if (!rodando || acabou) return;
-  if (CARTAS[carta].custo > atual.energia) return nao("Energia insuficiente");
-  if (!m.ok) return nao(CARTAS[carta].tipo === "magia" ? "Fora da arena" : "Solte no seu lado da arena");
+  if (CARTAS[k].custo > atual.energia) return nao("Energia insuficiente");
+  if (!m.ok) return nao(CARTAS[k].tipo === "magia" ? "Fora da arena" : "Solte no seu lado da arena");
   if (modo === "convidado") rede.enviar({ t: "j", i, x: m.x, y: m.y });
   else jogar(s, lado, i, m.x, m.y);
   vibrar(12);
@@ -241,27 +257,39 @@ window.addEventListener("pointerup", (ev) => {
 $("tela").addEventListener("pointerdown", (ev) => { if (sel != null && !arrasto && modo !== "demo") soltar(ev.clientX, ev.clientY); });
 
 // ------------------------------------------------------------------ fim de partida
+let bauGanho = null;
 function fimDePartida(venc) {
   acabou = true;
   selecionar(null);
   mostrar("dica", false); mostrar("emotes", false);
   const ganhei = venc === lado, empate = venc === 2;
   const tipo = modo === "bot" ? `bot${prog().nivel}` : "online";
-  const delta = registrar(empate ? "e" : ganhei ? "v" : "d", tipo, atual.coroas[lado]);
+  const r = registrar(empate ? "e" : ganhei ? "v" : "d", tipo, atual.coroas[lado]);
+  bauGanho = r.bau;
   setTimeout(() => {
     if (modo === "demo") return;
     pararMusica();
     tocar(empate ? "extra" : ganhei ? "vitoria" : "derrota");
     if (ganhei) { vibrar([40, 40, 90]); confete(); }
-    $("tituloFim").textContent = empate ? "Empate" : ganhei ? "Vitória!" : "Derrota";
+    const t = $("tituloFim");
+    t.textContent = empate ? "Empate" : ganhei ? "Vitória!" : "Derrota";
+    t.classList.toggle("derrota", !ganhei);
     coroas($("fimCoroasEu"), atual.coroas[lado]); coroas($("fimCoroasInimigo"), atual.coroas[1 - lado]);
     $("fimNomeEu").textContent = nomeEu(); $("fimNomeInimigo").textContent = nomeInimigo;
     $("textoFim").textContent = empate ? "Ninguém derrubou mais torres." : ganhei ? (atual.coroas[lado] === 3 ? "Você derrubou o castelo!" : "Você derrubou mais torres.") : (atual.coroas[1 - lado] === 3 ? "Seu castelo caiu." : "O adversário derrubou mais torres.");
-    const g = $("ganhoTrofeus");
-    g.hidden = delta === 0; g.classList.toggle("perde", delta < 0);
-    g.textContent = `🏆 ${delta > 0 ? "+" : ""}${delta}  (${prog().trofeus})` + (ganhei && prog().sequencia > 1 ? `  🔥 ${prog().sequencia} seguidas` : "");
-    $("deNovo").textContent = modo === "convidado" ? "Pedir revanche" : "Jogar de novo";
-    tela("fim");
+    const g = [];
+    if (r.delta) g.push(`<span class="ganho${r.delta < 0 ? " perde" : ""}"><img src="img/ui/trofeu.png" alt="">${r.delta > 0 ? "+" : ""}${r.delta}</span>`);
+    if (r.ouro) g.push(`<span class="ganho" style="animation-delay:.15s"><img src="img/ui/moeda.png" alt="">+${r.ouro}</span>`);
+    if (r.xp) g.push(`<span class="ganho xp" style="animation-delay:.3s"><img src="img/ui/estrela.png" alt="">+${r.xp} XP</span>`);
+    if (ganhei && prog().sequencia > 1) g.push(`<span class="ganho" style="animation-delay:.45s">🔥 ${prog().sequencia} seguidas</span>`);
+    $("ganhos").innerHTML = g.join("");
+    const gb = $("ganhoBau");
+    gb.hidden = !ganhei;
+    gb.innerHTML = r.bau ? `<img src="img/ui/bau_${r.bau.tipo}.png" alt=""><b>${BAUS[r.bau.tipo].nome}</b><small>Abra na tela de Batalha</small>`
+      : `<b>Espaços de baú cheios</b><small>Abra um baú para ganhar o próximo</small>`;
+    if (r.subiuRei) setTimeout(() => { tocar("nivel"); aviso(`👑 Seu rei subiu para o nível ${r.subiuRei}!`, 2600); }, 1400);
+    $("deNovo").textContent = modo === "convidado" ? "Revanche" : "Jogar de novo";
+    mostrar("fim");
   }, 1500);
 }
 
@@ -275,66 +303,6 @@ function confete() {
     cx.appendChild(i);
   }
   setTimeout(() => { cx.innerHTML = ""; }, 4600);
-}
-
-// ------------------------------------------------------------------ troféus, nível, baralho e recordes
-// arenas: a que aparece no fundo do menu (dá para espiar as bloqueadas) e a que vale para jogar (só as liberadas)
-// versão de teste: tudo liberado (todas as arenas para jogar). Para voltar a liberar por troféus, mude para false.
-const TUDO_LIBERADO = true;
-const liberadas = () => TUDO_LIBERADO ? ARENAS.length : ARENAS.filter(a => prog().trofeus >= a.min).length;
-const arenaJogo = () => { const n = liberadas(), a = prog().arena; return a != null && a < n ? a : TUDO_LIBERADO ? 0 : n - 1; };
-let arenaVer = arenaJogo();
-function mostrarTrofeus() {
-  const p = prog(), a = arenaDe(p.trofeus), prox = proximaArena(p.trofeus);
-  const pct = prox ? Math.round((p.trofeus - a.min) / (prox.min - a.min) * 100) : 100;
-  const ver = ARENAS[arenaVer], trava = arenaVer >= liberadas();
-  $("trofeus").innerHTML = `<b>🏆 ${p.trofeus}</b><small>${prox ? `Próxima arena com ${prox.min} troféus` : "Você chegou na arena máxima!"}</small><div class="trilho"><i style="width:${pct}%"></i></div>
-    <div class="arenaSel"><button type="button" data-a="-1" aria-label="Arena anterior">◀</button><span><em>Arena ${arenaVer + 1}</em>${trava ? "🔒 " : ""}${ver.nome}${trava ? `<i>Libera com ${ver.min} 🏆</i>` : ""}</span><button type="button" data-a="1" aria-label="Próxima arena">▶</button></div>`;
-}
-$("trofeus").addEventListener("click", (ev) => {
-  const b = ev.target.closest("button[data-a]"); if (!b) return;
-  ligarSom(); tocar("clique");
-  arenaVer = (arenaVer + Number(b.dataset.a) + ARENAS.length) % ARENAS.length;
-  if (arenaVer < liberadas()) mudar({ arena: arenaVer });
-  cena.trocarCenario(arenaVer);
-  mostrarTrofeus();
-});
-function marcarNivel() {
-  for (const b of $("niveis").children) b.setAttribute("aria-checked", String(Number(b.dataset.n) === prog().nivel));
-  $("notaNivel").textContent = ["Bom para aprender. Vale menos troféus.", "Um adversário justo.", "Reage rápido e ganha 25% a mais de energia. Vale mais troféus."][prog().nivel];
-}
-$("niveis").addEventListener("click", (ev) => { const b = ev.target.closest("button"); if (!b) return; ligarSom(); tocar("clique"); mudar({ nivel: Number(b.dataset.n) }); marcarNivel(); });
-
-let escolha = [];
-function abrirBaralho() {
-  escolha = prog().baralho.slice();
-  desenharBaralho();
-  tela("baralho");
-}
-function desenharBaralho() {
-  const media = escolha.length ? (escolha.reduce((t, k) => t + CARTAS[k].custo, 0) / escolha.length).toFixed(1) : "-";
-  $("infoBaralho").innerHTML = `Escolha <b>8 cartas</b>. Selecionadas: <b>${escolha.length}/8</b> · custo médio <b>${media}</b>`;
-  $("gradeBaralho").innerHTML = TODAS.map(k => `<div class="carta ${escolha.includes(k) ? "dentro" : "fora"}" data-carta="${k}" role="checkbox" aria-checked="${escolha.includes(k)}" aria-label="${CARTAS[k].nome}">${htmlCarta(k)}</div>`).join("");
-  $("salvarBaralho").disabled = escolha.length !== 8;
-  $("salvarBaralho").style.opacity = escolha.length === 8 ? 1 : 0.5;
-}
-$("gradeBaralho").addEventListener("click", (ev) => {
-  const el = ev.target.closest(".carta"); if (!el) return;
-  const k = el.dataset.carta;
-  if (escolha.includes(k)) escolha = escolha.filter(x => x !== k);
-  else if (escolha.length < 8) escolha.push(k);
-  else { aviso("Tire uma carta antes de pôr outra"); tocar("erro"); return; }
-  tocar("escolher"); desenharBaralho();
-  aviso(CARTAS[k].texto, 2200);
-});
-
-function abrirStats() {
-  const p = prog();
-  const taxa = p.partidas ? Math.round(p.vitorias / p.partidas * 100) : 0;
-  const itens = [["🏆", p.trofeus, "troféus"], ["⚔️", p.partidas, "partidas"], ["✅", p.vitorias, "vitórias"], ["📈", `${taxa}%`, "de vitórias"],
-    ["🔥", p.melhorSeq, "melhor sequência"], ["👑", p.coroas, "coroas ganhas"]];
-  $("listaStats").innerHTML = itens.map(([e, v, t]) => `<div><b>${e} ${v}</b><small>${t}</small></div>`).join("");
-  tela("stats");
 }
 
 // ------------------------------------------------------------------ emotes
@@ -352,17 +320,23 @@ const emoteDeFora = (i) => { if (EMOJIS[i]) { cena.emote(1 - lado, EMOJIS[i]); t
 
 // ------------------------------------------------------------------ salas (jogar com um amigo)
 function linkDaSala() { return `${location.origin}${location.pathname}?sala=${codigo}${P.has("canal") ? "&canal=1" : ""}`; }
+const meusDados = () => ({ nome: nomeEu(), baralho: prog().baralho, niveis: niveisDoBaralho(), rei: nivelRei() });
+function mostrarSala() { fecharModais(); mostrar("fundoModal"); mostrar("sala"); }
 
 function abrirSala() {
   ligarSom();
   codigo = novoCodigo();
   $("codigoSala").textContent = codigo; $("estadoSala").textContent = "Abrindo a sala…";
   mostrar("caixaLink", false); mostrar("mandarLink", false);
-  tela("sala");
+  mostrarSala();
   rede = ligar("dono", codigo, (msg) => {
-    if (msg.t === "ola") { nomeInimigo = String(msg.nome || "Amigo").slice(0, 14); baralhoDele = msg.baralho; rede.enviar({ t: "comeca", nome: nomeEu(), arena: arenaJogo() }); comecar("dono"); }
+    if (msg.t === "ola") {
+      nomeInimigo = String(msg.nome || "Amigo").slice(0, 14);
+      dele = { baralho: msg.baralho, niveis: msg.niveis && typeof msg.niveis === "object" ? msg.niveis : {}, rei: Math.max(1, Math.min(NIVEL_MAX, msg.rei | 0 || 1)) };
+      rede.enviar({ t: "comeca", ...meusDados(), arena: arenaJogo() }); comecar("dono");
+    }
     else if (msg.t === "j" && s && rodando) jogar(s, 1, msg.i | 0, Number(msg.x), Number(msg.y));
-    else if (msg.t === "denovo" && acabou) { rede.enviar({ t: "comeca", nome: nomeEu(), arena: arenaJogo() }); comecar("dono"); }
+    else if (msg.t === "denovo" && acabou) { rede.enviar({ t: "comeca", ...meusDados(), arena: arenaJogo() }); comecar("dono"); }
     else if (msg.t === "emo") emoteDeFora(msg.i | 0);
   }, (estado, detalhe) => {
     if (estado === "pronto") { $("estadoSala").textContent = "Mande este link para o seu amigo. A partida começa quando ele entrar."; $("linkSala").value = linkDaSala(); mostrar("caixaLink"); mostrar("mandarLink", !!navigator.share); }
@@ -376,13 +350,13 @@ function entrarNaSala(cod) {
   codigo = cod.toUpperCase();
   $("codigoSala").textContent = codigo; $("estadoSala").textContent = "Entrando na sala…";
   mostrar("caixaLink", false); mostrar("mandarLink", false);
-  tela("sala");
+  mostrarSala();
   rede = ligar("convidado", codigo, (msg) => {
-    if (msg.t === "comeca") { nomeInimigo = String(msg.nome || "Amigo").slice(0, 14); comecar("convidado", undefined, Math.min(ARENAS.length - 1, Math.max(0, msg.arena | 0))); }
+    if (msg.t === "comeca") { nomeInimigo = String(msg.nome || "Amigo").slice(0, 14); reiInimigo = Math.max(1, Math.min(NIVEL_MAX, msg.rei | 0 || 1)); comecar("convidado", undefined, Math.min(ARENAS.length - 1, Math.max(0, msg.arena | 0))); }
     else if (msg.t === "f" && modo === "convidado") desenhar(msg.f);
     else if (msg.t === "emo") emoteDeFora(msg.i | 0);
   }, (estado, detalhe) => {
-    if (estado === "ligado") { $("estadoSala").textContent = "Conectado! Começando…"; rede.enviar({ t: "ola", nome: nomeEu(), baralho: prog().baralho }); }
+    if (estado === "ligado") { $("estadoSala").textContent = "Conectado! Começando…"; rede.enviar({ t: "ola", ...meusDados() }); }
     else if (estado === "caiu") { aviso("O outro jogador saiu da partida.", 3000); paraMenu(); }
     else if (estado === "erro") { $("estadoSala").textContent = detalhe; }
   });
@@ -390,33 +364,23 @@ function entrarNaSala(cod) {
 
 // ------------------------------------------------------------------ botões
 const clique = (id, f) => $(id).addEventListener("click", () => { ligarSom(); tocar("clique"); f(); });
-clique("jogarBot", () => { nomeInimigo = ["Computador (fácil)", "Computador", "Computador (difícil)"][prog().nivel]; comecar("bot"); });
+// o computador ganha um apelido de reino a cada partida
+const APELIDOS = ["Barão de Ferro", "Duquesa Brasa", "Sir Tomate", "Rainha da Neve", "Conde Trovão", "Lady Faísca", "Mestre Pão", "Capitão Lama",
+  "Bruxa do Brejo", "Rei Pipoca", "Dama do Lago", "Visconde Grilo"];
+clique("jogarBot", () => { nomeInimigo = APELIDOS[Math.floor(Math.random() * APELIDOS.length)]; comecar("bot"); });
 clique("criarSala", abrirSala);
 clique("entrarSala", () => entrarNaSala(P.get("sala")));
 clique("sairSala", paraMenu);
-clique("verComo", () => tela("como"));
-clique("fecharComo", () => tela("menu"));
-clique("verBaralho", abrirBaralho);
-clique("salvarBaralho", () => { if (escolha.length !== 8) return; mudar({ baralho: escolha.slice() }); aviso("Baralho salvo"); tela("menu"); });
-clique("verStats", abrirStats);
-clique("fecharStats", () => tela("menu"));
-clique("paraMenu", paraMenu);
-clique("botaoSair", () => { if (acabou || confirm("Sair da partida?")) paraMenu(); });
+clique("paraMenu", () => { paraMenu(); depoisDaPartida(); });
+clique("botaoSair", () => { if (acabou || confirm("Sair da partida? Conta como derrota.")) { if (!acabou && modo === "bot") registrar("d", `bot${prog().nivel}`, 0); paraMenu(); } });
 clique("botaoEmote", abrirEmotes);
 clique("deNovo", () => {
   if (modo === "bot") comecar("bot");
-  else if (modo === "dono") { rede.enviar({ t: "comeca", nome: nomeEu(), arena: arenaJogo() }); comecar("dono"); }
+  else if (modo === "dono") { rede.enviar({ t: "comeca", ...meusDados(), arena: arenaJogo() }); comecar("dono"); }
   else if (modo === "convidado") { rede.enviar({ t: "denovo" }); $("textoFim").textContent = "Pedido enviado. Esperando o outro jogador…"; }
 });
 clique("copiarLink", async () => { try { await navigator.clipboard.writeText(linkDaSala()); aviso("Link copiado"); } catch (e) { $("linkSala").select(); aviso("Segure no link para copiar"); } });
 clique("mandarLink", () => navigator.share({ title: "Arena dos Reinos", text: "Vem jogar comigo!", url: linkDaSala() }).catch(() => {}));
-$("botaoSom").addEventListener("click", () => { ligarSom(); $("botaoSom").classList.toggle("mudo", alternarMudo()); });
-$("botaoSom").classList.toggle("mudo", estaMudo());
-$("botaoMusica").addEventListener("click", () => { ligarSom(); const lig = alternarMusica(); $("botaoMusica").classList.toggle("mudo", !lig); if (lig) iniciarMusica(modo !== "demo"); });
-$("botaoMusica").classList.toggle("mudo", !musicaEstaLigada());
-$("nome").addEventListener("change", () => { try { localStorage.setItem("arena-nome", $("nome").value.trim()); } catch (e) { /* ok */ } });
-try { $("nome").value = localStorage.getItem("arena-nome") || ""; } catch (e) { /* ok */ }
-$("listaCartas").innerHTML = TODAS.map(k => `<div class="linhaCarta"><img src="cartas/${k}.png" alt=""><div><b>${CARTAS[k].nome}<i>${CARTAS[k].custo}</i></b><span>${CARTAS[k].texto}</span></div></div>`).join("");
 // a música só pode começar depois do primeiro toque na tela
 window.addEventListener("pointerdown", () => { ligarSom(); iniciarMusica(modo !== "demo"); }, { once: true });
 
@@ -434,7 +398,7 @@ if ("serviceWorker" in navigator && location.protocol === "https:") {
   navigator.serviceWorker.register("sw.js").then(r => { r.update().catch(() => {}); setInterval(() => r.update().catch(() => {}), 5 * 60 * 1000); }).catch(() => {});
   navigator.serviceWorker.addEventListener("controllerchange", () => {
     if (!tinha) return;
-    const tentar = () => { if (modo === "demo") location.reload(); else setTimeout(tentar, 3000); };
+    const tentar = () => { if (modo === "demo" && $("abrirBau").hidden) location.reload(); else setTimeout(tentar, 3000); };
     tentar();
   });
 }
@@ -462,7 +426,10 @@ function quadro() {
     console.error(e);
     return;
   }
-  window.__jogo = { cena, estado: () => ({ modo, lado, rodando, acabou, atual, sel, temSim: !!s }), sim: () => s, prog, RIO0 };
+  try { if (localStorage.getItem("arena-qualidade") === "0") cena.altaQualidade(false); } catch (e) { /* ok */ }
+  iniciarLobby({ cena, musica: () => iniciarMusica(modo !== "demo") });
+  window.__jogo = { cena, estado: () => ({ modo, lado, rodando, acabou, atual, sel, temSim: !!s }), sim: () => s, prog, RIO0, abrirTelaBau, fmt, arenaDoMenu, jogar };
+  mostrar("carregando", false);
   paraMenu();
   requestAnimationFrame(quadro);
 })();

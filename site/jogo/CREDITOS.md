@@ -9,5 +9,6 @@
 - **Esqueletos (esqueleto, guerreiro, necromante):** pacote [KayKit Skeletons](https://kaylousberg.itch.io/kaykit-skeletons), de Kay Lousberg. Licença CC0.
   Preparados por `blender/esqueletos.py`.
 - **Dragão, bola de fogo, flecha e ponte:** modelados por código no Blender (`blender/personagens.py`).
+- **Ícones, baús, logo e a arte das cartas Relâmpago, Gelo, Poção de Cura e Exército de Esqueletos:** feitos no Blender por código (`blender/interface.py`).
 - **Three.js** (MIT) para o 3D e **PeerJS** (MIT) para ligar os dois jogadores.
 - **Fonte Lilita One** (SIL Open Font License).

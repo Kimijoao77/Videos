@@ -1,6 +1,6 @@
 // Arena dos Reinos: guarda o jogo no aparelho para abrir rápido e jogar contra o computador sem internet.
 // Primeiro tenta a rede (para pegar as atualizações) e, sem rede, usa a cópia guardada.
-const VERSAO = "arena-202611131317";
+const VERSAO = "arena-202611132052";
 const ARQUIVOS = [
 "./",
 "index.html",
@@ -8,6 +8,7 @@ const ARQUIVOS = [
 "manifest.json",
 "js/bot.js",
 "js/cenario.js",
+"js/lobby.js",
 "js/main.js",
 "js/progresso.js",
 "js/rede.js",
@@ -52,15 +53,40 @@ const ARQUIVOS = [
 "cartas/bola_fogo.png",
 "cartas/catapulta.png",
 "cartas/cavaleiro.png",
+"cartas/cura.png",
 "cartas/dragao.png",
 "cartas/esqueletos.png",
+"cartas/exercito.png",
 "cartas/flechas.png",
+"cartas/gelo.png",
 "cartas/gigante.png",
 "cartas/guerreiro.png",
 "cartas/mago.png",
 "cartas/necromante.png",
+"cartas/relampago.png",
 "img/icone-192.png",
-"img/icone-512.png"
+"img/icone-512.png",
+"img/ui/bau_madeira.png",
+"img/ui/bau_madeira_aberto.png",
+"img/ui/bau_magico.png",
+"img/ui/bau_magico_aberto.png",
+"img/ui/bau_ouro.png",
+"img/ui/bau_ouro_aberto.png",
+"img/ui/bau_prata.png",
+"img/ui/bau_prata_aberto.png",
+"img/ui/cartas.png",
+"img/ui/coroa.png",
+"img/ui/engrenagem.png",
+"img/ui/escudo.png",
+"img/ui/espadas.png",
+"img/ui/estrela.png",
+"img/ui/logo.png",
+"img/ui/loja.png",
+"img/ui/moeda.png",
+"img/ui/moedas.png",
+"img/ui/relogio.png",
+"img/ui/trilha.png",
+"img/ui/trofeu.png"
 ];
 self.addEventListener("install", (ev) => { ev.waitUntil(caches.open(VERSAO).then(c => c.addAll(ARQUIVOS)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", (ev) => {
