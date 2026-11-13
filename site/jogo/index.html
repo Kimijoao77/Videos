@@ -32,6 +32,11 @@
   <div id="contagem" hidden></div>
   <div id="faixa" hidden></div>
   <button id="botaoSom" class="redondo" aria-label="Ligar ou desligar o som" hidden></button>
+  <button id="botaoMusica" class="redondo" aria-label="Ligar ou desligar a música" hidden></button>
+  <button id="botaoEmote" class="redondo" aria-label="Mandar um emoji" hidden>💬</button>
+  <div id="emotes" hidden></div>
+  <div id="dica" hidden></div>
+  <div id="confete" aria-hidden="true"></div>
   <button id="botaoSair" class="redondo" aria-label="Sair da partida" hidden>✕</button>
 
   <section id="carregando" class="painel">
@@ -42,11 +47,17 @@
 
   <section id="menu" class="painel" hidden>
     <h1 class="logo">Arena dos Reinos</h1>
-    <p class="sub">Derrube as torres do adversário em 3 minutos.</p>
+    <div class="trofeus" id="trofeus"></div>
     <label class="campo"><span>Seu nome</span><input id="nome" maxlength="14" autocomplete="off" placeholder="Jogador"></label>
     <button id="entrarSala" class="botao principal" hidden></button>
     <button id="jogarBot" class="botao principal">Jogar contra o computador</button>
+    <div class="niveis" id="niveis" role="radiogroup" aria-label="Nível do computador">
+      <button data-n="0" role="radio">Fácil</button><button data-n="1" role="radio">Normal</button><button data-n="2" role="radio">Difícil</button>
+    </div>
+    <small class="notaNivel" id="notaNivel"></small>
     <button id="criarSala" class="botao">Jogar com um amigo</button>
+    <div class="linhaBotoes"><button id="verBaralho" class="botao">Baralho</button><button id="verStats" class="botao">Recordes</button></div>
+    <button id="instalar" class="botao" hidden>Instalar o jogo</button>
     <button id="verComo" class="botao fino">Como jogar</button>
   </section>
 
@@ -62,6 +73,19 @@
     <button id="fecharComo" class="botao principal">Entendi</button>
   </section>
 
+  <section id="baralho" class="painel largo" hidden>
+    <h2>Seu baralho</h2>
+    <p id="infoBaralho"></p>
+    <div id="gradeBaralho"></div>
+    <button id="salvarBaralho" class="botao principal">Salvar baralho</button>
+  </section>
+
+  <section id="stats" class="painel" hidden>
+    <h2>Recordes</h2>
+    <div id="listaStats"></div>
+    <button id="fecharStats" class="botao principal">Voltar</button>
+  </section>
+
   <section id="sala" class="painel" hidden>
     <h2>Sala <span id="codigoSala"></span></h2>
     <p id="estadoSala">Abrindo a sala…</p>
@@ -74,6 +98,7 @@
     <h2 id="tituloFim">Vitória!</h2>
     <div class="placar"><div><span id="fimCoroasEu" class="coroas grande"></span><small id="fimNomeEu">Você</small></div><b>×</b><div><span id="fimCoroasInimigo" class="coroas grande"></span><small id="fimNomeInimigo">Adversário</small></div></div>
     <p id="textoFim"></p>
+    <div class="ganhoTrofeus" id="ganhoTrofeus" hidden></div>
     <button id="deNovo" class="botao principal">Jogar de novo</button>
     <button id="paraMenu" class="botao fino">Voltar ao início</button>
   </section>

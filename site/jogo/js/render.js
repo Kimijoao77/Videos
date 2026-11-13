@@ -5,14 +5,25 @@ import * as THREE from "three";
 import { GLTFLoader } from "../vendor/GLTFLoader.js";
 import * as SkeletonUtils from "../vendor/SkeletonUtils.js";
 import { CARTAS, L, C, RIO0, RIO1, PONTES } from "./sim.js";
+import { montarCenario } from "./cenario.js";
 
 const AZUL = new THREE.Color("#2F7BFF"), VERMELHO = new THREE.Color("#F0463C");
 // modelos do pacote KayKit (com esqueleto e animações): altura no jogo, em casas
-const KAYKIT = { cavaleiro: 2.2, besteiro: 1.9, gigante: 3.6, mago: 2.2, bandido: 1.7 };
+const KAYKIT = { cavaleiro: 2.2, besteiro: 1.9, gigante: 3.6, mago: 2.2, bandido: 1.7, esqueleto: 1.35, guerreiro: 2.35, necromante: 2.2 };
 const MEUS = ["dragao", "bola_fogo", "flecha", "ponte"];                      // modelados por código no Blender
 // do pacote KayKit Medieval Hexagon: um arquivo azul e um vermelho, ou um só (neutros)
 const PREDIOS_TIME = ["torre", "castelo", "catapulta"], NEUTROS = ["ruina", "pedra_cat", "arvore", "pinheiro", "pedra", "bosque"];
 const ALT_VOO = 1.9;
+const COR_RASTRO = { fogo: 0xff8a1e, magia: 0x7fefff, sombra: 0xb26bff, bola: 0xffa52e };
+
+// brilho redondo (para magia, fogo e o clarão de quando a tropa nasce)
+function texturaBrilho() {
+  const cv = document.createElement("canvas"); cv.width = cv.height = 64;
+  const g = cv.getContext("2d"), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, "rgba(255,255,255,1)"); gr.addColorStop(0.35, "rgba(255,255,255,0.55)"); gr.addColorStop(1, "rgba(255,255,255,0)");
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
 
 export class Cena {
   constructor(canvas) {
@@ -22,10 +33,16 @@ export class Cena {
     this.cena = new THREE.Scene();
     this.cena.background = new THREE.Color("#274E2B");
     this.cam = new THREE.PerspectiveCamera(30, 1, 1, 300);
-    this.cena.add(new THREE.HemisphereLight(0xffffff, 0x7d8a6a, 1.15));
-    const sol = new THREE.DirectionalLight(0xfff1d6, 1.9);
+    this.hemi = new THREE.HemisphereLight(0xffffff, 0x7d8a6a, 1.15);
+    this.cena.add(this.hemi);
+    const sol = this.sol = new THREE.DirectionalLight(0xfff1d6, 1.9);
     sol.position.set(-8, 18, 10);
-    this.cena.add(sol);
+    // sombras de verdade (prédios, árvores e tropas); se o aparelho for fraco, a qualidade automática desliga
+    this.r.shadowMap.enabled = true; this.r.shadowMap.type = THREE.PCFSoftShadowMap;
+    sol.castShadow = true; sol.shadow.mapSize.set(2048, 2048); sol.shadow.bias = -0.0008; sol.shadow.normalBias = 0.03;
+    Object.assign(sol.shadow.camera, { left: -24, right: 24, top: 30, bottom: -26, near: 1, far: 70 });
+    this.cena.add(sol, sol.target);
+    this.matPeca = new THREE.MeshLambertMaterial();
     this.visao = 0;
     this.bonecos = new Map();       // id → Boneco
     this.projs = new Map();
@@ -41,6 +58,10 @@ export class Cena {
     this.matDisco = [new THREE.MeshBasicMaterial({ color: AZUL, transparent: true, opacity: 0.5, depthWrite: false }),
       new THREE.MeshBasicMaterial({ color: VERMELHO, transparent: true, opacity: 0.5, depthWrite: false })];
     this.geoDisco = new THREE.CircleGeometry(1, 28).rotateX(-Math.PI / 2);
+    this.matSombra = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.22, depthWrite: false });
+    this.texBrilho = texturaBrilho();
+    this.geoBolinha = new THREE.SphereGeometry(1, 8, 6);
+    this.qual = { soma: 0, n: 0, razao: Math.min(window.devicePixelRatio || 1, 2) };
     this.matBarra = { fundo: new THREE.SpriteMaterial({ color: 0x10182b, depthTest: false }), 0: new THREE.SpriteMaterial({ color: 0x4d9bff, depthTest: false }),
       1: new THREE.SpriteMaterial({ color: 0xff5a4f, depthTest: false }) };
   }
@@ -48,7 +69,7 @@ export class Cena {
   // ------------------------------------------------------------ carregar os modelos
   async carregar(base, progresso) {
     const loader = new GLTFLoader();
-    const nomes = [...Object.keys(KAYKIT), ...MEUS, ...NEUTROS, ...PREDIOS_TIME.flatMap(n => [`${n}_azul`, `${n}_vermelho`])];
+    const nomes = ["cenario", ...Object.keys(KAYKIT), ...MEUS, ...NEUTROS, ...PREDIOS_TIME.flatMap(n => [`${n}_azul`, `${n}_vermelho`])];
     let feitos = 0;
     await Promise.all(nomes.map(async (n) => {
       const g = await loader.loadAsync(`${base}modelos/${n}.glb`);
@@ -71,6 +92,13 @@ export class Cena {
     const leve = (g) => { g.scene.traverse(o => { if (o.isMesh) o.material = new THREE.MeshLambertMaterial({ map: o.material.map }); }); return g.scene; };
     for (const n of NEUTROS) { const cena = leve(this.modelos[n]); this.modelos[n].porTime = [cena, cena]; }
     for (const n of PREDIOS_TIME) this.modelos[n] = { porTime: [leve(this.modelos[`${n}_azul`]), leve(this.modelos[`${n}_vermelho`])] };
+    // peças de cenário: um arquivo só, todas com o mesmo material (a cor do tema tinge todas de uma vez)
+    const cen = this.modelos.cenario.scene;
+    this.pecas = {};
+    for (const o of cen.children) {
+      o.traverse(m => { if (m.isMesh) { if (!this.matPeca.map) { this.matPeca.map = m.material.map; } m.material = this.matPeca; } });
+      o.position.set(0, 0, 0); this.pecas[o.name] = o;
+    }
     this.montarArena();
   }
 
@@ -107,49 +135,8 @@ export class Cena {
 
   // ------------------------------------------------------------ a arena
   montarArena() {
-    const cv = document.createElement("canvas"), T = 48;
-    cv.width = L * T; cv.height = C * T;
-    const g = cv.getContext("2d");
-    for (let y = 0; y < C; y++) for (let x = 0; x < L; x++) {
-      const claro = (x + y) % 2 === 0;
-      g.fillStyle = claro ? "#7FC65A" : "#74BC51";
-      g.fillRect(x * T, y * T, T, T);
-    }
-    // caminhos de terra das pontes até as torres
-    g.fillStyle = "rgba(196,164,108,0.55)";
-    for (const px of PONTES) { g.fillRect((px - 1) * T, 5 * T, 2 * T, 22 * T); }
-    g.fillRect(2.5 * T, 5.2 * T, 13 * T, 1.6 * T); g.fillRect(2.5 * T, (C - 6.8) * T, 13 * T, 1.6 * T);
-    // rio
-    const rio = g.createLinearGradient(0, RIO0 * T, 0, RIO1 * T);
-    rio.addColorStop(0, "#3FA9E0"); rio.addColorStop(0.5, "#2C8FD0"); rio.addColorStop(1, "#3FA9E0");
-    g.fillStyle = rio; g.fillRect(0, RIO0 * T, L * T, (RIO1 - RIO0) * T);
-    g.strokeStyle = "rgba(255,255,255,0.35)"; g.lineWidth = 3;
-    for (let k = 0; k < 26; k++) { const x = (k * 37 % 100) / 100 * L * T, y = (RIO0 + 0.3 + (k * 53 % 100) / 100 * 1.4) * T; g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + 14, y - 5, x + 28, y); g.stroke(); }
-    g.fillStyle = "#C9B58A"; g.fillRect(0, RIO0 * T - 5, L * T, 5); g.fillRect(0, RIO1 * T, L * T, 5);
-    const tex = new THREE.CanvasTexture(cv);
-    tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
-    const chao = new THREE.Mesh(new THREE.PlaneGeometry(L, C).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ map: tex }));
-    this.cena.add(chao);
-    const fora = new THREE.Mesh(new THREE.PlaneGeometry(90, 110).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ color: "#3E7A3A" }));
-    fora.position.y = -0.03; this.cena.add(fora);
-    // mureta em volta
-    const pedra = new THREE.MeshLambertMaterial({ color: "#B9B1A2" });
-    for (const [x, z, sx, sz] of [[0, -C / 2 - 0.3, L + 1.2, 0.6], [0, C / 2 + 0.3, L + 1.2, 0.6], [-L / 2 - 0.3, 0, 0.6, C], [L / 2 + 0.3, 0, 0.6, C]]) {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(sx, 0.5, sz), pedra); m.position.set(x, 0.2, z); this.cena.add(m);
-    }
-    for (const px of PONTES) { const p = this.novo("ponte"); p.position.set(px - L / 2, 0.02, 0); this.cena.add(p); }
-    // árvores, pedras e arbustos em volta (sempre nos mesmos lugares)
-    let s = 7;
-    const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
-    for (let k = 0; k < 64; k++) {
-      const lado = k % 2 ? 1 : -1, x = lado * (L / 2 + 1.8 + rnd() * 7), z = (rnd() - 0.5) * (C + 14);
-      const tipo = ["arvore", "pinheiro", "arvore", "bosque", "pedra", "pinheiro"][Math.floor(rnd() * 6)];
-      const o = this.novo(tipo); const e = 0.85 + rnd() * 0.6;
-      o.position.set(x + (tipo === "bosque" ? lado * 2 : 0), 0, z); o.scale.setScalar(e); o.rotation.y = rnd() * 6.28; this.cena.add(o);
-    }
-    for (let k = 0; k < 14; k++) {
-      const o = this.novo(k % 3 ? "pinheiro" : "bosque"); o.position.set((rnd() - 0.5) * 26, 0, -(C / 2 + 3 + rnd() * 5)); o.scale.setScalar(1 + rnd() * 0.5); this.cena.add(o);
-    }
+    this.trocarCenario(this.temaAtual || 0);
+    for (const px of PONTES) { const p = this.novo("ponte"); p.position.set(px - L / 2, 0.02, 0); p.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } }); this.cena.add(p); }
     // zona proibida (aparece quando o jogador escolhe uma carta) e a marca de onde vai cair
     this.zonas = new THREE.Group(); this.zonas.visible = false; this.cena.add(this.zonas);
     this.matZona = new THREE.MeshBasicMaterial({ color: 0xff3b30, transparent: true, opacity: 0.26, depthWrite: false });
@@ -159,6 +146,24 @@ export class Cena {
     const feixe = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.5, 3, 12, 1, true), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide }));
     feixe.position.y = 1.5;
     this.marca.add(anel, feixe); this.anelMarca = anel;
+  }
+
+  // troca o cenário (0 a 5, um por arena)
+  trocarCenario(i) {
+    if (this.cenario && this.temaAtual === i) return;
+    if (this.cenario) {
+      this.cena.remove(this.cenario.grupo);
+      this.cenario.grupo.traverse(o => { if (o.isMesh || o.isPoints) { o.geometry.dispose(); const m = o.material; if (m !== this.matPeca) { if (m.map) m.map.dispose(); m.dispose(); } } });
+    }
+    this.temaAtual = i;
+    this.cenario = montarCenario(this, i, (n) => this.peca(n));
+    this.ajustarNeblina();
+  }
+  peca(n) { const o = this.pecas && this.pecas[n]; return o ? o.clone(true) : null; }
+  ajustarNeblina() {
+    if (!this.cena.fog || !this.camBase) return;
+    const d = this.camBase.length();
+    this.cena.fog.near = d + 6; this.cena.fog.far = d + (this.temaAtual === 2 ? 45 : 90);
   }
 
   // sim → mundo 3D (o campo de quem joga fica perto da câmera)
@@ -176,7 +181,7 @@ export class Cena {
     // enquadra a arena inteira entre a barra de cima e as cartas
     const el = THREE.MathUtils.degToRad(47), dir = new THREE.Vector3(0, Math.sin(el), Math.cos(el));
     const pts = [];
-    for (const x of [-L / 2 - 0.4, L / 2 + 0.4]) { pts.push(new THREE.Vector3(x, 0, C / 2 + 0.6), new THREE.Vector3(x, 0, -C / 2 - 0.4), new THREE.Vector3(x * 0.3, 5.6, -C / 2 + 3)); }
+    for (const x of [-L / 2 - 0.4, L / 2 + 0.4]) { pts.push(new THREE.Vector3(x, 0, C / 2 + 0.6), new THREE.Vector3(x, 0, -C / 2 - 2.6), new THREE.Vector3(x * 0.3, 5.6, -C / 2 + 3)); }
     const yCima = 1 - 2 * this.margens.cima, yBaixo = -1 + 2 * this.margens.baixo;
     const medir = (d, zt) => {
       this.cam.position.set(0, dir.y * d, dir.z * d + zt);
@@ -198,6 +203,7 @@ export class Cena {
     }
     medir(longe, centrar(longe));
     this.camBase = this.cam.position.clone();
+    this.ajustarNeblina();
   }
 
   // ponto da arena debaixo do dedo (coordenadas da simulação), ou null
@@ -223,12 +229,64 @@ export class Cena {
     quad(L / 2, L, RIO0 - 0.25, caiuDir ? RIO1 + 0.25 : 21.25);
   }
 
-  mostrarMarca(x, y, valido, raio = 0.9) {
+  mostrarMarca(x, y, valido, raio = 0.9, carta = null) {
     if (x == null) { this.marca.visible = false; return; }
     this.marca.visible = true;
     this.marca.position.set(this.X(x), 0, this.Z(y));
     this.anelMarca.scale.setScalar(raio / 0.9);
     this.matMarca.color.set(valido ? 0xffffff : 0xff4b3e);
+    if (carta !== this.cartaFantasma) this.montarFantasma(carta);
+    if (this.fantasma) for (const m of this.fantasmaMats) m.opacity = valido ? 0.55 : 0.25;
+  }
+
+  // a prévia meio transparente da tropa (ou construção) no lugar onde a carta vai cair
+  montarFantasma(carta) {
+    if (this.fantasma) { this.marca.remove(this.fantasma); this.fantasma = null; }
+    this.cartaFantasma = carta;
+    const c = carta && CARTAS[carta];
+    if (!c || c.tipo === "magia") return;
+    const g = new THREE.Group(), modelo = c.modelo || carta, mats = [];
+    const dir = this.visao === 0 ? 1 : -1;      // para a frente, visto do jogador
+    const lugares = c.n === 1 ? [[0, 0]] : c.n === 2 ? [[-0.55, 0], [0.55, 0]] : [[0, 0.5], [-0.6, -0.35], [0.6, -0.35]];
+    for (const [dx, dy] of lugares) {
+      const o = this.novo(modelo, 0);
+      if (KAYKIT[modelo]) {
+        o.scale.setScalar(KAYKIT[modelo] / this.modelos[modelo].altura);
+        const mx = new THREE.AnimationMixer(o), clip = this.modelos[modelo].animations.find(a => a.name === "parado");
+        if (clip) { mx.clipAction(clip).play(); mx.update(0.01); }
+      } else if (carta === "dragao") { o.scale.setScalar(1.3); o.position.y = ALT_VOO; }
+      o.rotation.y = Math.PI;
+      o.traverse(m => {
+        if (!m.isMesh) return;
+        m.material = m.material.clone(); m.material.transparent = true; m.material.opacity = 0.55; m.material.depthWrite = false; mats.push(m.material);
+      });
+      o.position.x += dx; o.position.z += -dy * dir * (this.visao === 0 ? 1 : -1);
+      g.add(o);
+    }
+    this.fantasma = g; this.fantasmaMats = mats;
+    this.marca.add(g);
+  }
+
+  // onde um ponto da arena aparece na tela (para a coroa voar até o placar)
+  naTela(x, y, alt = 0) {
+    const v = new THREE.Vector3(this.X(x), alt, this.Z(y)).project(this.cam), r = this.canvas.getBoundingClientRect();
+    return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height };
+  }
+
+  // balão com um emoji em cima do castelo de um lado (emotes)
+  emote(lado, texto) {
+    const rei = [...this.bonecos.values()].find(b => b.k === "rei" && b.lado === lado);
+    const x = rei ? rei.g.position.x : 0, z = rei ? rei.g.position.z : (lado === this.visao ? C / 2 - 3 : -C / 2 + 3);
+    const cv = document.createElement("canvas"); cv.width = 160; cv.height = 140;
+    const g = cv.getContext("2d");
+    g.fillStyle = "#ffffff"; g.strokeStyle = "#10182b"; g.lineWidth = 8;
+    g.beginPath(); g.roundRect(8, 8, 144, 104, 26); g.moveTo(66, 112); g.lineTo(80, 134); g.lineTo(94, 112); g.fill(); g.stroke();
+    g.fillStyle = "#ffffff"; g.fillRect(70, 104, 20, 10);
+    g.font = "64px 'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText(texto, 80, 62);
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
+    sp.renderOrder = 20; sp.position.set(x, 8.2, z);
+    this.efeito(sp, 2.4, (q) => { const s = q < 0.12 ? q / 0.12 : 1; sp.scale.set(3.4 * s, 3.0 * s, 1); sp.material.opacity = q > 0.85 ? (1 - q) / 0.15 : 1; sp.position.y = 8.2 + q * 0.6; });
   }
 
   // ------------------------------------------------------------ aplicar uma foto do estado
@@ -257,7 +315,9 @@ export class Cena {
   evento(ev) {
     const [t, a, b, c, d] = ev;
     if (t === "atq") { const o = this.bonecos.get(a); o && o.atacar(); this.aoSom && this.aoSom("atq", o && o.k); }
-    else if (t === "nasce") { const o = this.bonecos.get(a); if (o) this.poeira(o.g.position.x, o.g.position.z, 0xfff3c4, o.raio + 0.5); this.aoSom && this.aoSom("nasce"); }
+    else if (t === "nasce") { const o = this.bonecos.get(a); if (o) this.surgir(o); this.aoSom && this.aoSom("nasce"); }
+    else if (t === "giro") { const o = this.bonecos.get(a); if (o) { o.atacar(); this.poeira(o.g.position.x, o.g.position.z, 0xffffff, CARTAS[o.k].giro + 0.6); } }
+    else if (t === "invoca") { const o = this.bonecos.get(a); if (o) o.invocar(); this.aoSom && this.aoSom("magia"); }
     else if (t === "morte") {
       const fixa = d === "torre" || d === "rei";
       this.fumaca(this.X(b), this.Z(c), fixa ? 22 : 7, fixa ? 2.2 : 0.7, fixa ? 0xd8d2c4 : 0xffffff);
@@ -266,6 +326,22 @@ export class Cena {
     } else if (t === "explode") { this.explosao(this.X(a), this.Z(b), c, d); this.aoSom && this.aoSom(d ? "impacto" : "explosao"); if (!d) this.tremor = 0.35; }
     else if (t === "dano") { const o = this.bonecos.get(a); o && o.apanhar(); }
     else if (t === "magia") this.aoSom && this.aoSom("magia");
+  }
+
+  // tropa nascendo: coluna de luz na cor do time e um anel no chão
+  surgir(o) {
+    const cor = o.time === 0 ? 0x6fb0ff : 0xff7a70, X = o.g.position.x, Z = o.g.position.z, r = o.raio + 0.35;
+    const col = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.7, r, 5, 18, 1, true), new THREE.MeshBasicMaterial({ color: cor, transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+    col.position.set(X, 2.5, Z);
+    this.efeito(col, 0.6, (q) => { col.scale.set(1 - q * 0.5, 1, 1 - q * 0.5); col.material.opacity = 0.55 * (1 - q); });
+    this.poeira(X, Z, cor, r + 0.3);
+  }
+
+  // rastro de projétil: bolinha que some e encolhe
+  rastro(pos, cor, tam = 0.16) {
+    const m = new THREE.Mesh(this.geoBolinha, new THREE.MeshBasicMaterial({ color: cor, transparent: true, opacity: 0.7, depthWrite: false }));
+    m.position.copy(pos); m.scale.setScalar(tam);
+    this.efeito(m, 0.32, (q) => { m.scale.setScalar(tam * (1 - q * 0.8)); m.material.opacity = 0.7 * (1 - q); m.position.y += 0.01; });
   }
 
   ruina(X, Z, esc) { const r = this.novo("ruina"); r.position.set(X, 0, Z); r.scale.setScalar(esc); this.cena.add(r); (this.ruinas ||= []).push(r); }
@@ -301,6 +377,17 @@ export class Cena {
     this.efeito(g, 0.7 + raio * 0.15, (q) => { for (const [m, vx, vy, vz] of bolas) { m.position.set(vx * q, vy * q, vz * q); m.scale.setScalar(1 + q * 1.2); } mat.opacity = 0.9 * (1 - q * q); });
   }
   explosao(X, Z, raio, tipo) {
+    if (tipo === "flechas") {                      // chuva de flechas: poeira e flechas fincadas que somem
+      this.poeira(X, Z, 0xe8d7a8, raio);
+      const g = new THREE.Group(); g.position.set(X, 0, Z);
+      for (let k = 0; k < 16; k++) {
+        const f = this.novo("flecha"); const a = Math.random() * 6.28, d = Math.sqrt(Math.random()) * raio * 0.85;
+        f.position.set(Math.cos(a) * d, 0.25, Math.sin(a) * d); f.rotation.set(-Math.PI / 2 + (Math.random() - 0.5) * 0.5, 0, (Math.random() - 0.5) * 0.5); f.scale.setScalar(1.3); g.add(f);
+      }
+      this.efeito(g, 1.1, (q) => { g.position.y = q > 0.7 ? -(q - 0.7) * 1.5 : 0; });
+      this.fumaca(X, Z, 8, raio * 0.6, 0xd9c9a0);
+      return;
+    }
     const cor = tipo === "magia" ? 0x7fefff : 0xff8a1e;
     const bola = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), new THREE.MeshBasicMaterial({ color: cor, transparent: true, opacity: 0.85 }));
     bola.position.set(X, 0.5, Z);
@@ -310,7 +397,17 @@ export class Cena {
   }
 
   quadro() {
-    const dt = Math.min(0.05, this.relogio.getDelta()), agora = this.relogio.elapsedTime;
+    const dtReal = this.relogio.getDelta(), dt = Math.min(0.05, dtReal), agora = this.relogio.elapsedTime;
+    // qualidade automática: se o aparelho não aguenta ~40 quadros por segundo, desenha com menos pixels
+    const Q = this.qual;
+    Q.soma += dtReal; Q.n++;
+    if (Q.soma > 3) {
+      const fps = Q.n / Q.soma;
+      if (fps < 40 && Q.razao > 0.75) { Q.razao = Math.max(0.75, Q.razao - 0.35); this.r.setPixelRatio(Q.razao); this.ajustar(); }
+      else if (fps < 34 && this.sol.castShadow) this.sol.castShadow = false;
+      Q.soma = 0; Q.n = 0;
+    }
+    if (this.cenario) this.cenario.quadro(agora, dt);
     for (const b of this.bonecos.values()) b.quadro(dt, agora);
     for (const p of this.projs.values()) p.quadro(dt);
     this.efeitos = this.efeitos.filter(e => { e.t += dt; const q = Math.min(1, e.t / e.dur); e.passo(q); if (q >= 1) { this.cena.remove(e.o); return false; } return true; });
@@ -338,6 +435,9 @@ class Boneco {
     this.g = new THREE.Group();
     this.m = c.novo(modelo, time);
     this.g.add(this.m);
+    this.mats = [];                                   // materiais só deste boneco (para piscar quando apanha)
+    this.m.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); this.mats.push(o.material); o.castShadow = true; o.receiveShadow = this.fixa; } });
+    this.pisca = 0;
     this.esc = 1;
     if (KAYKIT[modelo]) {
       const gl = c.modelos[modelo];
@@ -360,7 +460,10 @@ class Boneco {
     this.g.position.set(c.X(x), 0, c.Z(y));
     this.ang = this.fixa ? 0 : c.giro(a);               // torres e castelos sempre de frente para a câmera
     this.m.rotation.y = this.predio ? 0 : this.ang;
-    if (this.voa) this.m.position.y = ALT_VOO;
+    if (this.voa) {
+      this.m.position.y = ALT_VOO;
+      const s = new THREE.Mesh(c.geoDisco, c.matSombra); s.scale.setScalar(this.raio * 1.6); s.position.y = 0.035; this.g.add(s);
+    }
     // disco do time no chão
     if (!this.fixa) {
       const d = new THREE.Mesh(c.geoDisco, c.matDisco[time]);
@@ -385,7 +488,12 @@ class Boneco {
     }
     this.tx = x; this.ty = y; this.hp = hpMax; this.est = 0; this.tn = 0; this.soco = 0; this.tAtq = 9;
     c.cena.add(this.g);
-    if (this.mixer) this.tocar("parado", 0);
+    if (this.mixer) {
+      if (this.acoes.nascer && !this.fixa) {               // os esqueletos saem do chão
+        const a = this.acoes.nascer; a.setLoop(THREE.LoopOnce); a.clampWhenFinished = true;
+        a.setEffectiveTimeScale(Math.max(1, a.getClip().duration / 1.0)).play(); this.nascendo = true; this.base = "nascer";
+      } else this.tocar("parado", 0);
+    }
   }
 
   tocar(nome, fade = 0.15) {
@@ -407,7 +515,8 @@ class Boneco {
       if (this.fixa) this.numero();
     } else if (this.fixa && !this.temNum) this.numero();
     if (!this.fixa) this.angAlvo = this.c.giro(a);
-    if (this.mixer && !this.atacando) this.tocar(est === 1 ? "andar" : "parado");
+    if (this.nascendo && tn <= 0) this.nascendo = false;
+    if (this.mixer && !this.atacando && !this.nascendo) this.tocar(est === 1 ? "andar" : "parado");
   }
 
   numero() {
@@ -429,7 +538,14 @@ class Boneco {
       a.reset().setEffectiveTimeScale(Math.max(1, this.dAtq / (cad * 0.95))).setEffectiveWeight(1).fadeIn(0.06).play();
     }
   }
-  apanhar() { this.soco = 1; }
+  apanhar() { this.soco = 1; this.pisca = 1; }
+  invocar() {
+    const a = this.acoes && this.acoes.invocar;
+    if (!a) return;
+    this.atacando = true;
+    for (const [n, o] of Object.entries(this.acoes)) if (n !== "invocar" && o.isRunning()) o.fadeOut(0.08);
+    a.setLoop(THREE.LoopOnce); a.reset().setEffectiveTimeScale(1.4).setEffectiveWeight(1).fadeIn(0.06).play();
+  }
 
   quadro(dt, agora) {
     const c = this.c, p = this.g.position;
@@ -441,10 +557,14 @@ class Boneco {
       this.m.rotation.y = this.ang;
     }
     this.soco = Math.max(0, this.soco - dt * 7);
+    if (this.pisca > 0) {
+      this.pisca = Math.max(0, this.pisca - dt * 6);
+      for (const m of this.mats) if (m.emissive) m.emissive.setScalar(this.pisca * 0.45);
+    }
     this.tAtq += dt;
     // nascendo: cresce com um quique
     let esc = this.esc * (1 + this.soco * 0.07);
-    if (this.tn > 0) { const q = 1 - Math.min(1, this.tn); esc *= 0.35 + 0.65 * (1 - Math.pow(1 - q, 3)); }
+    if (this.tn > 0 && !this.acoes?.nascer) { const q = 1 - Math.min(1, this.tn); esc *= 0.35 + 0.65 * (1 - Math.pow(1 - q, 3)); }
     this.m.scale.setScalar(esc);
     if (this.mixer) { this.mixer.update(dt); return; }
     const P = this.pecas, golpe = Math.max(0, 1 - this.tAtq / 0.35);
@@ -466,7 +586,18 @@ class Boneco {
     }
   }
 
-  sair(seco) { this.c.cena.remove(this.g); if (this.mixer) this.mixer.stopAllAction(); }
+  // morte: encolhe, afunda e some (na limpeza da partida, some na hora)
+  sair(seco) {
+    if (seco || this.fixa) { this.c.cena.remove(this.g); if (this.mixer) this.mixer.stopAllAction(); return; }
+    this.c.cena.remove(this.g);
+    const g = this.g, m = this.m, e0 = m.scale.x, y0 = m.position.y;
+    for (const mt of this.mats) { mt.transparent = true; }
+    this.barra.visible = false;
+    this.c.efeito(g, 0.35, (q) => {
+      m.scale.setScalar(e0 * (1 - q * 0.7)); m.position.y = y0 - q * (this.voa ? 1.6 : 0.4); m.rotation.z = q * 0.6;
+      for (const mt of this.mats) { mt.opacity = 1 - q; if (mt.emissive) mt.emissive.setScalar(0.5 * (1 - q)); }
+    });
+  }
 }
 
 // ------------------------------------------------------------------ projéteis
@@ -474,13 +605,24 @@ class Projetil {
   constructor(c, p) {
     this.c = c; this.tipo = p[1];
     const time = p[5] === c.visao ? 0 : 1;
-    if (this.tipo === "bola") { this.o = c.novo("bola_fogo"); this.o.scale.setScalar(1.9); }
+    this.carta = p[6];
+    if (this.tipo === "bola" && this.carta === "flechas") {             // chuva de flechas: um bando de flechas voando junto
+      this.o = new THREE.Group();
+      for (let k = 0; k < 14; k++) { const f = c.novo("flecha"); f.scale.setScalar(1.4); f.position.set((Math.random() - 0.5) * 2.6, (Math.random() - 0.5) * 1.2, (Math.random() - 0.5) * 2.2); this.o.add(f); }
+    } else if (this.tipo === "bola") { this.o = c.novo("bola_fogo"); this.o.scale.setScalar(1.9); }
+    else if (this.tipo === "fogo") { this.o = c.novo("bola_fogo"); this.o.scale.setScalar(0.75); }
     else if (this.tipo === "pedra") { this.o = c.novo("pedra_cat"); }
     else if (this.tipo === "flecha" || this.tipo === "virote") { this.o = c.novo("flecha"); this.o.scale.setScalar(this.tipo === "virote" ? 1.5 : 1.25); }
-    else {
-      const cor = this.tipo === "magia" ? (time === 0 ? 0x7fefff : 0xff9df0) : 0xff8a1e;
-      this.o = new THREE.Mesh(new THREE.SphereGeometry(this.tipo === "magia" ? 0.24 : 0.3, 12, 8), new THREE.MeshBasicMaterial({ color: cor }));
+    else {                                         // magia do mago e a sombra do necromante: bolinha brilhante
+      const cor = this.tipo === "sombra" ? 0xc58bff : time === 0 ? 0x9ff4ff : 0xffa6f2;
+      this.o = new THREE.Group();
+      this.o.add(new THREE.Mesh(c.geoBolinha, new THREE.MeshBasicMaterial({ color: 0xffffff })));
+      this.o.children[0].scale.setScalar(0.16);
+      const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: c.texBrilho, color: cor, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+      halo.scale.setScalar(1.1); this.o.add(halo);
     }
+    this.corRastro = this.carta === "flechas" ? null : COR_RASTRO[this.tipo] && (this.tipo === "magia" && time === 1 ? 0xff9df0 : COR_RASTRO[this.tipo]);
+    this.tRastro = 0;
     this.h0 = this.tipo === "bola" ? 4 : p[4] ? 3.6 : this.tipo === "fogo" ? ALT_VOO + 0.9 : this.tipo === "pedra" ? 2.6 : 1.3;
     this.h1 = p[6] ? ALT_VOO + 0.5 : 0.9;
     this.x = p[2]; this.y = p[3];
@@ -501,7 +643,11 @@ class Projetil {
     o.position.set(c.X(this.x), h, c.Z(this.y));
     const v = o.position.clone().sub(antes);
     if (v.lengthSq() > 1e-6) o.lookAt(o.position.clone().add(v));
-    if (this.tipo === "bola") o.rotateZ(dt * 9);
+    if (this.tipo === "bola" && this.carta !== "flechas") o.rotateZ(dt * 9);
+    if (this.corRastro) {
+      this.tRastro += dt;
+      if (this.tRastro > 0.03) { this.tRastro = 0; c.rastro(o.position, this.corRastro, this.tipo === "bola" ? 0.5 : this.tipo === "fogo" ? 0.28 : 0.16); }
+    }
     if (this.tipo === "pedra") o.rotateX(this.giro = (this.giro || 0) + dt * 9);
   }
   sair() { this.c.cena.remove(this.o); }

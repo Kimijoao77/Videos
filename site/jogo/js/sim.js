@@ -25,11 +25,25 @@ export const CARTAS = {
     texto: "Torre de defesa que atira pedras. Dura 30 segundos." },
   bola_fogo: { nome: "Bola de Fogo", custo: 4, tipo: "magia", dano: 570, area: 2.5, danoTorre: 0.35,
     texto: "Dano em área em qualquer lugar da arena." },
+  esqueletos: { nome: "Esqueletos", custo: 1, tipo: "tropa", n: 3, modelo: "esqueleto", hp: 75, dano: 70, cad: 1.0, vel: 1.4, alc: 0.5, raio: 0.32, visao: 5.5, massa: 1,
+    texto: "Três esqueletos baratinhos. Distraem e cercam o inimigo." },
+  guerreiro: { nome: "Guerreiro Esqueleto", custo: 4, tipo: "tropa", n: 1, hp: 1500, dano: 190, cad: 1.5, vel: 1.0, alc: 0.6, raio: 0.55, visao: 5.5, giro: 1.6, massa: 7,
+    texto: "Gira o machado e acerta todo mundo em volta dele." },
+  necromante: { nome: "Necromante", custo: 5, tipo: "tropa", n: 1, hp: 700, dano: 110, cad: 1.6, vel: 1.0, alc: 5, raio: 0.45, visao: 5.5, ar: true, proj: "sombra", massa: 4,
+    invoca: { carta: "esqueletos", n: 2, cada: 7 },
+    texto: "Atira magia de longe e chama dois esqueletos a cada 7 segundos." },
+  flechas: { nome: "Chuva de Flechas", custo: 3, tipo: "magia", dano: 250, area: 3.8, danoTorre: 0.4,
+    texto: "Muitas flechas numa área grande. Acaba com tropas fracas." },
 };
 export const BARALHO = ["cavaleiro", "besteiros", "gigante", "mago", "bandidos", "dragao", "catapulta", "bola_fogo"];
+export const TODAS = ["cavaleiro", "besteiros", "gigante", "mago", "bandidos", "dragao", "catapulta", "bola_fogo", "esqueletos", "guerreiro", "necromante", "flechas"];
+// um baralho válido tem 8 cartas diferentes que existem; se não, usa o padrão
+export function baralhoValido(b) {
+  return Array.isArray(b) && b.length === 8 && new Set(b).size === 8 && b.every(k => CARTAS[k]) ? b.slice() : BARALHO.slice();
+}
 const TORRE = { hp: 2600, dano: 105, cad: 0.8, alc: 7.5, raio: 1.3, ar: true, proj: "flecha", massa: 999 };
 const REI = { hp: 4200, dano: 105, cad: 1.0, alc: 7.0, raio: 1.85, ar: true, proj: "flecha", massa: 999 };
-const VEL_PROJ = { flecha: 14, magia: 10, fogo: 9, virote: 16, pedra: 12 };
+const VEL_PROJ = { flecha: 14, magia: 10, fogo: 9, virote: 16, pedra: 12, sombra: 10 };
 const T_NASCER = 1.0;
 
 // gerador de números da partida (a mesma semente dá o mesmo embaralhamento)
@@ -37,12 +51,12 @@ function rng(s) {
   return () => { s |= 0; s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 }
 
-export function criarPartida(semente = 1) {
+export function criarPartida(semente = 1, baralhos = [BARALHO, BARALHO]) {
   const r = rng(semente);
   const s = { tk: 0, tempo: T_PARTIDA, fase: "jogo", venc: -1, coroas: [0, 0], energia: [5, 5], ent: [], proj: [], ev: [], prox: 1, r,
     maos: [[], []], filas: [[], []], reiAtivo: [false, false] };
   for (const lado of [0, 1]) {
-    const b = BARALHO.slice();
+    const b = baralhoValido(baralhos[lado]);
     for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; }
     s.maos[lado] = b.slice(0, 4);
     s.filas[lado] = b.slice(4);
@@ -93,15 +107,19 @@ export function jogar(s, lado, i, x, y) {
     s.ev.push(["magia", lado, x, y]);
     return true;
   }
-  const dir = lado === 0 ? 1 : -1;
-  const lugares = c.n === 1 ? [[0, 0]] : c.n === 2 ? [[-0.55, 0], [0.55, 0]] : [[0, 0.5 * dir], [-0.6, -0.35 * dir], [0.6, -0.35 * dir]];
+  nascer(s, carta, lado, x, y, c.n);
+  return true;
+}
+
+function nascer(s, carta, lado, x, y, n) {
+  const c = CARTAS[carta], dir = lado === 0 ? 1 : -1;
+  const lugares = n === 1 ? [[0, 0]] : n === 2 ? [[-0.55, 0], [0.55, 0]] : [[0, 0.5 * dir], [-0.6, -0.35 * dir], [0.6, -0.35 * dir]];
   for (const [dx, dy] of lugares) {
-    const e = { id: s.prox++, k: carta, lado, x: Math.min(L - 0.4, Math.max(0.4, x + dx)), y: y + dy, hp: c.hp, hpMax: c.hp, cd: 0, alvo: 0, est: 0, tn: T_NASCER,
-      a: lado === 0 ? 0 : Math.PI, predio: c.tipo === "predio", fixa: false, c, vida: c.vida || 0 };
+    const e = { id: s.prox++, k: carta, lado, x: Math.min(L - 0.4, Math.max(0.4, x + dx)), y: Math.min(C - 0.4, Math.max(0.4, y + dy)), hp: c.hp, hpMax: c.hp, cd: 0, alvo: 0, est: 0,
+      tn: T_NASCER, a: lado === 0 ? 0 : Math.PI, predio: c.tipo === "predio", fixa: false, c, vida: c.vida || 0, inv: c.invoca ? c.invoca.cada * 0.5 : 0 };
     s.ent.push(e);
     s.ev.push(["nasce", e.id]);
   }
-  return true;
 }
 
 const ladoDoRio = (y) => y < RIO0 ? 0 : y > RIO1 ? 1 : -1;
@@ -189,6 +207,15 @@ export function passo(s) {
     const c = e.c;
     if (e.vida) { e.vida -= DT; e.hp -= e.hpMax * DT / c.vida; if (e.hp <= 0) continue; }
     e.cd = Math.max(0, e.cd - DT);
+    if (c.invoca) {                                         // o necromante chama esqueletos de tempos em tempos
+      e.inv -= DT;
+      if (e.inv <= 0) {
+        e.inv = c.invoca.cada;
+        const atras = e.lado === 0 ? -0.9 : 0.9;
+        nascer(s, c.invoca.carta, e.lado, e.x, e.y + atras, c.invoca.n);
+        s.ev.push(["invoca", e.id]);
+      }
+    }
     if (e.k === "rei" && !s.reiAtivo[e.lado]) continue;     // o rei só acorda quando apanha ou perde uma torre
     // alvo: mantém o atual se ainda vale; senão procura outro
     let alvo = porId.get(e.alvo);
@@ -212,7 +239,8 @@ export function passo(s) {
         if (c.proj) {
           s.proj.push({ id: s.prox++, tipo: c.proj, lado: e.lado, x: e.x, y: e.y, alvo: alvo.id, tx: alvo.x, ty: alvo.y, dano: c.dano, area: c.area || 0, ar: !!c.ar,
             alto: e.fixa ? 1 : 0, voaAlvo: !!alvo.c.voa });
-        } else if (c.area) danoArea(s, e.lado, alvo.x, alvo.y, c.area, c.dano, !!c.ar);
+        } else if (c.giro) { danoArea(s, e.lado, e.x, e.y, c.giro + c.raio, c.dano, !!c.ar); s.ev.push(["giro", e.id]); }
+        else if (c.area) danoArea(s, e.lado, alvo.x, alvo.y, c.area, c.dano, !!c.ar);
         else dano(s, alvo, c.dano, e);
       }
     } else if (!e.predio) {                                 // longe: anda
@@ -276,7 +304,7 @@ export function passo(s) {
       if (q >= 1) {
         const c = CARTAS[p.carta];
         danoArea(s, p.lado, p.tx, p.ty, c.area, c.dano, true, c.danoTorre);
-        s.ev.push(["explode", p.tx, p.ty, c.area]);
+        s.ev.push(["explode", p.tx, p.ty, c.area, p.carta === "flechas" ? "flechas" : undefined]);
         p.fim = true;
       }
       continue;
@@ -327,7 +355,8 @@ export function foto(s, lado, ev) {
     dobro: s.fase === "extra" || s.tempo <= 60, mao: s.maos[lado].slice(), prox: s.filas[lado][0], rei: s.reiAtivo.slice(),
     ent: s.ent.map(e => [e.id, e.k, e.lado, Math.round(e.x * 100) / 100, Math.round(e.y * 100) / 100, Math.max(0, Math.round(e.hp)), e.hpMax, e.est, Math.round(e.a * 100) / 100,
       e.tn > 0 ? Math.round(e.tn * 100) / 100 : 0]),
-    proj: s.proj.map(p => p.tipo === "bola" ? [p.id, "bola", Math.round(p.x * 100) / 100, Math.round(p.y * 100) / 100, Math.round(Math.min(1, p.t / p.dur) * 100) / 100, p.lado]
+    proj: s.proj.map(p => p.tipo === "bola" ? [p.id, "bola", Math.round(p.x * 100) / 100, Math.round(p.y * 100) / 100, Math.round(Math.min(1, p.t / p.dur) * 100) / 100, p.lado, p.carta,
+      Math.round(p.tx * 100) / 100, Math.round(p.ty * 100) / 100]
       : [p.id, p.tipo, Math.round(p.x * 100) / 100, Math.round(p.y * 100) / 100, p.alto, p.lado, p.voaAlvo ? 1 : 0, Math.round(p.tx * 100) / 100, Math.round(p.ty * 100) / 100]),
     ev: ev || s.ev,
   };
