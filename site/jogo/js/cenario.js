@@ -452,6 +452,15 @@ gl_Position = projectionMatrix * mvPosition;`);
   const RUA = [["tenda", "quartel", "arquearia", "tenda", "celeiro", "tenda"], ["casa_a", "taverna", "casa_b", "mercado", "casa_c", "igreja", "ferreiro", "casa_a"],
     ["casa_c", "serraria", "celeiro", "casa_a", "ferreiro"], ["quartel", "casa_b", "torre_vigia", "ferreiro", "taverna", "igreja", "torre_vigia"],
     ["torre_vigia", "quartel", "ferreiro", "torre_vigia", "serraria"], ["igreja", "casa_b", "mercado", "taverna", "torre_vigia", "casa_b"]][i];
+  // atrás dos muros de cima e de baixo: uma fileira de construções coladas, para não sobrar chão à vista
+  for (const sz of [-1, 1]) {
+    let j = sz < 0 ? 0 : 2;
+    for (let x = -XF - 1.5; x <= XF + 1.6; x += 3.0 + r() * 0.5) {
+      const nome = RUA[j++ % RUA.length], esc = nome === "torre_vigia" ? 1.6 : nome === "igreja" ? 3.2 : 2.9;
+      por(nome, x, sz * (ZF + 2.4 + r() * 0.6), esc, (sz < 0 ? 0 : Math.PI) + (r() - 0.5) * 0.25);
+    }
+    for (let x = -XF; x <= XF; x += 4.2 + r()) por(RUA[j++ % RUA.length], x + 1.5, sz * (ZF + 5.6 + r()), 3.1, (sz < 0 ? 0 : Math.PI) + (r() - 0.5) * 0.3);
+  }
   lados(sx => {
     let j = 0;
     for (let z = -ZF - 2; z < ZF + 3; z += 3.3 + r() * 0.8) {
