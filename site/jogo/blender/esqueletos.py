@@ -14,6 +14,7 @@ import kit
 BASE = Path(sys.argv[1]) / "addons" / "kaykit_character_pack_skeletons"
 JOGO = Path(sys.argv[2])
 FOTOS = "fotos" in sys.argv
+SO = set(next((a[3:].split(",") for a in sys.argv if a.startswith("so:")), []))
 D = (0, -0.079, 0)                                   # onde a arma fica no osso da mão (igual ao pacote dos aventureiros)
 
 # saída: (personagem, [(arma, osso, posição)], {nome no jogo: animação}, pose da carta (animação, quadro))
@@ -25,10 +26,15 @@ QUEM = {
     "necromante": ("Skeleton_Mage", [("Skeleton_Staff", "handslot.r", D)],
                    {"parado": "Idle", "andar": "Walking_D_Skeletons", "atacar": "Spellcast_Shoot", "invocar": "Spellcast_Summon", "nascer": "Spawn_Air"},
                    ("Spellcast_Summon", 14)),
+    "assassino": ("Skeleton_Rogue", [("Skeleton_Blade", "handslot.r", D), ("Skeleton_Blade", "handslot.l", D)],
+                  {"parado": "Idle_Combat", "andar": "Running_C", "atacar": "Dualwield_Melee_Attack_Stab", "saltar": "1H_Melee_Attack_Jump_Chop",
+                   "nascer": "Spawn_Ground_Skeletons"}, ("1H_Melee_Attack_Jump_Chop", 12)),
 }
 
 medidas = json.loads((JOGO / "modelos" / "kaykit.json").read_text())
 for saida, (arq, armas, anims, pose) in QUEM.items():
+    if SO and saida not in SO:
+        continue
     bpy.ops.wm.read_factory_settings(use_empty=True)
     bpy.ops.import_scene.gltf(filepath=str(BASE / "Characters" / "gltf" / f"{arq}.glb"))
     rig = next(o for o in bpy.data.objects if o.type == "ARMATURE")

@@ -506,7 +506,46 @@ def flecha():
 
 
 # cavaleiro, besteiro, gigante, mago e bandido vêm do pacote KayKit (kaykit.py); os de cima ficam como reserva
-TROPAS = ["dragao"]
+def gomo(perfil, a0, a1, n=4):
+    """Pedaço (fatia de laranja) de uma superfície de revolução, do ângulo a0 ao a1 (graus)."""
+    vs, fs = [], []
+    for r, z in perfil:
+        for k in range(n + 1):
+            a = math.radians(a0 + (a1 - a0) * k / n)
+            vs.append((r * math.cos(a), r * math.sin(a), z))
+    w = n + 1
+    for i in range(len(perfil) - 1):
+        for k in range(n):
+            fs.append((i * w + k, i * w + k + 1, (i + 1) * w + k + 1, (i + 1) * w + k))
+    return vs, fs
+
+
+def balao():
+    """Balão de ar quente com listras do time, cesto de vime e a bomba pendurada embaixo (a peça "bomba" cai)."""
+    m = Modelo("balao", 1.0)
+    m.peca("corpo", (0, 0, 0))
+    m.peca("bomba", (0, 0, 0.05), "corpo")
+    env = [(0.0, 3.25), (0.42, 3.2), (0.78, 3.05), (1.02, 2.8), (1.12, 2.45), (1.08, 2.1), (0.92, 1.75), (0.66, 1.42), (0.42, 1.2), (0.3, 1.08)]
+    for k in range(12):
+        m.add("corpo", gomo(env, 30 * k, 30 * (k + 1), 4), TIME if k % 2 == 0 else BRANCO, (0.82, 1.12))
+    m.add("corpo", tr(cilindro(1.13, 1.13, 0.1, 24, 0.02), (0, 0, 2.4)), OURO, (1, 1))
+    m.add("corpo", tr(cilindro(0.31, 0.31, 0.08, 16, 0.01), (0, 0, 1.07)), COURO2, (1, 1))
+    for k in range(4):                                     # cordas até o cesto
+        a = math.radians(45 + 90 * k)
+        m.add("corpo", tubo([(0.3 * math.cos(a), 0.3 * math.sin(a), 1.08), (0.36 * math.cos(a), 0.36 * math.sin(a), 0.62)], 0.018, 6), COURO, (1, 1))
+    m.add("corpo", tr(caixa(0.8, 0.8, 0.5, 0.06), (0, 0, 0.36)), MADEIRA, (0.8, 1.05))
+    m.add("corpo", tr(caixa(0.86, 0.86, 0.08, 0.03), (0, 0, 0.62)), MADEIRA2, (1, 1))
+    for z in (0.22, 0.42):
+        m.add("corpo", tr(caixa(0.82, 0.82, 0.035, 0.01), (0, 0, z)), MADEIRA2, (1, 1))
+    m.add("corpo", tr(cilindro(0.14, 0.1, 0.12, 12, 0.02), (0, 0, 0.66)), "#FF9A2E", (1, 1.2))   # o fogo do maçarico
+    m.add("bomba", tr(esfera(0.24, 14, 10), (0, 0, -0.18)), PRETO, (0.8, 1.15))
+    m.add("bomba", tr(cilindro(0.08, 0.08, 0.08, 10), (0, 0, 0.07)), ACO2, (1, 1))
+    m.add("bomba", tr(cilindro(0.02, 0.02, 0.14, 6), (0.04, 0, 0.16), rot=(0, 25, 0)), COURO, (1, 1))
+    m.alt = 3.3
+    return m
+
+
+TROPAS = ["dragao", "balao"]
 # torres, castelo, catapulta, ruína e árvores vêm do pacote KayKit Medieval Hexagon (hexagono.py)
 PREDIOS = []
 OBJETOS = ["bola_fogo", "flecha", "ponte"]

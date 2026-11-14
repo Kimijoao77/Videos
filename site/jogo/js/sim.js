@@ -40,6 +40,29 @@ export const CARTAS = {
     texto: "Congela tropas e torres inimigas por 4 segundos." },
   cura: { nome: "Poção de Cura", custo: 3, tipo: "magia", raridade: "raro", cura: 520, area: 3.0, instante: true,
     texto: "Cura as suas tropas que estiverem na área." },
+  paladino: { nome: "Paladino", custo: 4, tipo: "tropa", raridade: "epico", n: 1, hp: 1650, dano: 230, cad: 1.4, vel: 1.0, alc: 0.6, raio: 0.55, visao: 5.5, massa: 8,
+    investida: { dist: 2.5, vel: 2.1, mult: 2 },
+    texto: "Depois de andar um pouco sem lutar, dispara numa investida: o primeiro golpe tira o dobro." },
+  mago_gelo: { nome: "Mago de Gelo", custo: 3, tipo: "tropa", raridade: "raro", n: 1, hp: 620, dano: 80, cad: 1.5, vel: 1.0, alc: 5, raio: 0.45, visao: 5.5, ar: true, proj: "geada", area: 1.2, lento: 2.5, massa: 4,
+    texto: "Atira gelo de longe numa área pequena: quem é atingido anda e ataca mais devagar." },
+  assassino: { nome: "Assassino", custo: 4, tipo: "tropa", raridade: "epico", n: 1, hp: 900, dano: 150, cad: 0.9, vel: 1.45, alc: 0.5, raio: 0.42, visao: 6.5, massa: 4,
+    salto: { min: 2.6, max: 6.5, mult: 2.2, dur: 0.55, espera: 5 },
+    texto: "Salta de longe em cima do alvo, até por cima do rio, e o golpe da aterrissagem tira o dobro. No ar ninguém acerta." },
+  balao: { nome: "Balão", custo: 5, tipo: "tropa", raridade: "epico", n: 1, hp: 1400, dano: 600, cad: 2.2, vel: 1.0, alc: 0.3, raio: 0.6, visao: 7, voa: true, soPredio: true, bomba: 1.3, massa: 5,
+    morte: { dano: 240, area: 2.0 },
+    texto: "Voa direto nas construções e solta bombas pesadas. Quando cai, a última bomba explode no chão." },
+  quartel: { nome: "Quartel", custo: 5, tipo: "predio", raridade: "raro", n: 1, hp: 1200, dano: 0, cad: 1, vel: 0, alc: 0, raio: 0.95, visao: 0, vida: 40, massa: 999, semAtaque: true,
+    invoca: { carta: "bandidos", n: 1, cada: 4.5, frente: 1.4 }, morteInvoca: { carta: "bandidos", n: 2 },
+    texto: "Treina um bandido a cada 4,5 segundos durante 40 segundos. Quando cai, saem mais dois." },
+  mina: { nome: "Mina de Energia", custo: 5, tipo: "predio", raridade: "raro", n: 1, hp: 950, dano: 0, cad: 1, vel: 0, alc: 0, raio: 0.85, visao: 0, vida: 64, massa: 999, semAtaque: true,
+    gera: { energia: 1, cada: 8 },
+    texto: "Cava 1 de energia a cada 8 segundos enquanto estiver de pé. Dura 64 segundos." },
+  torre_arq: { nome: "Torre de Arqueiros", custo: 4, tipo: "predio", raridade: "raro", n: 1, hp: 1150, dano: 90, cad: 0.75, vel: 0, alc: 6.5, raio: 0.75, visao: 6.5, ar: true, proj: "flecha", alto: true, vida: 35, massa: 999,
+    texto: "Torre de defesa com flechas rápidas, inclusive em quem voa. Dura 35 segundos." },
+  veneno: { nome: "Veneno", custo: 4, tipo: "magia", raridade: "epico", dano: 70, area: 3.2, danoTorre: 0.3, instante: true, zona: { dur: 8, cada: 0.5, lento: true },
+    texto: "Nuvem venenosa por 8 segundos: tira vida de tudo o que fica dentro e deixa mais lento." },
+  furia: { nome: "Fúria", custo: 2, tipo: "magia", raridade: "epico", area: 3.0, instante: true, zona: { dur: 6, cada: 0.25, furia: true },
+    texto: "Por 6 segundos, as suas tropas dentro da área andam e atacam 40% mais rápido." },
   exercito: { nome: "Exército de Esqueletos", custo: 3, tipo: "tropa", raridade: "epico", n: 12, modelo: "esqueleto", hp: 75, dano: 70, cad: 1.0, vel: 1.4, alc: 0.5, raio: 0.32, visao: 5.5, massa: 1,
     texto: "Doze esqueletos de uma vez. Cercam e derrubam qualquer tropa sozinha." },
 };
@@ -66,14 +89,17 @@ export function lugaresDe(n, dir = 1) {
 }
 export const BARALHO = ["cavaleiro", "besteiros", "gigante", "mago", "bandidos", "dragao", "catapulta", "bola_fogo"];
 export const TODAS = ["cavaleiro", "besteiros", "gigante", "mago", "bandidos", "dragao", "catapulta", "bola_fogo", "esqueletos", "guerreiro", "necromante", "flechas",
-  "relampago", "gelo", "cura", "exercito"];
+  "relampago", "gelo", "cura", "exercito", "paladino", "mago_gelo", "assassino", "balao", "quartel", "mina", "torre_arq", "veneno", "furia"];
 // um baralho válido tem 8 cartas diferentes que existem; se não, usa o padrão
 export function baralhoValido(b) {
   return Array.isArray(b) && b.length === 8 && new Set(b).size === 8 && b.every(k => CARTAS[k]) ? b.slice() : BARALHO.slice();
 }
 const TORRE = { hp: 2600, dano: 105, cad: 0.8, alc: 7.5, raio: 1.3, ar: true, proj: "flecha", massa: 999 };
 const REI = { hp: 4200, dano: 105, cad: 1.0, alc: 7.0, raio: 1.85, ar: true, proj: "flecha", massa: 999 };
-const VEL_PROJ = { flecha: 14, magia: 10, fogo: 9, virote: 16, pedra: 12, sombra: 10 };
+const VEL_PROJ = { flecha: 14, magia: 10, fogo: 9, virote: 16, pedra: 12, sombra: 10, geada: 11 };
+const LENTO = 0.65, FURIA = 1.4;                            // lento: anda e ataca a 65%; fúria: 140%
+// fora do jogo agora: morto, nascendo ou no meio do salto (ninguém mira nem acerta)
+const fora = (o) => o.hp <= 0 || o.tn > 0 || !!o.pulo;
 const T_NASCER = 1.0;
 
 // gerador de números da partida (a mesma semente dá o mesmo embaralhamento)
@@ -85,7 +111,7 @@ function rng(s) {
 export function criarPartida(semente = 1, baralhos = [BARALHO, BARALHO], niveis = [{}, {}], reis = [1, 1]) {
   const r = rng(semente);
   const s = { tk: 0, tempo: T_PARTIDA, fase: "jogo", venc: -1, coroas: [0, 0], energia: [5, 5], ent: [], proj: [], ev: [], prox: 1, r,
-    maos: [[], []], filas: [[], []], reiAtivo: [false, false], niv: [niveis[0] || {}, niveis[1] || {}], reis: reis.slice(), cache: [{}, {}] };
+    maos: [[], []], filas: [[], []], reiAtivo: [false, false], niv: [niveis[0] || {}, niveis[1] || {}], reis: reis.slice(), cache: [{}, {}], zonas: [] };
   for (const lado of [0, 1]) {
     const b = baralhoValido(baralhos[lado]);
     for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; }
@@ -157,11 +183,17 @@ export function jogar(s, lado, i, x, y) {
 // magia que acontece na hora (relâmpago, gelo, cura)
 function magia(s, lado, carta, x, y) {
   const c = dados(s, lado, carta);
+  if (c.zona) {                                             // veneno e fúria: uma área que fica um tempo na arena
+    s.zonas.push({ id: s.prox++, k: carta, lado, x, y, area: c.area, t: c.zona.dur, tick: 0, cada: c.zona.cada, dano: c.dano || 0, danoTorre: c.danoTorre || 1,
+      lento: !!c.zona.lento, furia: !!c.zona.furia });
+    s.ev.push(["magia", lado, x, y]); s.ev.push(["zona", carta, x, y, c.area]);
+    return;
+  }
   if (c.cura) {
     for (const o of s.ent) if (o.lado === lado && !o.fixa && o.hp > 0 && Math.hypot(o.x - x, o.y - y) <= c.area + o.c.raio * 0.6) { o.hp = Math.min(o.hpMax, o.hp + c.cura); s.ev.push(["curou", o.id]); }
   } else {
     for (const o of s.ent) {
-      if (o.lado === lado || o.hp <= 0 || o.tn > 0) continue;
+      if (o.lado === lado || fora(o)) continue;
       if (Math.hypot(o.x - x, o.y - y) > c.area + o.c.raio * 0.6) continue;
       dano(s, o, o.fixa ? c.dano * c.danoTorre : c.dano);
       if (c.atordoa) { o.para = Math.max(o.para || 0, c.atordoa); o.gelo = false; o.cd = Math.max(o.cd, o.c.cad * 0.5); }
@@ -176,7 +208,8 @@ function nascer(s, carta, lado, x, y, n) {
   const c = dados(s, lado, carta), dir = lado === 0 ? 1 : -1;
   for (const [dx, dy] of lugaresDe(n, dir)) {
     const e = { id: s.prox++, k: carta, lado, x: Math.min(L - 0.4, Math.max(0.4, x + dx)), y: Math.min(C - 0.4, Math.max(0.4, y + dy)), hp: c.hp, hpMax: c.hp, cd: 0, alvo: 0, est: 0,
-      tn: T_NASCER, a: lado === 0 ? 0 : Math.PI, predio: c.tipo === "predio", fixa: false, c, vida: c.vida || 0, inv: c.invoca ? c.invoca.cada * 0.5 : 0, para: 0, gelo: false };
+      tn: T_NASCER, a: lado === 0 ? 0 : Math.PI, predio: c.tipo === "predio", fixa: false, c, vida: c.vida || 0, inv: c.invoca ? c.invoca.cada * 0.5 : 0, para: 0, gelo: false,
+      ger: c.gera ? c.gera.cada : 0, lento: 0, furia: 0, corrida: 0, investe: false, pulo: null, esperaSalto: 0 };
     s.ent.push(e);
     s.ev.push(["nasce", e.id]);
   }
@@ -202,18 +235,20 @@ function rumo(e, tx, ty) {
   return [bx, entrada];
 }
 
-function dano(s, alvo, v, autor) {
+function dano(s, alvo, v, autor, aos = false) {
   if (alvo.hp <= 0) return;
   alvo.hp -= v;
   if (alvo.k === "rei") s.reiAtivo[alvo.lado] = true;
-  s.ev.push(["dano", alvo.id, Math.round(v)]);
+  s.ev.push(aos ? ["dano", alvo.id, Math.round(v), "z"] : ["dano", alvo.id, Math.round(v)]);   // "z": aos poucos (veneno), pisca de leve
 }
 
-function danoArea(s, lado, x, y, raio, v, ar, fatorTorre = 1) {
+function danoArea(s, lado, x, y, raio, v, ar, fatorTorre = 1, lento = 0) {
   for (const o of s.ent) {
-    if (o.lado === lado || o.hp <= 0 || o.tn > 0) continue;
+    if (o.lado === lado || fora(o)) continue;
     if (o.c.voa && !ar) continue;
-    if (Math.hypot(o.x - x, o.y - y) <= raio + o.c.raio * 0.6) dano(s, o, o.fixa ? v * fatorTorre : v);
+    if (Math.hypot(o.x - x, o.y - y) > raio + o.c.raio * 0.6) continue;
+    dano(s, o, o.fixa ? v * fatorTorre : v);
+    if (lento) o.lento = Math.max(o.lento || 0, lento);
   }
 }
 
@@ -223,7 +258,7 @@ function escolherAlvo(s, e) {
   // 1) uma tropa inimiga à vista (quem só ataca construção pula esta parte)
   if (!c.soPredio) {
     for (const o of s.ent) {
-      if (o.lado === e.lado || o.hp <= 0 || o.tn > 0 || o.predio) continue;
+      if (o.lado === e.lado || fora(o) || o.predio) continue;
       if (o.c.voa && !c.ar) continue;
       const d = Math.hypot(o.x - e.x, o.y - e.y) - o.c.raio - c.raio;
       if (d <= (e.fixa || e.predio ? c.alc : c.visao) && d < dm) { dm = d; melhor = o; }
@@ -232,7 +267,7 @@ function escolherAlvo(s, e) {
   }
   if (e.fixa || e.predio) {                                 // torre e catapulta também atiram em construção ao alcance
     for (const o of s.ent) {
-      if (o.lado === e.lado || o.hp <= 0 || o.tn > 0 || !o.predio || o.fixa) continue;
+      if (o.lado === e.lado || fora(o) || !o.predio || o.fixa) continue;
       const d = Math.hypot(o.x - e.x, o.y - e.y) - o.c.raio - c.raio;
       if (d <= c.alc && d < dm) { dm = d; melhor = o; }
     }
@@ -240,7 +275,7 @@ function escolherAlvo(s, e) {
   }
   // 2) a construção inimiga mais perto (pelo caminho de verdade: passando pela ponte)
   for (const o of s.ent) {
-    if (o.lado === e.lado || o.hp <= 0 || o.tn > 0 || !o.predio) continue;
+    if (o.lado === e.lado || fora(o) || !o.predio) continue;
     let d = Math.hypot(o.x - e.x, o.y - e.y);
     if (!c.voa && ladoDoRio(o.y) !== ladoDoRio(e.y) && ladoDoRio(e.y) !== -1) {
       let via = 1e9;
@@ -261,26 +296,64 @@ export function passo(s) {
   for (const lado of [0, 1]) s.energia[lado] = Math.min(ENERGIA_MAX, s.energia[lado] + DT / T_ENERGIA * (dobro ? 2 : 1));
   const porId = new Map(s.ent.map(e => [e.id, e]));
 
+  // zonas (veneno e fúria): de tempos em tempos pegam quem está dentro
+  for (const z of s.zonas) {
+    z.t -= DT; z.tick -= DT;
+    if (z.tick > 0) continue;
+    z.tick += z.cada;
+    for (const o of s.ent) {
+      if (fora(o) || Math.hypot(o.x - z.x, o.y - z.y) > z.area + o.c.raio * 0.6) continue;
+      if (z.furia) { if (o.lado === z.lado && !o.fixa) o.furia = Math.max(o.furia || 0, z.cada + 0.8); }
+      else if (o.lado !== z.lado) {
+        dano(s, o, (o.fixa ? z.dano * z.danoTorre : z.dano) * z.cada, null, true);
+        if (z.lento && !o.fixa) o.lento = Math.max(o.lento || 0, z.cada + 0.3);
+      }
+    }
+  }
+  s.zonas = s.zonas.filter(z => z.t > 0);
+
   for (const e of s.ent) {
     if (e.hp <= 0) continue;
     if (e.tn > 0) { e.tn -= DT; if (e.tn <= 0) e.est = 1; continue; }
     const c = e.c;
     if (e.vida) { e.vida -= DT; e.hp -= e.hpMax * DT / c.vida; if (e.hp <= 0) continue; }
-    if (e.para > 0) { e.para -= DT; if (e.para <= 0) { e.para = 0; e.gelo = false; } continue; }
-    e.cd = Math.max(0, e.cd - DT);
-    if (c.invoca) {                                         // o necromante chama esqueletos de tempos em tempos
+    if (e.pulo) {                                           // assassino no ar: vai até o alvo e cai com o golpe forte
+      const p = e.pulo, alvo = porId.get(p.alvo);
+      p.t += DT;
+      if (alvo && alvo.hp > 0) { const ux = alvo.x - p.x0, uy = alvo.y - p.y0, n = Math.hypot(ux, uy) || 1, r = alvo.c.raio + c.raio; p.tx = alvo.x - ux / n * r; p.ty = alvo.y - uy / n * r; }
+      const q = Math.min(1, p.t / c.salto.dur);
+      e.x = p.x0 + (p.tx - p.x0) * q; e.y = p.y0 + (p.ty - p.y0) * q;
+      if (q >= 1) {
+        e.pulo = null; e.esperaSalto = c.salto.espera; e.cd = c.cad; e.est = 2;
+        if (alvo && alvo.hp > 0) dano(s, alvo, c.dano * c.salto.mult, e);
+        s.ev.push(["pouso", e.id]);
+      }
+      continue;
+    }
+    if (e.para > 0) { e.para -= DT; e.investe = false; e.corrida = 0; if (e.para <= 0) { e.para = 0; e.gelo = false; } continue; }
+    if (e.lento > 0) e.lento -= DT;
+    if (e.furia > 0) e.furia -= DT;
+    if (e.esperaSalto > 0) e.esperaSalto -= DT;
+    const rit = (e.lento > 0 ? LENTO : 1) * (e.furia > 0 ? FURIA : 1);   // ritmo: anda e ataca mais devagar ou mais rápido
+    e.cd = Math.max(0, e.cd - DT * rit);
+    if (c.invoca) {                                         // o necromante chama esqueletos de tempos em tempos (o quartel, bandidos)
       e.inv -= DT;
       if (e.inv <= 0) {
         e.inv = c.invoca.cada;
-        const atras = e.lado === 0 ? -0.9 : 0.9;
-        nascer(s, c.invoca.carta, e.lado, e.x, e.y + atras, c.invoca.n);
+        const dy = c.invoca.frente ? (e.lado === 0 ? 1 : -1) * c.invoca.frente : (e.lado === 0 ? -0.9 : 0.9);
+        nascer(s, c.invoca.carta, e.lado, e.x, e.y + dy, c.invoca.n);
         s.ev.push(["invoca", e.id]);
       }
     }
+    if (c.gera) {                                           // a mina cava energia
+      e.ger -= DT;
+      if (e.ger <= 0) { e.ger += c.gera.cada; s.energia[e.lado] = Math.min(ENERGIA_MAX, s.energia[e.lado] + c.gera.energia); s.ev.push(["gera", e.id, e.lado]); }
+    }
+    if (c.semAtaque) { e.est = 1; continue; }
     if (e.k === "rei" && !s.reiAtivo[e.lado]) continue;     // o rei só acorda quando apanha ou perde uma torre
     // alvo: mantém o atual se ainda vale; senão procura outro
     let alvo = porId.get(e.alvo);
-    if (alvo && (alvo.hp <= 0 || alvo.tn > 0)) alvo = null;
+    if (alvo && fora(alvo)) alvo = null;
     if (alvo) {
       const d = Math.hypot(alvo.x - e.x, alvo.y - e.y) - alvo.c.raio - c.raio;
       if (e.fixa || e.predio) { if (d > c.alc) alvo = null; }
@@ -291,31 +364,47 @@ export function passo(s) {
     e.alvo = alvo ? alvo.id : 0;
     if (!alvo) { e.est = 1; continue; }
     const dx = alvo.x - e.x, dy = alvo.y - e.y, dist = Math.hypot(dx, dy), d = dist - alvo.c.raio - c.raio;
+    // assassino: alvo a uma boa distância (e no chão) → salta em cima dele
+    if (c.salto && e.esperaSalto <= 0 && !alvo.c.voa && d >= c.salto.min && d <= c.salto.max) {
+      e.pulo = { t: 0, x0: e.x, y0: e.y, tx: alvo.x, ty: alvo.y, alvo: alvo.id };
+      e.a = Math.atan2(dx, dy); e.est = 1;
+      s.ev.push(["salto", e.id]);
+      continue;
+    }
     if (d <= c.alc) {                                       // ao alcance: bate
-      if (e.est !== 2) { e.est = 2; e.cd = Math.max(e.cd, c.cad * 0.45); }
+      if (e.est !== 2) { e.est = 2; e.cd = Math.max(e.cd, e.investe ? 0.12 : c.cad * 0.45); }
       e.a = Math.atan2(dx, dy);
       if (e.cd <= 0) {
         e.cd = c.cad;
         s.ev.push(["atq", e.id]);
-        if (c.proj) {
-          s.proj.push({ id: s.prox++, tipo: c.proj, lado: e.lado, x: e.x, y: e.y, alvo: alvo.id, tx: alvo.x, ty: alvo.y, dano: c.dano, area: c.area || 0, ar: !!c.ar,
-            alto: e.fixa ? 1 : 0, voaAlvo: !!alvo.c.voa });
-        } else if (c.giro) { danoArea(s, e.lado, e.x, e.y, c.giro + c.raio, c.dano, !!c.ar); s.ev.push(["giro", e.id]); }
-        else if (c.area) danoArea(s, e.lado, alvo.x, alvo.y, c.area, c.dano, !!c.ar);
-        else dano(s, alvo, c.dano, e);
+        let v = c.dano;
+        if (c.investida) { if (e.investe) { v *= c.investida.mult; s.ev.push(["golpeForte", e.id]); } e.investe = false; e.corrida = 0; }
+        if (c.bomba) {                                      // o balão solta a bomba: cai em meio segundo
+          s.proj.push({ id: s.prox++, tipo: "queda", lado: e.lado, x: alvo.x, y: alvo.y, tx: alvo.x, ty: alvo.y, t: 0, dur: 0.45, dano: v, area: c.bomba, ar: false });
+        } else if (c.proj) {
+          s.proj.push({ id: s.prox++, tipo: c.proj, lado: e.lado, x: e.x, y: e.y, alvo: alvo.id, tx: alvo.x, ty: alvo.y, dano: v, area: c.area || 0, ar: !!c.ar,
+            alto: e.fixa || c.alto ? 1 : 0, voaAlvo: !!alvo.c.voa, lento: c.lento || 0 });
+        } else if (c.giro) { danoArea(s, e.lado, e.x, e.y, c.giro + c.raio, v, !!c.ar); s.ev.push(["giro", e.id]); }
+        else if (c.area) danoArea(s, e.lado, alvo.x, alvo.y, c.area, v, !!c.ar);
+        else dano(s, alvo, v, e);
       }
     } else if (!e.predio) {                                 // longe: anda
       e.est = 1;
       const [rx, ry] = rumo(e, alvo.x, alvo.y);
       const vx = rx - e.x, vy = ry - e.y, n = Math.hypot(vx, vy) || 1;
-      const andar = Math.min(c.vel * DT, n);
+      const vel = (c.investida && e.investe ? c.investida.vel : c.vel) * rit;
+      const andar = Math.min(vel * DT, n);
       e.x += vx / n * andar; e.y += vy / n * andar;
       e.a = Math.atan2(vx, vy);
+      if (c.investida && !e.investe) {                      // paladino: depois de andar um tanto, dispara
+        e.corrida += andar;
+        if (e.corrida >= c.investida.dist) { e.investe = true; s.ev.push(["investida", e.id]); }
+      }
     } else e.est = 1;
   }
 
   // ninguém fica em cima de ninguém; tropa no chão não entra na torre nem no rio
-  const moveis = s.ent.filter(e => !e.predio && e.hp > 0 && e.tn <= 0);
+  const moveis = s.ent.filter(e => !e.predio && e.hp > 0 && e.tn <= 0 && !e.pulo);
   for (let i = 0; i < moveis.length; i++) {
     const a = moveis[i];
     for (let j = i + 1; j < moveis.length; j++) {
@@ -358,6 +447,11 @@ export function passo(s) {
 
   // projéteis
   for (const p of s.proj) {
+    if (p.tipo === "queda") {                               // bomba do balão caindo
+      p.t += DT;
+      if (p.t >= p.dur) { danoArea(s, p.lado, p.tx, p.ty, p.area, p.dano, p.ar); s.ev.push(["explode", p.tx, p.ty, p.area, "queda"]); p.fim = true; }
+      continue;
+    }
     if (p.tipo === "bola") {
       p.t += DT;
       const q = Math.min(1, p.t / p.dur);
@@ -374,7 +468,7 @@ export function passo(s) {
     if (alvo && alvo.hp > 0) { p.tx = alvo.x; p.ty = alvo.y; }
     const dx = p.tx - p.x, dy = p.ty - p.y, d = Math.hypot(dx, dy), v = VEL_PROJ[p.tipo] * DT;
     if (d <= v + 0.2) {
-      if (p.area) { danoArea(s, p.lado, p.tx, p.ty, p.area, p.dano, p.ar); s.ev.push(["explode", p.tx, p.ty, p.area * 0.7, p.tipo]); }
+      if (p.area) { danoArea(s, p.lado, p.tx, p.ty, p.area, p.dano, p.ar, 1, p.lento || 0); s.ev.push(["explode", p.tx, p.ty, p.area * 0.7, p.tipo]); }
       else if (alvo && alvo.hp > 0) dano(s, alvo, p.dano);
       p.fim = true;
     } else { p.x += dx / d * v; p.y += dy / d * v; }
@@ -386,6 +480,11 @@ export function passo(s) {
   for (const e of s.ent) {
     if (e.hp > 0) continue;
     s.ev.push(["morte", e.id, e.x, e.y, e.k]);
+    if (e.c.morte) {                                        // o balão caindo: a última bomba
+      const f = CARTAS[e.k].dano ? e.c.dano / CARTAS[e.k].dano : 1;
+      s.proj.push({ id: s.prox++, tipo: "queda", lado: e.lado, x: e.x, y: e.y, tx: e.x, ty: e.y, t: 0, dur: 0.9, dano: e.c.morte.dano * f, area: e.c.morte.area, ar: false });
+    }
+    if (e.c.morteInvoca) nascer(s, e.c.morteInvoca.carta, e.lado, e.x, e.y + (e.lado === 0 ? 1 : -1) * 1.1, e.c.morteInvoca.n);
     if (e.fixa) {
       const quem = 1 - e.lado;
       if (e.k === "rei") { s.coroas[quem] = 3; caiuRei = e.lado; }
@@ -415,10 +514,12 @@ export function foto(s, lado, ev) {
     tk: s.tk, tempo: Math.max(0, Math.ceil(s.tempo)), fase: s.fase, venc: s.venc, coroas: s.coroas.slice(), energia: Math.round(s.energia[lado] * 100) / 100,
     dobro: s.fase === "extra" || s.tempo <= 60, mao: s.maos[lado].slice(), prox: s.filas[lado][0], rei: s.reiAtivo.slice(),
     ent: s.ent.map(e => [e.id, e.k, e.lado, Math.round(e.x * 100) / 100, Math.round(e.y * 100) / 100, Math.max(0, Math.round(e.hp)), e.hpMax, e.est, Math.round(e.a * 100) / 100,
-      e.tn > 0 ? Math.round(e.tn * 100) / 100 : 0, e.para > 0 ? (e.gelo ? 2 : 1) : 0]),
-    proj: s.proj.map(p => p.tipo === "bola" ? [p.id, "bola", Math.round(p.x * 100) / 100, Math.round(p.y * 100) / 100, Math.round(Math.min(1, p.t / p.dur) * 100) / 100, p.lado, p.carta,
+      e.tn > 0 ? Math.round(e.tn * 100) / 100 : 0, e.para > 0 ? (e.gelo ? 2 : 1) : 0,
+      (e.investe ? 1 : 0) | (e.lento > 0 ? 2 : 0) | (e.furia > 0 ? 4 : 0) | (e.pulo ? 8 : 0)]),
+    proj: s.proj.map(p => p.tipo === "bola" || p.tipo === "queda" ? [p.id, p.tipo, Math.round(p.x * 100) / 100, Math.round(p.y * 100) / 100, Math.round(Math.min(1, p.t / p.dur) * 100) / 100, p.lado, p.carta,
       Math.round(p.tx * 100) / 100, Math.round(p.ty * 100) / 100]
       : [p.id, p.tipo, Math.round(p.x * 100) / 100, Math.round(p.y * 100) / 100, p.alto, p.lado, p.voaAlvo ? 1 : 0, Math.round(p.tx * 100) / 100, Math.round(p.ty * 100) / 100]),
+    zonas: (s.zonas || []).map(z => [z.id, z.k, Math.round(z.x * 100) / 100, Math.round(z.y * 100) / 100, z.area, z.lado, Math.round(z.t * 10) / 10]),
     ev: ev || s.ev,
   };
   return f;

@@ -35,8 +35,12 @@ export function tocar(nome, extra) {
     case "erro": tom(220, 150, 0.16, "square", 0.08); break;
     case "nasce": tom(300, 620, 0.14, "triangle", 0.16); ruido(0.12, 900, 0.1); break;
     case "atq":
-      if (extra === "torre" || extra === "rei" || extra === "besteiros" || extra === "catapulta") { ruido(0.07, 3200, 0.07, 3); tom(900, 500, 0.06, "triangle", 0.04); }
+      if (extra === "torre" || extra === "rei" || extra === "besteiros" || extra === "catapulta" || extra === "torre_arq") { ruido(0.07, 3200, 0.07, 3); tom(900, 500, 0.06, "triangle", 0.04); }
       else if (extra === "mago") tom(900, 1500, 0.14, "sine", 0.07);
+      else if (extra === "mago_gelo") { tom(1800, 2400, 0.12, "sine", 0.06); ruido(0.1, 6000, 0.04, 3); }
+      else if (extra === "paladino") { ruido(0.12, 900, 0.12, 1.2); tom(220, 110, 0.1, "triangle", 0.1); }
+      else if (extra === "assassino") { ruido(0.05, 4200, 0.08, 4); tom(1400, 700, 0.05, "triangle", 0.05); }
+      else if (extra === "balao") break;
       else if (extra === "dragao") ruido(0.22, 700, 0.1, 0.7);
       else { ruido(0.06, 1800, 0.1, 2); tom(180, 90, 0.08, "triangle", 0.1); }
       break;
@@ -59,6 +63,13 @@ export function tocar(nome, extra) {
     case "gelo": [2100, 2600, 3100].forEach((f, i) => tom(f, f * 0.9, 0.25, "sine", 0.06, i * 0.05)); ruido(0.4, 5000, 0.08, 3); break;
     case "cura": [523, 784, 1047].forEach((f, i) => tom(f, f * 1.02, 0.4, "sine", 0.09, i * 0.08)); break;
     case "vs": tom(160, 80, 0.5, "sawtooth", 0.12); ruido(0.4, 300, 0.2, 0.5); break;
+    case "investida": ruido(0.5, 400, 0.12, 0.6); [330, 392, 494].forEach((f, i) => tom(f, f, 0.1, "square", 0.04, i * 0.06)); break;
+    case "golpeForte": ruido(0.25, 600, 0.3, 0.7); tom(160, 60, 0.3, "sine", 0.3); break;
+    case "salto": tom(300, 900, 0.25, "triangle", 0.08); ruido(0.2, 2500, 0.06, 2); break;
+    case "pouso": ruido(0.3, 300, 0.3, 0.6); tom(140, 50, 0.25, "sine", 0.25); break;
+    case "gera": [988, 1319].forEach((f, i) => tom(f, f, 0.12, "sine", 0.06, i * 0.07)); break;
+    case "veneno": ruido(0.9, 900, 0.1, 0.8); [180, 170, 160].forEach((f, i) => tom(f, f * 0.8, 0.4, "sawtooth", 0.03, i * 0.12)); break;
+    case "furia": [440, 554, 659, 880].forEach((f, i) => tom(f, f * 1.03, 0.18, "sawtooth", 0.05, i * 0.05)); ruido(0.3, 1800, 0.08, 1.5); break;
   }
 }
 

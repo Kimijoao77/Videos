@@ -19,8 +19,16 @@ for cor, pt in (("blue", "azul"), ("red", "vermelho")):
     QUAIS[f"castelo_{pt}"] = (f"buildings/{cor}/building_castle_{cor}", 1.65)
     QUAIS[f"torre_{pt}"] = (f"buildings/{cor}/building_tower_B_{cor}", 2.0)
     QUAIS[f"catapulta_{pt}"] = (f"buildings/{cor}/building_tower_catapult_{cor}", 1.3)
+    QUAIS[f"quartel_{pt}"] = (f"buildings/{cor}/building_barracks_{cor}", 1.35)
+    QUAIS[f"mina_{pt}"] = (f"buildings/{cor}/building_mine_{cor}", 1.3)
+    QUAIS[f"torre_arq_{pt}"] = (f"buildings/{cor}/building_tower_A_{cor}", 1.55)
+SO = set(next((a[3:].split(",") for a in sys.argv if a.startswith("so:")), []))
+FOTO = {"catapulta_azul": ("catapulta", (0, 0, 1.35), 7.4), "quartel_azul": ("quartel", (0, 0, 1.0), 7.0),
+        "mina_azul": ("mina", (0, 0, 0.9), 6.6), "torre_arq_azul": ("torre_arq", (0, 0, 1.6), 8.2)}
 
 for saida, (arq, esc) in QUAIS.items():
+    if SO and not any(saida.startswith(x) for x in SO):
+        continue
     bpy.ops.wm.read_factory_settings(use_empty=True)
     bpy.ops.import_scene.gltf(filepath=str(PACOTE / f"{arq}.gltf"))
     for o in bpy.data.objects:
@@ -30,8 +38,9 @@ for saida, (arq, esc) in QUAIS.items():
         for tira in ("_blue", "_red"):
             nome = nome.replace(tira, "")
         o.name = nome
-    if "fotos" in sys.argv and saida == "catapulta_azul":
-        kit.foto(JOGO / "cartas" / "catapulta.png", alvo=(0, 0, 1.35), dist=7.4, az=-32, el=16, larg=512, alt=512, amostras=48, transparente=True)
+    if "fotos" in sys.argv and saida in FOTO:
+        carta, alvo, dist = FOTO[saida]
+        kit.foto(JOGO / "cartas" / f"{carta}.png", alvo=alvo, dist=dist, az=-32, el=16, larg=512, alt=512, amostras=48, transparente=True)
         for o in list(bpy.data.objects):
             if o.name.startswith("_foto"):
                 bpy.data.objects.remove(o)

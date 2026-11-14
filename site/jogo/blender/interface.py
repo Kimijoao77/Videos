@@ -684,11 +684,59 @@ def carta_exercito():
     render(CARTAS / "exercito.png")
 
 
+def caveira(c, esc=1.0):
+    osso = mat("osso", "#F2EEE2", rug=0.5)
+    preto = mat("olho", "#141018", rug=0.9)
+    x, y, z = c
+    esfera((x, y, z + 0.1 * esc), 0.62 * esc, osso, (1.0, 0.92, 0.95))
+    caixa((x, y - 0.08 * esc, z - 0.45 * esc), (0.62 * esc, 0.5 * esc, 0.32 * esc), osso, 0.08 * esc)
+    for sx in (-1, 1):
+        esfera((x + 0.24 * sx * esc, y - 0.5 * esc, z + 0.08 * esc), 0.17 * esc, preto, (1, 0.6, 1.1))
+    esfera((x, y - 0.55 * esc, z - 0.17 * esc), 0.07 * esc, preto, (1, 0.6, 1.3))
+    for k in range(4):
+        caixa((x - 0.18 * esc + 0.12 * k * esc, y - 0.34 * esc, z - 0.52 * esc), (0.04 * esc, 0.05 * esc, 0.2 * esc), preto, 0.0)
+
+
+def carta_veneno():
+    cena_nova(384, 64)
+    nuvem = mat("toxico", "#7BE04A", rug=0.6, emis="#5BD12E", forca=0.6)
+    escura = mat("toxico2", "#3E9A2A", rug=0.7, emis="#2E8A1E", forca=0.3)
+    for x, z, r, m in ((-0.9, 0.0, 0.85, escura), (0.95, -0.1, 0.8, escura), (0.0, 0.7, 1.0, nuvem), (-0.55, 0.55, 0.7, nuvem),
+                       (0.6, 0.6, 0.72, nuvem), (-0.3, -0.5, 0.75, nuvem), (0.45, -0.55, 0.7, nuvem), (0, 1.35, 0.6, nuvem)):
+        esfera((x, 0.5, z), r, m)
+    caveira((0, -0.55, 0.15), 0.95)
+    for k in range(12):
+        a = 2 * math.pi * k / 12
+        esfera((1.6 * math.cos(a), -0.4, 0.2 + 1.3 * math.sin(a)), 0.06 + 0.04 * (k % 3), brilho(f"bolha{k}", "#B8FF7A", 5.0))
+    camera((0, 0, 0.3), 8.0, -8, 6, 50)
+    render(CARTAS / "veneno.png")
+
+
+def carta_furia():
+    cena_nova(384, 64)
+    chama = brilho("chama_roxa", "#C25BFF", 5.5)
+    chama2 = brilho("chama_rosa", "#FF7AF2", 7.0)
+    for x, z, h, r, m in ((-0.85, -0.2, 2.2, 0.55, chama), (0.85, -0.2, 2.1, 0.55, chama), (0, 0.1, 3.0, 0.75, chama),
+                          (-0.4, -0.4, 1.6, 0.4, chama2), (0.45, -0.4, 1.7, 0.4, chama2)):
+        o = esfera((x, 0.6, z + h * 0.3), r, m, (1, 1, h / (2 * r)))
+    # elmo com chifres
+    metal = mat("elmo", "#9AA6B8", metal=1.0, rug=0.3)
+    chifre = mat("chifre", "#F4E9CF", rug=0.5)
+    esfera((0, -0.4, 0.0), 0.95, metal, (1, 1, 0.85))
+    cil((0, -0.4, -0.55), 1.0, 0.25, mat("aro", "#E3B23C", metal=1.0, rug=0.3), 48)
+    for sx in (-1, 1):
+        cil((0.95 * sx, -0.4, 0.35), 0.24, 1.1, chifre, 24, (0, math.radians(-38 * sx), 0), r2=0.02)
+    caixa((0, -1.3, -0.15), (0.16, 0.08, 0.8), metal, 0.03)
+    esfera((0, 0.6, 0.6), 2.0, halo("halo_furia", "#C25BFF", 1.2))
+    camera((0, 0, 0.45), 8.2, -8, 8, 50)
+    render(CARTAS / "furia.png")
+
+
 TUDO = {
     "moeda": icone_moeda, "moedas": icone_moedas, "trofeu": icone_trofeu, "coroa": icone_coroa, "espadas": icone_espadas,
     "engrenagem": icone_engrenagem, "cartas": icone_cartas, "loja": icone_saco, "trilha": icone_bandeira,
     "escudo": icone_escudo, "estrela": icone_estrela, "relogio": icone_relogio, "logo": logo,
-    "relampago": carta_relampago, "gelo": carta_gelo, "cura": carta_cura, "exercito": carta_exercito,
+    "relampago": carta_relampago, "gelo": carta_gelo, "cura": carta_cura, "exercito": carta_exercito, "veneno": carta_veneno, "furia": carta_furia,
 }
 for t in BAUS:
     TUDO[f"bau_{t}"] = (lambda t=t: bau(t, False))

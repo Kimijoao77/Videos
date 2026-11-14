@@ -6,6 +6,10 @@
   Preparados por `blender/hexagono.py`.
 - **Cenários (casas, moinhos, muralhas, barracas, montanhas, nuvens, plantas do rio):** pacote KayKit Medieval Hexagon, de Kay Lousberg. Licença CC0.
   Juntados em `modelos/cenario.glb` por `blender/cenario.py`.
+- **Paladino e Mago de Gelo:** pacote KayKit Adventurers (o Knight com a espada de duas mãos e o Mage com a roupa repintada de azul-gelo), de Kay Lousberg. Licença CC0. Preparados por `blender/kaykit.py`.
+- **Assassino:** pacote KayKit Skeletons (Skeleton_Rogue com as duas lâminas), de Kay Lousberg. Licença CC0. Preparado por `blender/esqueletos.py`.
+- **Quartel, Mina de Energia e Torre de Arqueiros:** pacote KayKit Medieval Hexagon (barracks, mine e tower_A), de Kay Lousberg. Licença CC0. Preparados por `blender/hexagono.py`.
+- **Balão:** modelado por código no Blender (`blender/personagens.py`). **Arte das cartas Veneno e Fúria:** feita no Blender por código (`blender/interface.py`).
 - **Esqueletos (esqueleto, guerreiro, necromante):** pacote [KayKit Skeletons](https://kaylousberg.itch.io/kaykit-skeletons), de Kay Lousberg. Licença CC0.
   Preparados por `blender/esqueletos.py`.
 - **Dragão, bola de fogo, flecha e ponte:** modelados por código no Blender (`blender/personagens.py`).

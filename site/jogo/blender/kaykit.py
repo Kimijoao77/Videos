@@ -14,6 +14,7 @@ import kit
 PACOTE = Path(sys.argv[1]) / "addons" / "kaykit_character_pack_adventures" / "Characters" / "gltf"
 JOGO = Path(sys.argv[2])
 FOTOS = "fotos" in sys.argv
+SO = set(next((a[3:].split(",") for a in sys.argv if a.startswith("so:")), []))       # só estes (ex.: so:paladino,mago_gelo)
 
 # saída: (arquivo, acessórios que ficam, {nome no jogo: animação do pacote}, pose da carta (animação, quadro))
 QUEM = {
@@ -27,12 +28,41 @@ QUEM = {
              {"parado": "Idle", "andar": "Walking_A", "atacar": "Spellcast_Shoot"}, ("Spellcast_Raise", 10)),
     "bandido": ("Rogue", ["Knife", "Knife_Offhand", "Rogue_Cape"],
                 {"parado": "Idle", "andar": "Running_A", "atacar": "1H_Melee_Attack_Stab"}, ("Running_A", 4)),
+    "paladino": ("Knight", ["2H_Sword", "Knight_Helmet", "Knight_Cape"],
+                 {"parado": "2H_Melee_Idle", "andar": "Running_A", "atacar": "2H_Melee_Attack_Slice"}, ("2H_Melee_Attack_Chop", 9)),
+    "mago_gelo": ("Mage", ["1H_Wand", "Spellbook_open", "Mage_Hat", "Mage_Cape"],
+                  {"parado": "Idle", "andar": "Walking_A", "atacar": "Spellcast_Shoot"}, ("Spellcast_Shoot", 12)),
 }
+# tinta: troca a cor da roupa no mapa de cores do personagem (o roxo do mago vira azul-gelo)
+TINTA = {"mago_gelo": ((240, 330), 196, 1.25)}       # (faixa de matiz em graus, matiz novo, mais claro)
 
-medidas = {}
+
+def pintar(saida):
+    import colorsys
+    faixa, novo, claro = TINTA[saida]
+    for img in bpy.data.images:
+        if not img.size[0]:
+            continue
+        px = list(img.pixels)
+        for i in range(0, len(px), 4):
+            r, g, b = px[i:i + 3]
+            h, l_, s_ = colorsys.rgb_to_hls(r, g, b)
+            if s_ > 0.18 and faixa[0] <= h * 360 <= faixa[1]:
+                r, g, b = colorsys.hls_to_rgb(novo / 360, min(0.92, l_ * claro), s_ * 0.9)
+                px[i:i + 3] = (r, g, b)
+        img.pixels[:] = px
+        img.update()
+        img.pack()
+
+
+medidas = json.loads((JOGO / "modelos" / "kaykit.json").read_text()) if (JOGO / "modelos" / "kaykit.json").exists() else {}
 for saida, (arq, manter, anims, pose) in QUEM.items():
+    if SO and saida not in SO:
+        continue
     bpy.ops.wm.read_factory_settings(use_empty=True)
     bpy.ops.import_scene.gltf(filepath=str(PACOTE / f"{arq}.glb"))
+    if saida in TINTA:
+        pintar(saida)
     rig = next(o for o in bpy.data.objects if o.type == "ARMATURE")
     corpo = []
     for o in list(bpy.data.objects):

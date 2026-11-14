@@ -9,12 +9,16 @@ import { montarCenario } from "./cenario.js";
 
 const AZUL = new THREE.Color("#2F7BFF"), VERMELHO = new THREE.Color("#F0463C");
 // modelos do pacote KayKit (com esqueleto e animações): altura no jogo, em casas
-const KAYKIT = { cavaleiro: 2.2, besteiro: 1.9, gigante: 3.6, mago: 2.2, bandido: 1.7, esqueleto: 1.35, guerreiro: 2.35, necromante: 2.2 };
-const MEUS = ["dragao", "bola_fogo", "flecha", "ponte"];                      // modelados por código no Blender
+const KAYKIT = { cavaleiro: 2.2, besteiro: 1.9, gigante: 3.6, mago: 2.2, bandido: 1.7, esqueleto: 1.35, guerreiro: 2.35, necromante: 2.2,
+  paladino: 2.35, mago_gelo: 2.2, assassino: 1.75 };
+const MEUS = ["dragao", "bola_fogo", "flecha", "ponte", "balao"];             // modelados por código no Blender
 // do pacote KayKit Medieval Hexagon: um arquivo azul e um vermelho, ou um só (neutros)
-const PREDIOS_TIME = ["torre", "castelo", "catapulta"], NEUTROS = ["ruina", "pedra_cat", "arvore", "pinheiro", "pedra", "bosque"];
+const PREDIOS_TIME = ["torre", "castelo", "catapulta", "quartel", "mina", "torre_arq"], NEUTROS = ["ruina", "pedra_cat", "arvore", "pinheiro", "pedra", "bosque"];
 const ALT_VOO = 1.9;
-const COR_RASTRO = { fogo: 0xff8a1e, magia: 0x7fefff, sombra: 0xb26bff, bola: 0xffa52e };
+const COR_RASTRO = { fogo: 0xff8a1e, magia: 0x7fefff, sombra: 0xb26bff, bola: 0xffa52e, geada: 0xbfeeff };
+// altura de cada construção (para a barra de vida) e quanto o balão fica acima do chão
+const ALT_PREDIO = { catapulta: 2.7, quartel: 2.7, mina: 2.2, torre_arq: 4.0 };
+const ALT_BALAO = ALT_VOO - 0.35;
 
 // brilho redondo (para magia, fogo e o clarão de quando a tropa nasce)
 function texturaBrilho() {
@@ -46,6 +50,7 @@ export class Cena {
     this.visao = 0;
     this.bonecos = new Map();       // id → Boneco
     this.projs = new Map();
+    this.zonasVis = new Map();      // veneno e fúria no chão
     this.efeitos = [];
     this.modelos = {};
     this.relogio = new THREE.Clock();
@@ -266,6 +271,7 @@ export class Cena {
         const mx = new THREE.AnimationMixer(o), clip = this.modelos[modelo].animations.find(a => a.name === "parado");
         if (clip) { mx.clipAction(clip).play(); mx.update(0.01); }
       } else if (carta === "dragao") { o.scale.setScalar(1.3); o.position.y = ALT_VOO; }
+      else if (carta === "balao") o.position.y = ALT_BALAO;
       o.rotation.y = Math.PI;
       o.traverse(m => {
         if (!m.isMesh) return;
@@ -311,6 +317,7 @@ export class Cena {
       if (!b) { b = new Boneco(this, id, k, lado, x, y, hpMax, a); this.bonecos.set(id, b); }
       b.alvo(x, y, hp, est, a, tn);
       b.parar(para || 0);
+      b.marcas(e[11] || 0);
     }
     for (const [id, b] of this.bonecos) if (!vistos.has(id)) { b.sair(); this.bonecos.delete(id); }
     const pv = new Set();
@@ -321,6 +328,12 @@ export class Cena {
       o.alvo(p);
     }
     for (const [id, o] of this.projs) if (!pv.has(id)) { o.sair(); this.projs.delete(id); }
+    const zv = new Set();
+    for (const z of f.zonas || []) {
+      zv.add(z[0]);
+      if (!this.zonasVis.has(z[0])) this.zonasVis.set(z[0], new Zona(this, z));
+    }
+    for (const [id, o] of this.zonasVis) if (!zv.has(id)) { o.sair(); this.zonasVis.delete(id); }
     for (const ev of f.ev || []) this.evento(ev);
   }
 
@@ -337,12 +350,18 @@ export class Cena {
       this.aoSom && this.aoSom(fixa ? "torre" : "morte");
     } else if (t === "explode") {
       this.explosao(this.X(a), this.Z(b), c, d);
-      const especial = d === "relampago" ? "raio" : d === "gelo" ? "gelo" : d === "cura" ? "cura" : null;
+      const especial = d === "relampago" ? "raio" : d === "gelo" || d === "geada" ? "gelo" : d === "cura" ? "cura" : d === "queda" ? "explosao" : null;
       this.aoSom && this.aoSom(especial || (d ? "impacto" : "explosao"));
-      if (!d) this.tremor = 0.35; else if (d === "relampago") this.tremor = 0.25;
+      if (!d) this.tremor = 0.35; else if (d === "relampago") this.tremor = 0.25; else if (d === "queda") this.tremor = Math.max(this.tremor, 0.42);
     }
     else if (t === "curou") { const o = this.bonecos.get(a); if (o) this.poeira(o.g.position.x, o.g.position.z, 0x7dff9a, o.raio + 0.4); }
-    else if (t === "dano") { const o = this.bonecos.get(a); o && o.apanhar(); }
+    else if (t === "investida") { const o = this.bonecos.get(a); if (o) this.poeira(o.g.position.x, o.g.position.z, 0xfff0c8, o.raio + 0.5); this.aoSom && this.aoSom("investida"); }
+    else if (t === "golpeForte") { const o = this.bonecos.get(a); if (o) { this.poeira(o.g.position.x, o.g.position.z, 0xffd166, o.raio + 1.1); this.tremor = Math.max(this.tremor, 0.18); } this.aoSom && this.aoSom("golpeForte"); }
+    else if (t === "salto") { const o = this.bonecos.get(a); if (o) o.saltar(); this.aoSom && this.aoSom("salto"); }
+    else if (t === "pouso") { const o = this.bonecos.get(a); if (o) { this.poeira(o.g.position.x, o.g.position.z, 0xd9d2ff, o.raio + 0.9); this.fumaca(o.g.position.x, o.g.position.z, 5, 0.5, 0xbdb6a6); } this.tremor = Math.max(this.tremor, 0.14); this.aoSom && this.aoSom("pouso"); }
+    else if (t === "gera") { const o = this.bonecos.get(a); if (o) this.maisEnergia(o); this.aoSom && b === this.visao && this.aoSom("gera"); }
+    else if (t === "zona") this.aoSom && this.aoSom(a === "furia" ? "furia" : "veneno");
+    else if (t === "dano") { const o = this.bonecos.get(a); if (o) { if (c === "z") { o.pisca = Math.max(o.pisca, 0.22); o.tingir(); } else o.apanhar(); } }
     else if (t === "magia") this.aoSom && this.aoSom("magia");
   }
 
@@ -362,6 +381,31 @@ export class Cena {
     this.efeito(m, 0.32, (q) => { m.scale.setScalar(tam * (1 - q * 0.8)); m.material.opacity = 0.7 * (1 - q); m.position.y += 0.01; });
   }
 
+  // a mina cavou energia: uma gota rosa com "+1" subindo
+  maisEnergia(o) {
+    const cv = document.createElement("canvas"); cv.width = 128; cv.height = 128;
+    const g = cv.getContext("2d");
+    g.fillStyle = "#e35cff"; g.strokeStyle = "#2a0a35"; g.lineWidth = 6;
+    g.beginPath(); g.moveTo(64, 10); g.bezierCurveTo(100, 54, 108, 70, 108, 84); g.arc(64, 84, 44, 0, Math.PI); g.bezierCurveTo(20, 70, 28, 54, 64, 10); g.fill(); g.stroke();
+    g.font = "bold 44px 'Lilita One', system-ui, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.lineWidth = 7; g.strokeStyle = "#2a0a35";
+    g.strokeText("+1", 64, 84); g.fillStyle = "#ffffff"; g.fillText("+1", 64, 84);
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
+    sp.renderOrder = 15; sp.position.set(o.g.position.x, o.altura + 0.6, o.g.position.z);
+    this.efeito(sp, 1.3, (q) => { sp.position.y = o.altura + 0.6 + q * 1.6; const e = q < 0.15 ? q / 0.15 : 1; sp.scale.setScalar(1.25 * e); sp.material.opacity = q > 0.7 ? (1 - q) / 0.3 : 1; });
+  }
+  // geada do mago de gelo: estouro azul-claro e floquinhos
+  geadaArea(X, Z, raio) {
+    const bola = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 10), new THREE.MeshBasicMaterial({ color: 0xd6f6ff, transparent: true, opacity: 0.8, depthWrite: false }));
+    bola.position.set(X, 0.5, Z);
+    this.efeito(bola, 0.4, (q) => { bola.scale.setScalar(raio * (0.3 + q * 0.9)); bola.material.opacity = 0.8 * (1 - q); });
+    this.poeira(X, Z, 0xbff6ff, raio * 1.1);
+    const g = new THREE.Group(); g.position.set(X, 0, Z);
+    const lista = [], mf = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, depthWrite: false });
+    for (let k = 0; k < 10; k++) { const m = new THREE.Mesh(this.geoBolinha, mf), a = Math.random() * 6.28, d = Math.random() * raio; m.scale.setScalar(0.06 + Math.random() * 0.05); lista.push([m, Math.cos(a) * d, Math.sin(a) * d, 0.5 + Math.random() * 1.5]); g.add(m); }
+    this.efeito(g, 0.8, (q) => { for (const [m, x, z, h] of lista) m.position.set(x, h * (1 - q), z); mf.opacity = 0.95 * (1 - q); });
+  }
+
   ruina(X, Z, esc) { const r = this.novo("ruina"); r.position.set(X, 0, Z); r.scale.setScalar(esc); this.cena.add(r); (this.ruinas ||= []).push(r); }
 
   limpar() {
@@ -369,6 +413,8 @@ export class Cena {
     this.bonecos.clear();
     for (const p of this.projs.values()) p.sair();
     this.projs.clear();
+    for (const z of this.zonasVis.values()) this.cena.remove(z.g);
+    this.zonasVis.clear();
     for (const r of this.ruinas || []) this.cena.remove(r);
     this.ruinas = [];
     for (const e of this.efeitos) this.cena.remove(e.o);
@@ -398,6 +444,7 @@ export class Cena {
     if (tipo === "relampago") return this.relampago(X, Z, raio);
     if (tipo === "gelo") return this.geloArea(X, Z, raio);
     if (tipo === "cura") return this.curaArea(X, Z, raio);
+    if (tipo === "geada") return this.geadaArea(X, Z, raio);
     if (tipo === "flechas") {                      // chuva de flechas: poeira e flechas fincadas que somem
       this.poeira(X, Z, 0xe8d7a8, raio);
       const g = new THREE.Group(); g.position.set(X, 0, Z);
@@ -409,6 +456,7 @@ export class Cena {
       this.fumaca(X, Z, 8, raio * 0.6, 0xd9c9a0);
       return;
     }
+    if (tipo === "queda") tipo = undefined;                // bomba do balão: explosão grande, como a bola de fogo
     const cor = tipo === "magia" ? 0x7fefff : 0xff8a1e;
     const bola = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), new THREE.MeshBasicMaterial({ color: cor, transparent: true, opacity: 0.85 }));
     bola.position.set(X, 0.5, Z);
@@ -481,6 +529,7 @@ export class Cena {
     if (this.cenario) this.cenario.quadro(agora, dt);
     for (const b of this.bonecos.values()) b.quadro(dt, agora);
     for (const p of this.projs.values()) p.quadro(dt);
+    for (const z of this.zonasVis.values()) z.quadro(dt, agora);
     this.efeitos = this.efeitos.filter(e => { e.t += dt; const q = Math.min(1, e.t / e.dur); e.passo(q); if (q >= 1) { this.cena.remove(e.o); return false; } return true; });
     if (this.camBase) {
       this.tremor = Math.max(0, this.tremor - dt * 1.6);
@@ -524,7 +573,7 @@ class Boneco {
     } else {
       this.pecas = {};
       this.m.traverse(o => { this.pecas[o.name] = o; });
-      this.altura = this.fixa ? (k === "rei" ? 6.7 : 5.1) : this.voa ? ALT_VOO + 1.9 : 2.7;
+      this.altura = this.fixa ? (k === "rei" ? 6.7 : 5.1) : k === "balao" ? ALT_BALAO + 3.3 : this.voa ? ALT_VOO + 1.9 : ALT_PREDIO[k] || 2.7;
       if (k === "dragao") this.esc = 1.3;
     }
     this.m.scale.setScalar(this.esc);
@@ -532,7 +581,7 @@ class Boneco {
     this.ang = this.fixa ? 0 : c.giro(a);               // torres e castelos sempre de frente para a câmera
     this.m.rotation.y = this.predio ? 0 : this.ang;
     if (this.voa) {
-      this.m.position.y = ALT_VOO;
+      this.m.position.y = k === "balao" ? ALT_BALAO : ALT_VOO;
       const s = new THREE.Mesh(c.geoDisco, c.matSombra); s.scale.setScalar(this.raio * 1.6); s.position.y = 0.035; this.g.add(s);
     }
     // disco do time no chão
@@ -557,7 +606,7 @@ class Boneco {
       const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.texNum, depthTest: false })); sp.scale.set(1.9, 0.72, 1); sp.position.y = 0.62; sp.renderOrder = 12;
       this.barra.add(sp);
     }
-    this.tx = x; this.ty = y; this.hp = hpMax; this.est = 0; this.tn = 0; this.soco = 0; this.tAtq = 9;
+    this.tx = x; this.ty = y; this.hp = hpMax; this.est = 0; this.tn = 0; this.soco = 0; this.tAtq = 9; this.f = 0; this.tPoeira = 0;
     c.cena.add(this.g);
     if (this.mixer) {
       if (this.acoes.nascer && !this.fixa) {               // os esqueletos saem do chão
@@ -628,6 +677,37 @@ class Boneco {
     if (this.blocoGelo) this.blocoGelo.visible = v === 2;
     for (const m of this.mats) if (m.emissive) { if (v === 2) m.emissive.setRGB(0.1, 0.35, 0.6); else m.emissive.setScalar(0); }
   }
+  // marcas que vêm da partida: 1 investida, 2 lento, 4 fúria, 8 no ar (salto)
+  marcas(f) {
+    if (f === this.f) return;
+    const antes = this.f;
+    this.f = f;
+    if ((f & 4) && !this.aneFuria) {                     // fúria: anel rosa-choque girando nos pés
+      this.aneFuria = new THREE.Mesh(new THREE.RingGeometry(0.75, 1, 24, 1, 0, Math.PI * 1.6).rotateX(-Math.PI / 2),
+        new THREE.MeshBasicMaterial({ color: 0xff4fd8, transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending }));
+      this.aneFuria.position.y = 0.08; this.aneFuria.scale.setScalar(this.raio * 1.5); this.g.add(this.aneFuria);
+    }
+    if (this.aneFuria) this.aneFuria.visible = !!(f & 4);
+    if ((f & 8) && !(antes & 8) && !this.tSalto) this.saltar();
+    if (this.mixer) this.mixer.timeScale = (f & 2 ? 0.65 : 1) * (f & 4 ? 1.4 : 1) * (f & 1 ? 1.35 : 1);
+    this.tingir();
+  }
+  saltar() {
+    this.tSalto = performance.now();
+    if (this.acoes && this.acoes.saltar) {
+      this.atacando = true;
+      const a = this.acoes.saltar;
+      for (const [n, o] of Object.entries(this.acoes)) if (n !== "saltar" && o.isRunning()) o.fadeOut(0.06);
+      a.setLoop(THREE.LoopOnce); a.clampWhenFinished = false;
+      a.reset().setEffectiveTimeScale(Math.max(1, a.getClip().duration / 0.62)).setEffectiveWeight(1).fadeIn(0.05).play();
+    }
+  }
+  // cor por cima do modelo: piscada de quando apanha, azul do lento, rosa da fúria
+  tingir() {
+    const p = this.pisca * 0.45, f = this.f || 0;
+    const r = p + (f & 4 ? 0.13 : 0), g = p + (f & 2 ? 0.05 : 0), b = p + (f & 2 ? 0.13 : 0) + (f & 4 ? 0.07 : 0);
+    for (const m of this.mats) if (m.emissive) m.emissive.setRGB(r, g, b);
+  }
   invocar() {
     const a = this.acoes && this.acoes.invocar;
     if (!a) return;
@@ -651,9 +731,16 @@ class Boneco {
       this.m.scale.setScalar(this.esc);
       return;
     }
-    if (this.pisca > 0) {
-      this.pisca = Math.max(0, this.pisca - dt * 6);
-      for (const m of this.mats) if (m.emissive) m.emissive.setScalar(this.pisca * 0.45);
+    if (this.pisca > 0) { this.pisca = Math.max(0, this.pisca - dt * 6); this.tingir(); }
+    if (this.aneFuria && this.aneFuria.visible) this.aneFuria.rotation.y += dt * 5;
+    if ((this.f & 1) && this.est === 1) {                // investida: poeira saindo dos pés
+      this.tPoeira -= dt;
+      if (this.tPoeira <= 0) { this.tPoeira = 0.1; this.c.fumaca(p.x, p.z, 2, 0.25, 0xe7dcc2); }
+    }
+    if (this.tSalto) {                                    // salto: arco no ar
+      const q = (performance.now() - this.tSalto) / 560;
+      if (q >= 1 && !(this.f & 8)) { this.tSalto = 0; this.m.position.y = 0; }
+      else this.m.position.y = Math.sin(Math.PI * Math.min(1, q)) * 2.3;
     }
     this.tAtq += dt;
     // nascendo: cresce com um quique
@@ -670,6 +757,10 @@ class Boneco {
       if (P.cabeca) P.cabeca.rotation.x = -golpe * 0.5;
       this.m.position.y = ALT_VOO + Math.sin(agora * 2.4 + this.id) * 0.14 - bate * 0.05;
       this.m.rotation.x = 0.12;
+    } else if (this.k === "balao") {
+      this.m.position.y = ALT_BALAO + Math.sin(agora * 1.7 + this.id) * 0.13;
+      this.m.rotation.z = Math.sin(agora * 1.1 + this.id) * 0.05;
+      if (P.bomba) P.bomba.visible = this.tAtq > 1.1;
     } else if (this.k === "catapulta") {
       if (P.catapult_turret && this.angAlvo != null) {            // a catapulta gira no topo da torre e o braço dá o golpe
         let d = this.angAlvo - this.ang; d = Math.atan2(Math.sin(d), Math.cos(d));
@@ -694,6 +785,52 @@ class Boneco {
   }
 }
 
+// ------------------------------------------------------------------ zonas no chão (veneno e fúria)
+class Zona {
+  constructor(c, z) {
+    this.c = c; this.k = z[1];
+    const r = z[4], veneno = this.k === "veneno", cor = veneno ? 0x6dff5a : 0xff4fd8;
+    this.g = new THREE.Group(); this.g.position.set(c.X(z[2]), 0, c.Z(z[3]));
+    this.disco = new THREE.Mesh(new THREE.CircleGeometry(r, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: cor, transparent: true, opacity: 0, depthWrite: false }));
+    this.disco.position.y = 0.06;
+    this.borda = new THREE.Mesh(new THREE.RingGeometry(r * 0.94, r, 48).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: cor, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
+    this.borda.position.y = 0.08;
+    this.g.add(this.disco, this.borda);
+    if (veneno) {                                     // cúpula de névoa verde
+      this.cupula = new THREE.Mesh(new THREE.SphereGeometry(r, 28, 12, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0x8dff6a, emissive: 0x2c8a1c, emissiveIntensity: 0.6, transparent: true, opacity: 0, depthWrite: false }));
+      this.cupula.scale.y = 0.42; this.g.add(this.cupula);
+    }
+    this.bolhas = [];
+    const mat = new THREE.SpriteMaterial({ map: c.texBrilho, color: veneno ? 0xa8ff7a : 0xff8ae8, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+    for (let k = 0; k < (veneno ? 22 : 16); k++) {
+      const sp = new THREE.Sprite(mat), a = Math.random() * 6.28, d = Math.sqrt(Math.random()) * r * 0.92;
+      sp.scale.setScalar(veneno ? 0.35 + Math.random() * 0.35 : 0.28 + Math.random() * 0.2);
+      this.bolhas.push([sp, Math.cos(a) * d, Math.sin(a) * d, Math.random(), 0.6 + Math.random() * 0.7]); this.g.add(sp);
+    }
+    this.matBolha = mat; this.t = 0; this.fim = 0;
+    c.cena.add(this.g);
+  }
+  quadro(dt) {
+    this.t += dt;
+    const entra = Math.min(1, this.t / 0.35), sai = this.fim ? Math.max(0, 1 - (this.t - this.fim) / 0.4) : 1, a = entra * sai;
+    const veneno = this.k === "veneno";
+    this.disco.material.opacity = (veneno ? 0.3 : 0.22) * a;
+    this.borda.material.opacity = 0.85 * a;
+    if (this.cupula) this.cupula.material.opacity = 0.2 * a;
+    if (!veneno) this.borda.rotation.y += dt * 1.5;
+    this.matBolha.opacity = a;
+    for (const b of this.bolhas) {                     // bolhas (veneno) ou faíscas (fúria) subindo sem parar
+      const [sp, x, z, f, v] = b;
+      const q = (this.t * v + f) % 1;
+      sp.position.set(x, q * (veneno ? 1.6 : 2.6), z);
+      sp.material.opacity = a;
+    }
+    if (this.fim && sai <= 0) { this.c.cena.remove(this.g); this.morta = true; }
+  }
+  // some devagar (o efeito vazio só serve para continuar chamando o quadro até sumir)
+  sair() { this.fim = this.t; const z = this; this.c.efeito(new THREE.Group(), 0.5, () => { if (!z.morta) z.quadro(1 / 60); }); }
+}
+
 // ------------------------------------------------------------------ projéteis
 class Projetil {
   constructor(c, p) {
@@ -704,11 +841,17 @@ class Projetil {
       this.o = new THREE.Group();
       for (let k = 0; k < 14; k++) { const f = c.novo("flecha"); f.scale.setScalar(1.4); f.position.set((Math.random() - 0.5) * 2.6, (Math.random() - 0.5) * 1.2, (Math.random() - 0.5) * 2.2); this.o.add(f); }
     } else if (this.tipo === "bola") { this.o = c.novo("bola_fogo"); this.o.scale.setScalar(1.9); }
+    else if (this.tipo === "queda") {                                     // bomba do balão
+      this.o = new THREE.Group();
+      const bomba = new THREE.Mesh(c.geoBolinha, new THREE.MeshLambertMaterial({ color: 0x1d1f26 })); bomba.scale.setScalar(0.3); this.o.add(bomba);
+      const pavio = new THREE.Sprite(new THREE.SpriteMaterial({ map: c.texBrilho, color: 0xffb347, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+      pavio.position.y = 0.38; pavio.scale.setScalar(0.5); this.o.add(pavio);
+    }
     else if (this.tipo === "fogo") { this.o = c.novo("bola_fogo"); this.o.scale.setScalar(0.75); }
     else if (this.tipo === "pedra") { this.o = c.novo("pedra_cat"); }
     else if (this.tipo === "flecha" || this.tipo === "virote") { this.o = c.novo("flecha"); this.o.scale.setScalar(this.tipo === "virote" ? 1.5 : 1.25); }
     else {                                         // magia do mago e a sombra do necromante: bolinha brilhante
-      const cor = this.tipo === "sombra" ? 0xc58bff : time === 0 ? 0x9ff4ff : 0xffa6f2;
+      const cor = this.tipo === "sombra" ? 0xc58bff : this.tipo === "geada" ? 0xc9f3ff : time === 0 ? 0x9ff4ff : 0xffa6f2;
       this.o = new THREE.Group();
       this.o.add(new THREE.Mesh(c.geoBolinha, new THREE.MeshBasicMaterial({ color: 0xffffff })));
       this.o.children[0].scale.setScalar(0.16);
@@ -721,18 +864,20 @@ class Projetil {
     this.h1 = p[6] ? ALT_VOO + 0.5 : 0.9;
     this.x = p[2]; this.y = p[3];
     this.o.position.set(c.X(this.x), this.h0, c.Z(this.y));
-    this.d0 = this.tipo === "bola" ? 1 : Math.max(0.5, Math.hypot(p[7] - p[2], p[8] - p[3]));
+    this.d0 = this.tipo === "bola" || this.tipo === "queda" ? 1 : Math.max(0.5, Math.hypot(p[7] - p[2], p[8] - p[3]));
+    if (this.tipo === "queda") this.o.position.y = ALT_BALAO + 0.1;
     c.cena.add(this.o);
   }
   alvo(p) {
     this.tx = p[2]; this.ty = p[3];
-    this.q = this.tipo === "bola" ? p[4] : 1 - Math.min(1, Math.hypot(p[7] - p[2], p[8] - p[3]) / this.d0);
+    this.q = this.tipo === "bola" || this.tipo === "queda" ? p[4] : 1 - Math.min(1, Math.hypot(p[7] - p[2], p[8] - p[3]) / this.d0);
   }
   quadro(dt) {
     const c = this.c, o = this.o, k = 1 - Math.exp(-dt * 22);
     const antes = o.position.clone();
     this.x += (this.tx - this.x) * k; this.y += (this.ty - this.y) * k;
     const q = this.q || 0;
+    if (this.tipo === "queda") { o.position.set(c.X(this.x), 0.25 + (ALT_BALAO - 0.15) * (1 - q * q), c.Z(this.y)); o.rotation.z += dt * 3; return; }
     const h = this.tipo === "bola" ? 1.2 + Math.sin(Math.PI * q) * 7 + (1 - q) * 2.5 : this.h0 + (this.h1 - this.h0) * q + Math.sin(Math.PI * q) * (this.tipo === "pedra" ? 1.8 : 0.7);
     o.position.set(c.X(this.x), h, c.Z(this.y));
     const v = o.position.clone().sub(antes);

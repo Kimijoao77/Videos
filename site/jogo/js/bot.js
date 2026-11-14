@@ -4,16 +4,19 @@
 // nível 0 = fácil (lento e erra), 1 = normal, 2 = difícil (rápido e escolhe a resposta certa).
 import { CARTAS, C, jogar, podeSoltar } from "./sim.js";
 
-const TANQUE = ["gigante", "guerreiro", "cavaleiro"];
-const APOIO = ["mago", "necromante", "dragao", "besteiros"];
+const TANQUE = ["gigante", "paladino", "guerreiro", "cavaleiro"];
+const APOIO = ["mago", "mago_gelo", "necromante", "dragao", "besteiros", "assassino"];
 const ENXAME = ["esqueletos", "bandidos", "exercito"];
-const DEFESA_PREDIO = ["catapulta"];
+const DEFESA_PREDIO = ["catapulta", "torre_arq", "quartel"];
 export const BARALHOS_BOT = [
   ["cavaleiro", "besteiros", "gigante", "mago", "bandidos", "dragao", "catapulta", "bola_fogo"],
   ["guerreiro", "esqueletos", "gigante", "necromante", "besteiros", "dragao", "flechas", "bola_fogo"],
   ["cavaleiro", "esqueletos", "guerreiro", "mago", "bandidos", "necromante", "catapulta", "flechas"],
   ["gigante", "exercito", "relampago", "mago", "besteiros", "cura", "cavaleiro", "bola_fogo"],
   ["guerreiro", "dragao", "gelo", "bandidos", "necromante", "relampago", "catapulta", "esqueletos"],
+  ["paladino", "mago_gelo", "balao", "torre_arq", "esqueletos", "veneno", "furia", "besteiros"],
+  ["assassino", "quartel", "mina", "gigante", "mago_gelo", "relampago", "paladino", "veneno"],
+  ["balao", "furia", "cavaleiro", "mago", "assassino", "torre_arq", "flechas", "bandidos"],
 ];
 
 export function criarBot(lado, nivel = 1) {
@@ -55,20 +58,27 @@ export function pensar(bot, s, dt) {
       if (a && jogar(s, lado, mao.indexOf(magia), a.x, a.y)) return;
       continue;
     }
+    if (m.zona && m.zona.furia) {                            // fúria: 3+ tropas minhas juntas avançando no campo dele
+      const frente = meus.filter(e => e.tn <= 0 && meu(e.y) > 15);
+      const a = frente.find(f => frente.filter(g => Math.hypot(f.x - g.x, f.y - g.y) < m.area).length >= 3);
+      if (a && jogar(s, lado, mao.indexOf(magia), a.x, a.y + (lado === 0 ? 1 : -1))) return;
+      continue;
+    }
     if (m.congela) {                                          // gelo: segura um ataque grande perto das minhas torres
       const perto = inimigos.filter(e => meu(e.y) < 11);
       const a = perto.find(f => perto.filter(g => Math.hypot(f.x - g.x, f.y - g.y) < m.area).reduce((t, g) => t + valor(g), 0) >= 6);
       if (a && jogar(s, lado, mao.indexOf(magia), a.x, a.y)) return;
       continue;
     }
+    const total = m.zona ? m.dano * m.zona.dur * 0.7 : m.dano;  // veneno: quase tudo o que tira nos 8 segundos
     let melhor = null, ganho = 0;
     for (const a of inimigos) {
       let v = 0;
-      for (const b of inimigos) if (Math.hypot(a.x - b.x, a.y - b.y) <= m.area * 0.85 && b.hp <= m.dano * 1.2) v += valor(b);
+      for (const b of inimigos) if (Math.hypot(a.x - b.x, a.y - b.y) <= m.area * 0.85 && b.hp <= total * 1.2) v += valor(b);
       if (v > ganho) { ganho = v; melhor = a; }
     }
     if (melhor && ganho >= m.custo + (nv === 2 ? 0 : 0.5)) { if (jogar(s, lado, mao.indexOf(magia), melhor.x, melhor.y)) return; }
-    const torre = s.ent.find(e => e.fixa && e.lado !== lado && e.hp <= m.dano * m.danoTorre);
+    const torre = s.ent.find(e => e.fixa && e.lado !== lado && e.hp <= total * m.danoTorre);
     if (torre) { if (jogar(s, lado, mao.indexOf(magia), torre.x, torre.y)) return; }
   }
 
@@ -80,10 +90,10 @@ export function pensar(bot, s, dt) {
     const forca = ameacas.reduce((t, e) => t + valor(e), 0);
     if (nv === 0 ? meu(a.y) < 6 : (defesa * 2.5 < forca || meu(a.y) < 9)) {
       const voa = CARTAS[a.k].voa, muitos = ameacas.filter(e => Math.hypot(e.x - a.x, e.y - a.y) < 3).length >= 3, tanque = TANQUE.includes(a.k);
-      let ordem = voa ? ["besteiros", "mago", "necromante", "dragao", "catapulta"]
-        : muitos ? ["guerreiro", "mago", "dragao", "cavaleiro", "necromante", "bandidos", "besteiros"]
-        : tanque ? ["exercito", "esqueletos", "bandidos", "catapulta", "guerreiro", "cavaleiro", "besteiros", "mago", "necromante", "dragao"]
-        : ["cavaleiro", "guerreiro", "esqueletos", "bandidos", "besteiros", "catapulta", "mago", "dragao", "necromante"];
+      let ordem = voa ? ["torre_arq", "besteiros", "mago_gelo", "mago", "necromante", "dragao", "catapulta"]
+        : muitos ? ["guerreiro", "mago", "mago_gelo", "dragao", "cavaleiro", "paladino", "necromante", "bandidos", "besteiros"]
+        : tanque ? ["exercito", "esqueletos", "bandidos", "assassino", "torre_arq", "catapulta", "quartel", "guerreiro", "paladino", "cavaleiro", "besteiros", "mago", "necromante", "dragao"]
+        : ["cavaleiro", "paladino", "assassino", "guerreiro", "esqueletos", "bandidos", "besteiros", "mago_gelo", "catapulta", "torre_arq", "mago", "dragao", "necromante"];
       if (nv === 0) ordem = ordem.slice().sort(() => Math.random() - 0.5);
       for (const carta of ordem) {
         if (!tem(carta)) continue;
@@ -93,6 +103,11 @@ export function pensar(bot, s, dt) {
         if (soltar(carta, x, yy)) return;
       }
     }
+  }
+
+  // a mina: com energia sobrando e sem ninguém atacando, atrás do rei
+  if (tem("mina") && en >= (nv === 2 ? 6 : 7.5) && !ameacas.length && !s.ent.some(e => e.k === "mina" && e.lado === lado)) {
+    if (soltar("mina", Math.random() < 0.5 ? 6 : 12, 2.5)) return;
   }
 
   // 3) ataque: junta energia, solta um tanque e depois o apoio atrás dele
@@ -109,9 +124,9 @@ export function pensar(bot, s, dt) {
     if (Math.random() < 0.3) bot.pista = bot.pista < 9 ? 14.5 : 3.5;
     const fracas = s.ent.filter(e => e.k === "torre" && e.lado !== lado).sort((a, b) => a.hp - b.hp);
     if (fracas.length && fracas[0].hp < 1800) bot.pista = fracas[0].x;
-    for (const carta of [...TANQUE, "dragao", ...APOIO, ...ENXAME, ...DEFESA_PREDIO]) {
+    for (const carta of [...TANQUE, "balao", "dragao", ...APOIO, ...ENXAME, ...DEFESA_PREDIO]) {
       if (!tem(carta)) continue;
-      const yy = carta === "gigante" ? 3 : DEFESA_PREDIO.includes(carta) ? 10 : en >= 9.5 ? 13 : 6;
+      const yy = carta === "gigante" || carta === "balao" ? 3 : DEFESA_PREDIO.includes(carta) ? 10 : en >= 9.5 ? 13 : 6;
       if (soltar(carta, bot.pista + (Math.random() - 0.5), yy)) return;
     }
   }
