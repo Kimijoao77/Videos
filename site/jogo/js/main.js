@@ -397,7 +397,11 @@ window.addEventListener("pagehide", () => { if (rede) rede.fechar(); });
 let pedidoInstalar = null;
 window.addEventListener("beforeinstallprompt", (ev) => { ev.preventDefault(); pedidoInstalar = ev; mostrar("instalar"); });
 clique("instalar", async () => { if (!pedidoInstalar) return; pedidoInstalar.prompt(); await pedidoInstalar.userChoice.catch(() => {}); pedidoInstalar = null; mostrar("instalar", false); });
-if ("serviceWorker" in navigator && location.protocol === "https:") {
+// No app Android (a partir do ArenaApp/2) o jogo vem dentro do próprio APK e o app decide se usa a cópia dele ou a do
+// site (quando o site tem versão mais nova): o service worker do site só atrapalharia, então sai.
+const NO_APK = /ArenaApp\/([2-9]|\d{2,})/.test(navigator.userAgent);
+if (NO_APK && "serviceWorker" in navigator) navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister())).catch(() => {});
+else if ("serviceWorker" in navigator && location.protocol === "https:") {
   // quando sai versão nova do jogo, o aparelho baixa sozinho e recarrega (só se estiver no menu, para não cortar partida)
   const tinha = !!navigator.serviceWorker.controller;
   navigator.serviceWorker.register("sw.js").then(r => { r.update().catch(() => {}); setInterval(() => r.update().catch(() => {}), 5 * 60 * 1000); }).catch(() => {});
