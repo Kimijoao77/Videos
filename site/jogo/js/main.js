@@ -140,7 +140,7 @@ function desenhar(f) {
   cena.aplicar(f);
   if (modo === "demo") return;
   for (const ev of f.ev || []) {
-    if (ev[0] === "extra") { faixa("Tempo extra!"); tocar("extra"); }
+    if (ev[0] === "extra") { faixa("Tempo extra!"); tocar("extra"); if (modo !== "demo") iniciarMusica("extra"); }
     if (ev[0] === "fim" && !acabou) fimDePartida(ev[1]);
     if (ev[0] === "morte" && (ev[4] === "torre" || ev[4] === "rei")) posTorre[ev[1]] = [ev[2], ev[3]];
     if (ev[0] === "torre") torreCaiu(ev[1], ev[2]);
@@ -153,7 +153,7 @@ function desenhar(f) {
   $("relogio").classList.toggle("pressa", f.fase === "extra" || seg <= 10);
   mostrar("dobro", !!f.dobro);
   if (f.fase === "jogo" && seg <= 10 && seg > 0 && seg !== desenhar.seg) { desenhar.seg = seg; tocar("tique"); }
-  if (f.fase === "jogo" && seg === 60) { if (!desenhar.avisou) { desenhar.avisou = true; faixa("Energia em dobro!"); } } else if (seg > 60) desenhar.avisou = false;
+  if (f.fase === "jogo" && seg === 60) { if (!desenhar.avisou) { desenhar.avisou = true; faixa("Energia em dobro!"); if (modo !== "demo") iniciarMusica("extra"); } } else if (seg > 60) desenhar.avisou = false;
   const texto = f.mao.join(",") + "|" + f.prox;
   if (texto !== maoTexto) { maoTexto = texto; montarMao(f); }
   for (const el of $("cartas").children) el.classList.toggle("cara", CARTAS[el.dataset.carta].custo > f.energia);

@@ -1,6 +1,6 @@
 // Arena dos Reinos: guarda o jogo no aparelho para abrir rápido e jogar contra o computador sem internet.
 // Primeiro tenta a rede (para pegar as atualizações) e, sem rede, usa a cópia guardada.
-const VERSAO = "arena-202611141100a";
+const VERSAO = "arena-202611141205a";
 const ARQUIVOS = [
 "./",
 "index.html",
@@ -105,7 +105,31 @@ const ARQUIVOS = [
 "img/ui/moedas.png",
 "img/ui/relogio.png",
 "img/ui/trilha.png",
-"img/ui/trofeu.png"
+"img/ui/trofeu.png",
+"musica/batalha.ogg",
+"musica/derrota.ogg",
+"musica/extra.ogg",
+"musica/menu.ogg",
+"musica/vitoria.ogg",
+"sons/bau1.ogg",
+"sons/carta1.ogg",
+"sons/carta2.ogg",
+"sons/carta3.ogg",
+"sons/clique1.ogg",
+"sons/clique2.ogg",
+"sons/conquista1.ogg",
+"sons/conquista2.ogg",
+"sons/escolher1.ogg",
+"sons/escolher2.ogg",
+"sons/golpe1.ogg",
+"sons/golpe2.ogg",
+"sons/golpe3.ogg",
+"sons/lamina1.ogg",
+"sons/metal1.ogg",
+"sons/metal2.ogg",
+"sons/moeda1.ogg",
+"sons/moeda2.ogg",
+"sons/pagina1.ogg"
 ];
 self.addEventListener("install", (ev) => { ev.waitUntil(caches.open(VERSAO).then(c => c.addAll(ARQUIVOS)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", (ev) => {
@@ -114,7 +138,7 @@ self.addEventListener("activate", (ev) => {
 self.addEventListener("fetch", (ev) => {
   const url = new URL(ev.request.url);
   if (ev.request.method !== "GET" || url.origin !== location.origin) return;
-  const pesado = /\.(glb|png|woff2)$/.test(url.pathname);
+  const pesado = /\.(glb|png|woff2|ogg)$/.test(url.pathname);
   ev.respondWith(pesado
     ? caches.match(ev.request).then(r => r || fetch(ev.request).then(resp => { const cp = resp.clone(); caches.open(VERSAO).then(c => c.put(ev.request, cp)); return resp; }))
     : fetch(ev.request, { cache: "no-cache" }).then(resp => { const cp = resp.clone(); caches.open(VERSAO).then(c => c.put(ev.request, cp)); return resp; }).catch(() => caches.match(ev.request, { ignoreSearch: true })));

@@ -1,8 +1,39 @@
-// Sons do jogo, todos feitos na hora com a Web Audio (sem arquivos): soltar carta, flecha, golpe, explosão, torre caindo...
+// Sons do jogo. Desde a versão com a trilha sonora: a música é gravada (musica/*.ogg, composta em ferramentas/trilha.py)
+// e vários efeitos vêm de gravações livres (sons/*.ogg, pacote da Kenney, CC0); o resto continua feito na hora com a
+// Web Audio. Se um arquivo não carregar, toca a versão feita na hora.
 let ctx = null, mudo = false, ultimo = {};
+const base = new URL("../", import.meta.url).href;            // a pasta do jogo (funciona no site e dentro do app)
+const AMOSTRAS = {
+  carta: ["carta1", "carta2", "carta3"], escolher: ["escolher1", "escolher2"], clique: ["clique1", "clique2"], moeda: ["moeda1", "moeda2"],
+  bau: ["bau1"], golpe: ["golpe1", "golpe2", "golpe3"], lamina: ["lamina1"], metal: ["metal1", "metal2"], conquista: ["conquista1", "conquista2"], pagina: ["pagina1"],
+};
+const FAIXAS = { menu: "menu", batalha: "batalha", extra: "extra", vitoria: "vitoria", derrota: "derrota" };
+const buffers = {}, pedidos = {};
+function carregar(chave, url) {
+  if (!ctx) return Promise.resolve(null);
+  if (buffers[chave] !== undefined) return Promise.resolve(buffers[chave]);
+  return (pedidos[chave] ||= fetch(base + url).then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+    .then(b => ctx.decodeAudioData(b)).then(buf => (buffers[chave] = buf)).catch(() => (buffers[chave] = null)));
+}
+function preCarregar() {
+  for (const [k, l] of Object.entries(AMOSTRAS)) l.forEach(n => carregar(`s:${n}`, `sons/${n}.ogg`));
+  for (const f of Object.values(FAIXAS)) carregar(`m:${f}`, `musica/${f}.ogg`);
+}
+// toca uma gravação (uma das variações, ao acaso); devolve false se ainda não tem
+function amostra(nome, vol = 0.5, atraso = 0, taxa = 1) {
+  const l = AMOSTRAS[nome], buf = l && buffers[`s:${l[Math.floor(Math.random() * l.length)]}`];
+  if (!buf) return false;
+  const s = ctx.createBufferSource(), g = ctx.createGain();
+  s.buffer = buf; s.playbackRate.value = taxa * (0.94 + Math.random() * 0.12); g.gain.value = vol;
+  s.connect(g).connect(ctx.destination); s.start(ctx.currentTime + atraso);
+  return true;
+}
 try { mudo = localStorage.getItem("arena-mudo") === "1"; } catch (e) { /* sem armazenamento */ }
 
-export function ligarSom() { if (!ctx) { try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { ctx = null; } } if (ctx && ctx.state === "suspended") ctx.resume(); }
+export function ligarSom() {
+  if (!ctx) { try { ctx = new (window.AudioContext || window.webkitAudioContext)(); preCarregar(); } catch (e) { ctx = null; } }
+  if (ctx && ctx.state === "suspended") ctx.resume();
+}
 export function estaMudo() { return mudo; }
 export function alternarMudo() {
   mudo = !mudo; try { localStorage.setItem("arena-mudo", mudo ? "1" : "0"); } catch (e) { /* ok */ }
@@ -30,16 +61,17 @@ export function tocar(nome, extra) {
   if (minimo && agora - (ultimo[nome] || 0) < minimo) return;
   ultimo[nome] = agora;
   switch (nome) {
-    case "clique": tom(700, 900, 0.07, "triangle", 0.12); break;
-    case "escolher": tom(520, 780, 0.09, "triangle", 0.14); break;
+    case "clique": if (!amostra("clique", 0.55)) tom(700, 900, 0.07, "triangle", 0.12); break;
+    case "escolher": if (!amostra("escolher", 0.6)) tom(520, 780, 0.09, "triangle", 0.14); break;
     case "erro": tom(220, 150, 0.16, "square", 0.08); break;
-    case "nasce": tom(300, 620, 0.14, "triangle", 0.16); ruido(0.12, 900, 0.1); break;
+    case "nasce": amostra("carta", 0.55); tom(300, 620, 0.14, "triangle", 0.1); ruido(0.12, 900, 0.07); break;
     case "atq":
       if (extra === "torre" || extra === "rei" || extra === "besteiros" || extra === "catapulta" || extra === "torre_arq") { ruido(0.07, 3200, 0.07, 3); tom(900, 500, 0.06, "triangle", 0.04); }
       else if (extra === "mago") tom(900, 1500, 0.14, "sine", 0.07);
       else if (extra === "mago_gelo") { tom(1800, 2400, 0.12, "sine", 0.06); ruido(0.1, 6000, 0.04, 3); }
-      else if (extra === "paladino") { ruido(0.12, 900, 0.12, 1.2); tom(220, 110, 0.1, "triangle", 0.1); }
-      else if (extra === "assassino") { ruido(0.05, 4200, 0.08, 4); tom(1400, 700, 0.05, "triangle", 0.05); }
+      else if (extra === "paladino" || extra === "guerreiro" || extra === "gigante") { if (!amostra("golpe", 0.42, 0, 0.8)) { ruido(0.12, 900, 0.12, 1.2); tom(220, 110, 0.1, "triangle", 0.1); } }
+      else if (extra === "assassino" || extra === "bandidos") { if (!amostra("lamina", 0.3, 0, 1.2)) { ruido(0.05, 4200, 0.08, 4); tom(1400, 700, 0.05, "triangle", 0.05); } }
+      else if (extra === "cavaleiro") { if (!amostra("golpe", 0.36)) { ruido(0.06, 1800, 0.1, 2); tom(180, 90, 0.08, "triangle", 0.1); } }
       else if (extra === "balao") break;
       else if (extra === "dragao") ruido(0.22, 700, 0.1, 0.7);
       else { ruido(0.06, 1800, 0.1, 2); tom(180, 90, 0.08, "triangle", 0.1); }
@@ -51,14 +83,14 @@ export function tocar(nome, extra) {
     case "torre": ruido(1.0, 140, 0.55, 0.4); tom(90, 35, 0.9, "sine", 0.45); ruido(0.5, 900, 0.15, 0.6, 0.15); break;
     case "tique": tom(1000, 1000, 0.04, "square", 0.05); break;
     case "extra": [0, 0.16, 0.32].forEach(a => tom(660, 660, 0.12, "square", 0.08, a)); break;
-    case "vitoria": [523, 659, 784, 1047].forEach((f, i) => tom(f, f, 0.28, "triangle", 0.16, i * 0.14)); break;
-    case "derrota": [392, 330, 262, 196].forEach((f, i) => tom(f, f * 0.97, 0.34, "triangle", 0.14, i * 0.2)); break;
+    case "vitoria": if (!vinheta("vitoria")) [523, 659, 784, 1047].forEach((f, i) => tom(f, f, 0.28, "triangle", 0.16, i * 0.14)); break;
+    case "derrota": if (!vinheta("derrota")) [392, 330, 262, 196].forEach((f, i) => tom(f, f * 0.97, 0.34, "triangle", 0.14, i * 0.2)); break;
     case "contagem": tom(440, 440, 0.12, "triangle", 0.14); break;
     case "comeca": tom(660, 990, 0.3, "triangle", 0.18); break;
-    case "moeda": [1320, 1760].forEach((f, i) => tom(f, f, 0.09, "square", 0.05, i * 0.07)); break;
-    case "bau": ruido(0.25, 500, 0.25, 0.7); tom(200, 900, 0.35, "triangle", 0.14); [784, 988, 1175].forEach((f, i) => tom(f, f, 0.18, "triangle", 0.1, 0.15 + i * 0.08)); break;
-    case "nivel": [523, 659, 784, 1047, 1319].forEach((f, i) => tom(f, f * 1.01, 0.2, "triangle", 0.13, i * 0.07)); break;
-    case "epico": [659, 831, 988, 1319].forEach((f, i) => tom(f, f, 0.32, "sine", 0.13, i * 0.09)); ruido(0.5, 4000, 0.06, 2, 0.2); break;
+    case "moeda": if (!amostra("moeda", 0.6)) [1320, 1760].forEach((f, i) => tom(f, f, 0.09, "square", 0.05, i * 0.07)); break;
+    case "bau": amostra("bau", 0.6); ruido(0.25, 500, 0.18, 0.7); [784, 988, 1175].forEach((f, i) => tom(f, f, 0.18, "triangle", 0.1, 0.15 + i * 0.08)); break;
+    case "nivel": if (!amostra("conquista", 0.55)) [523, 659, 784, 1047, 1319].forEach((f, i) => tom(f, f * 1.01, 0.2, "triangle", 0.13, i * 0.07)); break;
+    case "epico": amostra("conquista", 0.5); [659, 831, 988, 1319].forEach((f, i) => tom(f, f, 0.32, "sine", 0.1, i * 0.09)); ruido(0.5, 4000, 0.06, 2, 0.2); break;
     case "raio": ruido(0.35, 2600, 0.35, 0.6); tom(1800, 200, 0.3, "sawtooth", 0.08); break;
     case "gelo": [2100, 2600, 3100].forEach((f, i) => tom(f, f * 0.9, 0.25, "sine", 0.06, i * 0.05)); ruido(0.4, 5000, 0.08, 3); break;
     case "cura": [523, 784, 1047].forEach((f, i) => tom(f, f * 1.02, 0.4, "sine", 0.09, i * 0.08)); break;
@@ -120,12 +152,49 @@ function agendar() {
     proxNota += passo; passoMus++;
   }
 }
-export function iniciarMusica(rapida = false) {
-  agitada = rapida;
-  if (!ctx || mudo || !musicaLigada) return;
+// a gravada: "menu", "batalha" ou "extra" (tempo extra e energia em dobro), sempre em laço
+let querida = null, fonte = null;
+const VOL_MUS = 0.42;
+function tocarGravada(nome) {
+  if (fonte && fonte.nome === nome) return true;
+  const buf = buffers[`m:${nome}`];
+  if (buf === null) return false;                              // não carregou: fica a feita na hora
+  if (!buf) { carregar(`m:${nome}`, `musica/${nome}.ogg`).then(b => { if (querida === nome && b) { pararFeitaNaHora(); tocarGravada(nome); } else if (querida === nome) iniciarFeitaNaHora(); }); return true; }
+  soltarFonte(0.8);
+  const s = ctx.createBufferSource(), g = ctx.createGain(), t = ctx.currentTime;
+  s.buffer = buf; s.loop = true;
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(VOL_MUS, t + 0.9);
+  s.connect(g).connect(ctx.destination); s.start(t);
+  fonte = { nome, s, g };
+  return true;
+}
+function soltarFonte(fade = 0.5) {
+  if (!fonte) return;
+  const { s, g } = fonte, t = ctx.currentTime;
+  g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(Math.max(0.0001, g.gain.value), t); g.gain.exponentialRampToValueAtTime(0.0001, t + fade);
+  s.stop(t + fade + 0.05);
+  fonte = null;
+}
+// vinheta de fim de partida (vitória ou derrota), por cima de tudo
+function vinheta(nome) {
+  const buf = buffers[`m:${nome}`];
+  if (!buf) return false;
+  const s = ctx.createBufferSource(), g = ctx.createGain();
+  s.buffer = buf; g.gain.value = 0.7; s.connect(g).connect(ctx.destination); s.start();
+  return true;
+}
+function iniciarFeitaNaHora() {
   if (!ganhoMus) { ganhoMus = ctx.createGain(); ganhoMus.gain.value = 0.5; ganhoMus.connect(ctx.destination); }
   if (tocandoMusica) return;
   tocandoMusica = true; proxNota = ctx.currentTime + 0.1; passoMus = 0;
   timerMusica = setInterval(agendar, 90);
 }
-export function pararMusica() { tocandoMusica = false; clearInterval(timerMusica); }
+function pararFeitaNaHora() { tocandoMusica = false; clearInterval(timerMusica); }
+// rapida: false = menu, true = batalha, "extra" = último minuto
+export function iniciarMusica(rapida = false) {
+  agitada = !!rapida;
+  querida = rapida === "extra" ? "extra" : rapida ? "batalha" : "menu";
+  if (!ctx || mudo || !musicaLigada) return;
+  if (!tocarGravada(querida)) iniciarFeitaNaHora();
+}
+export function pararMusica() { querida = null; pararFeitaNaHora(); if (ctx) soltarFonte(0.4); }

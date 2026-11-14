@@ -16,3 +16,5 @@
 - **Ícones, baús, logo e a arte das cartas Relâmpago, Gelo, Poção de Cura e Exército de Esqueletos:** feitos no Blender por código (`blender/interface.py`).
 - **Three.js** (MIT) para o 3D e **PeerJS** (MIT) para ligar os dois jogadores.
 - **Fonte Lilita One** (SIL Open Font License).
+- **Música (menu, batalha, tempo extra, vitória e derrota):** composta em código para o jogo (`ferramentas/trilha.py`) e tocada com o banco de sons [GeneralUser GS](https://github.com/mrbumpy409/GeneralUser-GS), de S. Christian Collins (livre para criar música, inclusive comercial).
+- **Efeitos gravados (cartas, cliques, moedas, baú, golpes, metal e conquistas):** pacotes de áudio da [Kenney](https://kenney.nl) (Casino, UI, RPG e Jingles). Licença CC0. Os outros sons são feitos na hora com a Web Audio.
