@@ -371,3 +371,15 @@ input { font: inherit; font-size: 17px; font-weight: 600; color: var(--texto); b
   #contagem.pulo, #faixa, .carta.nao, .botao.batalha, .raios, .slot.pronto, .slot.pronto img, #bauImg.treme, .carta.epico::before, .relogio.pressa { animation: none; }
   .coroaVoa { transition: none; } #confete { display: none; }
 }
+
+/* telas baixas (celular pequeno): logo e botões mais compactos para sobrar espaço para a arena */
+@media (max-height: 700px) {
+  #aba-batalha .logoImg { width: min(50%, 210px); }
+  .arenaSel > div { padding: 3px 10px 5px; min-width: 150px; }
+  .arenaSel b { font-size: 16px; }
+  .botao.batalha { font-size: 25px; padding: 8px 12px 11px; }
+  .botao.batalha img { height: 34px; }
+  .botao.amigo { padding: 7px 10px 8px; font-size: 15px; }
+  .niveis button { padding: 4px 4px 5px; }
+  .baus { width: min(86%, 300px); }
+}
