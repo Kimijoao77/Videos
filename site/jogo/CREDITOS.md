@@ -13,7 +13,9 @@
 - **Esqueletos (esqueleto, guerreiro, necromante):** pacote [KayKit Skeletons](https://kaylousberg.itch.io/kaykit-skeletons), de Kay Lousberg. Licença CC0.
   Preparados por `blender/esqueletos.py`.
 - **Dragão, bola de fogo, flecha e ponte:** modelados por código no Blender (`blender/personagens.py`).
-- **Leva 3 (lobo, touro, aranha, vespa, raptor, tiranossauro, tricerátops, bárbaro, caçadora, espírito de fogo, canhão, estábulo, poço mágico, barril, meteoro e lápides):** modelados um por um no Blender por código, com ossos e animações próprias (`blender/bichos.py`), que também faz a arte das 19 cartas novas.
+- **Lobo, touro, aranha, vespa, raptor, tiranossauro e tricerátops:** modelos do [Quaternius](https://quaternius.com) (Ultimate Animated Animals, Animated Dinosaurs e Easy Enemy Pack). Licença CC0. Retrabalhados um por um no Blender (`blender/bichos_reais.py`): malha suavizada, pintura de pelo e couro e a faixa do time.
+- **Bárbaros e Caçadora:** pacote KayKit Adventurers (Barbarian com dois machados e Rogue com a besta de mão), de Kay Lousberg. Licença CC0. Preparados por `blender/kaykit.py`.
+- **Espírito de fogo, canhão, estábulo, poço mágico, barril, meteoro e lápides:** modelados por código no Blender (`blender/bichos.py`), que também faz a arte das cartas deles e das magias novas.
 - **Ícones, baús, logo e a arte das cartas Relâmpago, Gelo, Poção de Cura e Exército de Esqueletos:** feitos no Blender por código (`blender/interface.py`).
 - **Three.js** (MIT) para o 3D e **PeerJS** (MIT) para ligar os dois jogadores.
 - **Fonte Lilita One** (SIL Open Font License).

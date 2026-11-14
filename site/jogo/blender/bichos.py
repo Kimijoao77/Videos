@@ -914,9 +914,12 @@ def lapides():
     return m, None
 
 
-MODELOS = {"lobo": lobo, "touro": touro, "aranha": aranha, "vespa": vespa, "raptor": raptor, "rex": rex, "triceratops": triceratops,
-           "barbaro": barbaro, "cacadora": cacadora, "espirito": espirito, "canhao": canhao, "estabulo": estabulo, "poco": poco,
-           "barril": barril, "meteoro": meteoro, "lapides": lapides}
+# 14/11/2026: os bichos e dinossauros do jogo passaram a vir de blender/bichos_reais.py (modelos da internet retrabalhados) e
+# o bárbaro e a caçadora de blender/kaykit.py; as versões daqui ficam só de referência (rode com so:lobo para gerar uma).
+PROPRIOS = {"lobo": lobo, "touro": touro, "aranha": aranha, "vespa": vespa, "raptor": raptor, "rex": rex, "triceratops": triceratops,
+            "barbaro": barbaro, "cacadora": cacadora}
+MODELOS = {"espirito": espirito, "canhao": canhao, "estabulo": estabulo, "poco": poco, "barril": barril, "meteoro": meteoro, "lapides": lapides}
+MODELOS.update({k: v for k, v in PROPRIOS.items() if k in SO})
 
 
 def construir(nome, cor=None):
@@ -965,15 +968,6 @@ if PREVIA:
 # ------------------------------------------------------------------ arte das cartas (em azul, fundo transparente)
 # carta: (modelo, [(x, y, giro, ação, quadro)], alvo, distância, azimute, elevação)
 CARTAS = {
-    "lobos": ("lobo", [(0.05, 0, 0, "atacar", 6), (-0.75, 0.55, 22, "andar", 4), (0.78, 0.62, -18, "parado", 12)], (0, 0.25, 0.45), 4.3, -24, 12),
-    "touro": ("touro", [(0, 0, 0, "atacar", 7)], (0, -0.25, 0.85), 4.6, -32, 9),
-    "aranhas": ("aranha", [(0, 0, 0, "atacar", 5), (-0.6, 0.45, 25, "andar", 3), (0.6, 0.5, -25, "andar", 8), (0.05, 0.95, 0, "parado", 10)], (0, 0.35, 0.22), 3.9, -24, 22),
-    "vespas": ("vespa", [(0, 0, 0, "atacar", 5), (-0.48, 0.4, 20, "andar", 2), (0.5, 0.45, -20, "andar", 7)], (0, 0.2, 0.02), 2.9, -22, 10),
-    "raptores": ("raptor", [(0.28, 0, -10, "atacar", 5), (-0.45, 0.55, 18, "andar", 4)], (0, -0.05, 0.75), 3.4, -30, 10),
-    "rex": ("rex", [(0, 0, 0, "atacar", 7)], (0, -0.3, 1.55), 6.4, -32, 8),
-    "triceratops": ("triceratops", [(0, 0, 0, "atacar", 6)], (0, -0.3, 0.92), 5.0, -34, 10),
-    "barbaros": ("barbaro", [(0, 0, 0, "atacar", 6), (-0.75, 0.6, 15, "andar", 4), (0.75, 0.6, -15, "parado", 10)], (0, 0.2, 1.15), 5.9, -20, 8),
-    "cacadora": ("cacadora", [(0, 0, 0, "atacar", 5)], (0, 0, 1.0), 3.7, -32, 8),
     "espiritos": ("espirito", [(0, 0, 0, None, 0), (-0.55, 0.42, 15, None, 0), (0.56, 0.46, -15, None, 0)], (0, 0.2, 0.62), 3.25, -20, 8),
     "canhao": ("canhao", [(0, 0, 0, None, 0)], (0, 0, 0.42), 3.0, -36, 18),
     "estabulo": ("estabulo", [(0, 0, 0, None, 0)], (0, 0, 0.9), 5.2, -34, 16),

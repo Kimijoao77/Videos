@@ -1,6 +1,6 @@
 // Arena dos Reinos: guarda o jogo no aparelho para abrir rápido e jogar contra o computador sem internet.
 // Primeiro tenta a rede (para pegar as atualizações) e, sem rede, usa a cópia guardada.
-const VERSAO = "arena-202611141240a";
+const VERSAO = "arena-202611141330a";
 const ARQUIVOS = [
 "./",
 "index.html",

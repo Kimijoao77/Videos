@@ -30,9 +30,10 @@ import { Particulas } from "./efeitos.js";
 const AZUL = new THREE.Color("#2F7BFF"), VERMELHO = new THREE.Color("#F0463C");
 // modelos do pacote KayKit (com esqueleto e animações): altura no jogo, em casas
 const KAYKIT = { cavaleiro: 2.2, besteiro: 1.9, gigante: 3.6, mago: 2.2, bandido: 1.7, esqueleto: 1.35, guerreiro: 2.35, necromante: 2.2,
-  paladino: 2.35, mago_gelo: 2.2, assassino: 1.75 };
-// modelados um por um no Blender (blender/bichos.py), já no tamanho do jogo, com ossos e animações próprias e a cor do time
-const ANIMADOS = ["lobo", "touro", "aranha", "vespa", "raptor", "rex", "triceratops", "barbaro", "cacadora"];
+  paladino: 2.35, mago_gelo: 2.2, assassino: 1.75, barbaro: 2.3, cacadora: 2.05 };
+// bichos e dinossauros: modelos livres (Quaternius, CC0) retrabalhados um por um no Blender (blender/bichos_reais.py),
+// já no tamanho do jogo, com as animações deles e a cor do time pintada no corpo
+const ANIMADOS = ["lobo", "touro", "aranha", "vespa", "raptor", "rex", "triceratops"];
 const MEUS = ["dragao", "bola_fogo", "flecha", "ponte", "balao", "espirito", "canhao", "estabulo", "poco", "barril", "meteoro", "lapides"];   // modelados por código no Blender
 // do pacote KayKit Medieval Hexagon: um arquivo azul e um vermelho, ou um só (neutros)
 const PREDIOS_TIME = ["torre", "castelo", "catapulta", "quartel", "mina", "torre_arq"], NEUTROS = ["ruina", "pedra_cat", "arvore", "pinheiro", "pedra", "bosque"];
@@ -174,7 +175,15 @@ transformed.y += sin(position.x * 4.0 - uTempo * 5.0) * 0.04 * pano;`);
     for (const n of ANIMADOS) {                              // bichos e gente do Blender: altura (com os ossos no lugar) e a cor do time
       const g = this.modelos[n];
       g.scene.updateMatrixWorld(true);
-      g.altura = new THREE.Box3().setFromObject(g.scene).max.y;
+      g.pele = true;                                         // malha presa nos ossos: cada cópia precisa do próprio esqueleto
+      const caixa = new THREE.Box3(), b = new THREE.Box3();
+      g.scene.traverse(o => {
+        if (!o.isSkinnedMesh) return;
+        o.frustumCulled = false; o.boundingBox = null; o.computeBoundingBox();
+        b.copy(o.boundingBox).applyMatrix4(o.matrixWorld);
+        if (Number.isFinite(b.max.y)) caixa.union(b);
+      });
+      g.altura = caixa.max.y;
       this.prepararMeu(n);
     }
     for (const n of MEUS) this.prepararMeu(n);
@@ -196,7 +205,7 @@ transformed.y += sin(position.x * 4.0 - uTempo * 5.0) * 0.04 * pano;`);
     const g = this.modelos[n];
     g.porTime = [0, 1].map(time => {
       const cor = time === 0 ? AZUL : VERMELHO;
-      const copia = g.scene.clone(true);
+      const copia = g.pele ? SkeletonUtils.clone(g.scene) : g.scene.clone(true);
       copia.traverse(o => {
         if (!o.isMesh) return;
         const geo = o.geometry.clone(), c = geo.getAttribute("color");
@@ -216,7 +225,7 @@ transformed.y += sin(position.x * 4.0 - uTempo * 5.0) * 0.04 * pano;`);
 
   novo(n, time = 0) {
     const g = this.modelos[n];
-    if (g.porTime) return g.porTime[time].clone(true);
+    if (g.porTime) return g.pele ? SkeletonUtils.clone(g.porTime[time]) : g.porTime[time].clone(true);
     const o = SkeletonUtils.clone(g.scene);
     o.traverse(m => { if (m.isMesh && /Cape|Shield/.test(m.name)) m.material = this.matTime[time]; });
     return o;

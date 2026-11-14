@@ -32,9 +32,13 @@ QUEM = {
                  {"parado": "2H_Melee_Idle", "andar": "Running_A", "atacar": "2H_Melee_Attack_Slice"}, ("2H_Melee_Attack_Chop", 9)),
     "mago_gelo": ("Mage", ["1H_Wand", "Spellbook_open", "Mage_Hat", "Mage_Cape"],
                   {"parado": "Idle", "andar": "Walking_A", "atacar": "Spellcast_Shoot"}, ("Spellcast_Shoot", 12)),
+    "barbaro": ("Barbarian", ["1H_Axe", "1H_Axe_Offhand", "Barbarian_Hat"],
+                {"parado": "Idle", "andar": "Running_A", "atacar": "Dualwield_Melee_Attack_Chop"}, ("Dualwield_Melee_Attack_Chop", 8)),
+    "cacadora": ("Rogue", ["1H_Crossbow", "Rogue_Cape"],
+                 {"parado": "1H_Ranged_Aiming", "andar": "Running_A", "atacar": "1H_Ranged_Shoot"}, ("1H_Ranged_Aiming", 3)),
 }
 # tinta: troca a cor da roupa no mapa de cores do personagem (o roxo do mago vira azul-gelo)
-TINTA = {"mago_gelo": ((240, 330), 196, 1.25)}       # (faixa de matiz em graus, matiz novo, mais claro)
+TINTA = {"mago_gelo": ((240, 330), 196, 1.25), "cacadora": ((130, 205), 32, 1.0)}       # (faixa de matiz em graus, matiz novo, mais claro)
 
 
 def pintar(saida):
