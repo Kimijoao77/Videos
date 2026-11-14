@@ -275,7 +275,7 @@ function fimDePartida(venc) {
     if (modo === "demo") return;
     pararMusica();
     tocar(empate ? "extra" : ganhei ? "vitoria" : "derrota");
-    if (ganhei) { vibrar([40, 40, 90]); confete(); }
+    if (ganhei) { vibrar([40, 40, 90]); confete(); cena.fogos(); }
     const t = $("tituloFim");
     t.textContent = empate ? "Empate" : ganhei ? "Vitória!" : "Derrota";
     t.classList.toggle("derrota", !ganhei);

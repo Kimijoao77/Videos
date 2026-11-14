@@ -95,6 +95,7 @@ export function tocar(nome, extra) {
     case "gelo": [2100, 2600, 3100].forEach((f, i) => tom(f, f * 0.9, 0.25, "sine", 0.06, i * 0.05)); ruido(0.4, 5000, 0.08, 3); break;
     case "cura": [523, 784, 1047].forEach((f, i) => tom(f, f * 1.02, 0.4, "sine", 0.09, i * 0.08)); break;
     case "vs": tom(160, 80, 0.5, "sawtooth", 0.12); ruido(0.4, 300, 0.2, 0.5); break;
+    case "fogos": ruido(0.45, 2600, 0.1, 1.1); ruido(0.3, 5200, 0.05, 2, 0.12); tom(900, 200, 0.25, "sine", 0.04); break;
     case "investida": ruido(0.5, 400, 0.12, 0.6); [330, 392, 494].forEach((f, i) => tom(f, f, 0.1, "square", 0.04, i * 0.06)); break;
     case "golpeForte": ruido(0.25, 600, 0.3, 0.7); tom(160, 60, 0.3, "sine", 0.3); break;
     case "salto": tom(300, 900, 0.25, "triangle", 0.08); ruido(0.2, 2500, 0.06, 2); break;

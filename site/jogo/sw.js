@@ -1,6 +1,6 @@
 // Arena dos Reinos: guarda o jogo no aparelho para abrir rápido e jogar contra o computador sem internet.
 // Primeiro tenta a rede (para pegar as atualizações) e, sem rede, usa a cópia guardada.
-const VERSAO = "arena-202611141205a";
+const VERSAO = "arena-202611141215a";
 const ARQUIVOS = [
 "./",
 "index.html",
@@ -8,6 +8,7 @@ const ARQUIVOS = [
 "manifest.json",
 "js/bot.js",
 "js/cenario.js",
+"js/efeitos.js",
 "js/lobby.js",
 "js/main.js",
 "js/progresso.js",
@@ -22,6 +23,16 @@ const ARQUIVOS = [
 "vendor/SkeletonUtils.js",
 "vendor/peerjs.min.js",
 "vendor/three.module.min.js",
+"vendor/pos/postprocessing/EffectComposer.js",
+"vendor/pos/postprocessing/MaskPass.js",
+"vendor/pos/postprocessing/OutputPass.js",
+"vendor/pos/postprocessing/Pass.js",
+"vendor/pos/postprocessing/RenderPass.js",
+"vendor/pos/postprocessing/ShaderPass.js",
+"vendor/pos/postprocessing/UnrealBloomPass.js",
+"vendor/pos/shaders/CopyShader.js",
+"vendor/pos/shaders/LuminosityHighPassShader.js",
+"vendor/pos/shaders/OutputShader.js",
 "modelos/arvore.glb",
 "modelos/assassino.glb",
 "modelos/balao.glb",
