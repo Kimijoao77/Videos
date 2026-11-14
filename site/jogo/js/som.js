@@ -57,7 +57,7 @@ function ruido(dur, freq, vol = 0.25, q = 1, atraso = 0) {
 
 export function tocar(nome, extra) {
   if (!ctx || mudo) return;
-  const agora = ctx.currentTime, minimo = { atq: 0.07, morte: 0.08, impacto: 0.1, nasce: 0.05 }[nome] || 0;
+  const agora = ctx.currentTime, minimo = { atq: 0.07, morte: 0.08, impacto: 0.1, nasce: 0.05, escudo: 0.15, quebraEscudo: 0.08, empurrao: 0.12 }[nome] || 0;
   if (minimo && agora - (ultimo[nome] || 0) < minimo) return;
   ultimo[nome] = agora;
   switch (nome) {
@@ -72,6 +72,13 @@ export function tocar(nome, extra) {
       else if (extra === "paladino" || extra === "guerreiro" || extra === "gigante") { if (!amostra("golpe", 0.42, 0, 0.8)) { ruido(0.12, 900, 0.12, 1.2); tom(220, 110, 0.1, "triangle", 0.1); } }
       else if (extra === "assassino" || extra === "bandidos") { if (!amostra("lamina", 0.3, 0, 1.2)) { ruido(0.05, 4200, 0.08, 4); tom(1400, 700, 0.05, "triangle", 0.05); } }
       else if (extra === "cavaleiro") { if (!amostra("golpe", 0.36)) { ruido(0.06, 1800, 0.1, 2); tom(180, 90, 0.08, "triangle", 0.1); } }
+      else if (extra === "barbaros") { if (!amostra("golpe", 0.38, 0, 0.9)) { ruido(0.1, 1200, 0.1, 1.5); tom(200, 100, 0.09, "triangle", 0.09); } }
+      else if (extra === "cacadora") { tom(700, 260, 0.12, "triangle", 0.06); ruido(0.05, 3800, 0.05, 3); }
+      else if (extra === "lobos" || extra === "raptores" || extra === "aranhas") { ruido(0.05, 2400, 0.08, 2.5); tom(420, 260, 0.05, "square", 0.03); }
+      else if (extra === "vespas") { tom(240, 200, 0.12, "sawtooth", 0.04); ruido(0.04, 5200, 0.04, 4); }
+      else if (extra === "touro" || extra === "triceratops") { ruido(0.25, 300, 0.22, 0.6); tom(120, 55, 0.22, "sine", 0.25); }
+      else if (extra === "rex") { ruido(0.45, 220, 0.24, 0.5); tom(90, 45, 0.5, "sawtooth", 0.12); }
+      else if (extra === "canhao") { ruido(0.3, 260, 0.3, 0.6); tom(140, 45, 0.25, "sine", 0.3); }
       else if (extra === "balao") break;
       else if (extra === "dragao") ruido(0.22, 700, 0.1, 0.7);
       else { ruido(0.06, 1800, 0.1, 2); tom(180, 90, 0.08, "triangle", 0.1); }
@@ -102,6 +109,15 @@ export function tocar(nome, extra) {
     case "pouso": ruido(0.3, 300, 0.3, 0.6); tom(140, 50, 0.25, "sine", 0.25); break;
     case "gera": [988, 1319].forEach((f, i) => tom(f, f, 0.12, "sine", 0.06, i * 0.07)); break;
     case "veneno": ruido(0.9, 900, 0.1, 0.8); [180, 170, 160].forEach((f, i) => tom(f, f * 0.8, 0.4, "sawtooth", 0.03, i * 0.12)); break;
+    case "tornado": ruido(1.6, 500, 0.16, 0.5); ruido(1.2, 1400, 0.06, 1.2, 0.3); tom(160, 260, 1.2, "sawtooth", 0.025); break;
+    case "terremoto": ruido(1.4, 90, 0.4, 0.4); tom(55, 38, 1.2, "sine", 0.35); ruido(0.6, 600, 0.1, 0.7, 0.4); break;
+    case "cemiterio": [196, 185, 165, 147].forEach((f, i) => tom(f, f * 0.97, 0.5, "triangle", 0.06, i * 0.18)); ruido(1.0, 400, 0.05, 0.8); break;
+    case "aviso": [880, 660].forEach((f, i) => tom(f, f, 0.12, "square", 0.05, i * 0.16)); break;
+    case "meteoro": ruido(1.1, 120, 0.6, 0.4); tom(110, 30, 0.9, "sine", 0.5); ruido(0.5, 1800, 0.12, 0.8, 0.1); break;
+    case "barril": ruido(0.25, 1400, 0.2, 0.9); tom(240, 120, 0.12, "triangle", 0.1); ruido(0.2, 500, 0.12, 0.7, 0.05); break;
+    case "escudo": [784, 1175, 1568].forEach((f, i) => tom(f, f * 1.01, 0.3, "sine", 0.07, i * 0.05)); break;
+    case "quebraEscudo": ruido(0.2, 5200, 0.1, 3); [1568, 1175].forEach((f, i) => tom(f, f * 0.8, 0.15, "triangle", 0.05, i * 0.04)); break;
+    case "empurrao": ruido(0.3, 380, 0.2, 0.7); tom(170, 70, 0.2, "sine", 0.18); break;
     case "furia": [440, 554, 659, 880].forEach((f, i) => tom(f, f * 1.03, 0.18, "sawtooth", 0.05, i * 0.05)); ruido(0.3, 1800, 0.08, 1.5); break;
   }
 }

@@ -132,9 +132,9 @@ export function lugaresDe(n, dir = 1) {
 }
 export const BARALHO = ["cavaleiro", "besteiros", "gigante", "mago", "bandidos", "dragao", "catapulta", "bola_fogo"];
 export const TODAS = ["cavaleiro", "besteiros", "gigante", "mago", "bandidos", "dragao", "catapulta", "bola_fogo", "esqueletos", "guerreiro", "necromante", "flechas",
-  "relampago", "gelo", "cura", "exercito", "paladino", "mago_gelo", "assassino", "balao", "quartel", "mina", "torre_arq", "veneno", "furia"];
-// leva 3 (entram em TODAS quando os desenhos e as cartas estiverem prontos)
-export const LEVA3 = ["barbaros", "cacadora", "lobos", "touro", "aranhas", "vespas", "raptores", "rex", "triceratops", "espiritos", "canhao", "estabulo", "poco",
+  "relampago", "gelo", "cura", "exercito", "paladino", "mago_gelo", "assassino", "balao", "quartel", "mina", "torre_arq", "veneno", "furia",
+  // leva 3 (14/11/2026): bichos, dinossauros e construções modelados no Blender
+  "barbaros", "cacadora", "lobos", "touro", "aranhas", "vespas", "raptores", "rex", "triceratops", "espiritos", "canhao", "estabulo", "poco",
   "tornado", "terremoto", "cemiterio", "escudo", "meteoro", "barril"];
 // um baralho válido tem 8 cartas diferentes que existem; se não, usa o padrão
 export function baralhoValido(b) {

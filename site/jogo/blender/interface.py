@@ -742,12 +742,13 @@ for t in BAUS:
     TUDO[f"bau_{t}"] = (lambda t=t: bau(t, False))
     TUDO[f"bau_{t}_aberto"] = (lambda t=t: bau(t, True))
 
-for nome, f in TUDO.items():
-    if QUAIS and nome not in QUAIS:
-        continue
-    try:
-        f()
-    except Exception as e:  # noqa: BLE001
-        import traceback
-        traceback.print_exc()
-        print("FALHOU", nome, e, flush=True)
+if __name__ == "__main__":
+    for nome, f in TUDO.items():
+        if QUAIS and nome not in QUAIS:
+            continue
+        try:
+            f()
+        except Exception as e:  # noqa: BLE001
+            import traceback
+            traceback.print_exc()
+            print("FALHOU", nome, e, flush=True)

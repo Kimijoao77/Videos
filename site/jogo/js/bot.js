@@ -4,10 +4,10 @@
 // nível 0 = fácil (lento e erra), 1 = normal, 2 = difícil (rápido e escolhe a resposta certa).
 import { CARTAS, C, jogar, podeSoltar } from "./sim.js";
 
-const TANQUE = ["gigante", "paladino", "guerreiro", "cavaleiro"];
-const APOIO = ["mago", "mago_gelo", "necromante", "dragao", "besteiros", "assassino"];
-const ENXAME = ["esqueletos", "bandidos", "exercito"];
-const DEFESA_PREDIO = ["catapulta", "torre_arq", "quartel"];
+const TANQUE = ["gigante", "paladino", "guerreiro", "cavaleiro", "rex", "triceratops", "touro"];
+const APOIO = ["mago", "mago_gelo", "necromante", "dragao", "besteiros", "assassino", "cacadora", "vespas", "raptores"];
+const ENXAME = ["esqueletos", "bandidos", "exercito", "lobos", "aranhas", "barbaros", "espiritos"];
+const DEFESA_PREDIO = ["catapulta", "torre_arq", "quartel", "canhao", "estabulo", "poco"];
 export const BARALHOS_BOT = [
   ["cavaleiro", "besteiros", "gigante", "mago", "bandidos", "dragao", "catapulta", "bola_fogo"],
   ["guerreiro", "esqueletos", "gigante", "necromante", "besteiros", "dragao", "flechas", "bola_fogo"],
@@ -17,6 +17,9 @@ export const BARALHOS_BOT = [
   ["paladino", "mago_gelo", "balao", "torre_arq", "esqueletos", "veneno", "furia", "besteiros"],
   ["assassino", "quartel", "mina", "gigante", "mago_gelo", "relampago", "paladino", "veneno"],
   ["balao", "furia", "cavaleiro", "mago", "assassino", "torre_arq", "flechas", "bandidos"],
+  ["rex", "cacadora", "lobos", "espiritos", "tornado", "poco", "vespas", "barril"],
+  ["triceratops", "barbaros", "aranhas", "raptores", "terremoto", "canhao", "escudo", "meteoro"],
+  ["touro", "estabulo", "cacadora", "espiritos", "cemiterio", "lobos", "vespas", "escudo"],
 ];
 
 export function criarBot(lado, nivel = 1) {
@@ -64,6 +67,32 @@ export function pensar(bot, s, dt) {
       if (a && jogar(s, lado, mao.indexOf(magia), a.x, a.y + (lado === 0 ? 1 : -1))) return;
       continue;
     }
+    if (m.escudo) {                                           // escudo: 3+ tropas minhas juntas brigando
+      const brigando = meus.filter(e => e.tn <= 0 && inimigos.some(i => Math.hypot(i.x - e.x, i.y - e.y) < 4));
+      const a = brigando.find(f => brigando.filter(g => Math.hypot(f.x - g.x, f.y - g.y) < m.area).length >= 3);
+      if (a && jogar(s, lado, mao.indexOf(magia), a.x, a.y)) return;
+      continue;
+    }
+    if (m.zona && m.zona.invoca) {                            // cemitério: com energia sobrando, na torre mais fraca dele
+      const torre = s.ent.filter(e => e.k === "torre" && e.lado !== lado).sort((a, b) => a.hp - b.hp)[0];
+      if (torre && en >= m.custo + (nv === 2 ? 1 : 2.5) && !inimigos.some(e => meu(e.y) < 12)) { if (jogar(s, lado, mao.indexOf(magia), torre.x + (torre.x < 9 ? 1.2 : -1.2), torre.y + (lado === 0 ? -1.5 : 1.5))) return; }
+      continue;
+    }
+    if (m.solta) {                                            // barril: joga os bandidos em cima da torre dele
+      const torre = s.ent.filter(e => e.k === "torre" && e.lado !== lado).sort((a, b) => a.hp - b.hp)[0];
+      if (torre && en >= m.custo + (nv === 2 ? 1 : 2.5) && !inimigos.some(e => meu(e.y) < 10)) { if (jogar(s, lado, mao.indexOf(magia), torre.x, torre.y + (lado === 0 ? -1.4 : 1.4))) return; }
+      continue;
+    }
+    if (m.zona && m.zona.puxa) {                              // tornado: puxa um bolo de tropas que vem para as minhas torres
+      const perto = inimigos.filter(e => meu(e.y) < 13);
+      const a = perto.find(f => perto.filter(g => Math.hypot(f.x - g.x, f.y - g.y) < m.area).reduce((t, g) => t + valor(g), 0) >= 5);
+      if (a && jogar(s, lado, mao.indexOf(magia), a.x, a.y)) return;
+      continue;
+    }
+    if (m.danoPredio > 1) {                                   // terremoto: derruba construção dele (ou termina uma torre)
+      const predio = s.ent.find(e => e.lado !== lado && e.predio && !e.fixa);
+      if (predio && jogar(s, lado, mao.indexOf(magia), predio.x, predio.y)) return;
+    }
     if (m.congela) {                                          // gelo: segura um ataque grande perto das minhas torres
       const perto = inimigos.filter(e => meu(e.y) < 11);
       const a = perto.find(f => perto.filter(g => Math.hypot(f.x - g.x, f.y - g.y) < m.area).reduce((t, g) => t + valor(g), 0) >= 6);
@@ -90,10 +119,12 @@ export function pensar(bot, s, dt) {
     const forca = ameacas.reduce((t, e) => t + valor(e), 0);
     if (nv === 0 ? meu(a.y) < 6 : (defesa * 2.5 < forca || meu(a.y) < 9)) {
       const voa = CARTAS[a.k].voa, muitos = ameacas.filter(e => Math.hypot(e.x - a.x, e.y - a.y) < 3).length >= 3, tanque = TANQUE.includes(a.k);
-      let ordem = voa ? ["torre_arq", "besteiros", "mago_gelo", "mago", "necromante", "dragao", "catapulta"]
-        : muitos ? ["guerreiro", "mago", "mago_gelo", "dragao", "cavaleiro", "paladino", "necromante", "bandidos", "besteiros"]
-        : tanque ? ["exercito", "esqueletos", "bandidos", "assassino", "torre_arq", "catapulta", "quartel", "guerreiro", "paladino", "cavaleiro", "besteiros", "mago", "necromante", "dragao"]
-        : ["cavaleiro", "paladino", "assassino", "guerreiro", "esqueletos", "bandidos", "besteiros", "mago_gelo", "catapulta", "torre_arq", "mago", "dragao", "necromante"];
+      let ordem = voa ? ["torre_arq", "cacadora", "vespas", "besteiros", "mago_gelo", "mago", "espiritos", "necromante", "dragao", "catapulta"]
+        : muitos ? ["guerreiro", "espiritos", "mago", "mago_gelo", "dragao", "barbaros", "rex", "triceratops", "cavaleiro", "paladino", "necromante", "bandidos", "besteiros"]
+        : tanque ? ["exercito", "esqueletos", "barbaros", "lobos", "aranhas", "bandidos", "assassino", "canhao", "estabulo", "torre_arq", "catapulta", "quartel", "raptores", "guerreiro",
+          "paladino", "cavaleiro", "besteiros", "vespas", "mago", "necromante", "dragao"]
+        : ["cavaleiro", "paladino", "assassino", "raptores", "guerreiro", "barbaros", "lobos", "esqueletos", "bandidos", "aranhas", "besteiros", "cacadora", "mago_gelo",
+          "canhao", "catapulta", "torre_arq", "triceratops", "mago", "dragao", "necromante"];
       if (nv === 0) ordem = ordem.slice().sort(() => Math.random() - 0.5);
       for (const carta of ordem) {
         if (!tem(carta)) continue;
@@ -114,7 +145,7 @@ export function pensar(bot, s, dt) {
   const dobro = s.fase === "extra" || s.tempo <= 60;
   const frente = meus.filter(m => TANQUE.includes(m.k) && m.tn <= 0).sort((a, b) => meu(b.y) - meu(a.y))[0];
   if (frente && meu(frente.y) > 6 && meu(frente.y) < 26) {
-    for (const carta of [...APOIO, ...ENXAME]) {
+    for (const carta of [...APOIO, ...ENXAME, "poco"]) {
       if (tem(carta) && en >= CARTAS[carta].custo + (nv === 0 ? 2 : 0)) {
         if (soltar(carta, frente.x + (Math.random() - 0.5) * 2, Math.min(14, meu(frente.y) - 2.5))) return;
       }
@@ -126,7 +157,7 @@ export function pensar(bot, s, dt) {
     if (fracas.length && fracas[0].hp < 1800) bot.pista = fracas[0].x;
     for (const carta of [...TANQUE, "balao", "dragao", ...APOIO, ...ENXAME, ...DEFESA_PREDIO]) {
       if (!tem(carta)) continue;
-      const yy = carta === "gigante" || carta === "balao" ? 3 : DEFESA_PREDIO.includes(carta) ? 10 : en >= 9.5 ? 13 : 6;
+      const yy = carta === "gigante" || carta === "balao" || carta === "rex" ? 3 : carta === "touro" ? 7 : DEFESA_PREDIO.includes(carta) ? 10 : en >= 9.5 ? 13 : 6;
       if (soltar(carta, bot.pista + (Math.random() - 0.5), yy)) return;
     }
   }
