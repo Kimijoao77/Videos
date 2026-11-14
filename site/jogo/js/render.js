@@ -10,7 +10,22 @@ import { EffectComposer } from "../vendor/pos/postprocessing/EffectComposer.js";
 import { RenderPass } from "../vendor/pos/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "../vendor/pos/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "../vendor/pos/postprocessing/OutputPass.js";
-import { Particulas, Clima } from "./efeitos.js";
+import { ShaderPass } from "../vendor/pos/postprocessing/ShaderPass.js";
+// acabamento da imagem: cores um pouco mais vivas e quentes e a borda levemente escurecida (vinheta)
+const ACABAMENTO = {
+  uniforms: { tDiffuse: { value: null }, uSat: { value: 1.14 }, uVinheta: { value: 0.32 } },
+  vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float uSat, uVinheta; varying vec2 vUv;
+void main() {
+  vec4 c = texture2D(tDiffuse, vUv);
+  float l = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
+  vec3 x = mix(vec3(l), c.rgb, uSat) * vec3(1.03, 1.0, 0.96);
+  vec2 d = vUv - 0.5; d.x *= 0.8;
+  x *= 1.0 - uVinheta * smoothstep(0.32, 0.8, length(d));
+  gl_FragColor = vec4(max(x, 0.0), c.a);
+}`,
+};
+import { Particulas } from "./efeitos.js";
 
 const AZUL = new THREE.Color("#2F7BFF"), VERMELHO = new THREE.Color("#F0463C");
 // modelos do pacote KayKit (com esqueleto e animações): altura no jogo, em casas
@@ -82,18 +97,41 @@ export class Cena {
     this.composer.addPass(new RenderPass(this.cena, this.cam));
     this.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.55, 0.45, 0.82);
     this.composer.addPass(this.bloom);
+    this.composer.addPass(new ShaderPass(ACABAMENTO));
     this.composer.addPass(new OutputPass());
     // aparelho que já mostrou tela preta com o brilho fica sem ele (guardado no aparelho)
     let semBrilho = false; try { semBrilho = localStorage.getItem("arena-sem-brilho") === "1"; } catch (e) { /* ok */ }
     this.comBrilho = !semBrilho && this.r.capabilities.isWebGL2;
     this.conferirBrilho = 3;      // confere os primeiros quadros com brilho (e depois de vez em quando)
     this._px = new Uint8Array(4);
-    // partículas: faíscas e fogo (somam luz) e fumaça e poeira (por cima); o clima de cada arena
+    // partículas: faíscas e fogo (somam luz) e fumaça e poeira (por cima); o clima de cada arena fica em cenario.js
     this.faiscas = new Particulas(this.cena, this.texBrilho, 1400, true);
     this.poeiraP = new Particulas(this.cena, this.texBrilho, 600, false);
-    this.clima = new Clima(this.cena, this.texBrilho);
     this.emissores = [];          // fogo que fica um tempo (torre caída)
+    this.uTempo = { value: 0 };   // relógio dos shaders (bandeiras tremulando)
+    this.matBandeira = [0, 1].map(time => this.criarBandeira(time));
     this._v2 = new THREE.Vector2();
+  }
+
+  // bandeira do time em cima das torres: tecido que tremula (shader) com um brasão
+  criarBandeira(time) {
+    const cv = document.createElement("canvas"); cv.width = 128; cv.height = 80;
+    const g = cv.getContext("2d");
+    g.fillStyle = time === 0 ? "#2f6fe0" : "#d9382c"; g.fillRect(0, 0, 128, 80);
+    g.fillStyle = time === 0 ? "#1f4fae" : "#a8261d"; g.fillRect(0, 62, 128, 18); g.fillRect(0, 0, 128, 8);
+    g.fillStyle = "#ffd36b";                                  // coroa
+    g.beginPath(); g.moveTo(40, 52); g.lineTo(36, 26); g.lineTo(50, 38); g.lineTo(64, 20); g.lineTo(78, 38); g.lineTo(92, 26); g.lineTo(88, 52); g.closePath(); g.fill();
+    g.fillRect(40, 52, 48, 7);
+    const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;
+    const m = new THREE.MeshLambertMaterial({ map: t, side: THREE.DoubleSide });
+    m.onBeforeCompile = (sh) => {
+      sh.uniforms.uTempo = this.uTempo;
+      sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nuniform float uTempo;").replace("#include <begin_vertex>", `#include <begin_vertex>
+float pano = clamp(position.x / 1.2, 0.0, 1.0);
+transformed.z += sin(position.x * 5.5 - uTempo * 7.0 + position.y * 2.0) * 0.12 * pano;
+transformed.y += sin(position.x * 4.0 - uTempo * 5.0) * 0.04 * pano;`);
+    };
+    return m;
   }
 
   // qualidade: sombras e resolução cheia (ou leve, para aparelho fraco)
@@ -198,7 +236,6 @@ export class Cena {
     }
     this.temaAtual = i;
     this.cenario = montarCenario(this, i, (n) => this.peca(n));
-    this.clima && this.clima.trocar(i);
     this.ajustarNeblina();
   }
   peca(n) { const o = this.pecas && this.pecas[n]; return o ? o.clone(true) : null; }
@@ -372,7 +409,7 @@ export class Cena {
     else if (t === "morte") {
       const fixa = d === "torre" || d === "rei", o = this.bonecos.get(a);
       this.fumaca(this.X(b), this.Z(c), fixa ? 22 : 7, fixa ? 2.2 : 0.7, fixa ? 0xd8d2c4 : 0xffffff);
-      if (fixa) { this.tremor = 0.7; this.ruina(this.X(b), this.Z(c), d === "rei" ? 1.5 : 1); this.destrocos(this.X(b), this.Z(c), d === "rei" ? 1.4 : 1); }
+      if (fixa) { this.tremor = 0.7; this.ruina(this.X(b), this.Z(c), d === "rei" ? 1.5 : 1); this.destrocos(this.X(b), this.Z(c), d === "rei" ? 1.4 : 1); this.cenario?.comemorar?.(); }
       else if (o) this.alma(this.X(b), this.Z(c), o.time, o.voa ? ALT_VOO : 0.6);
       this.aoSom && this.aoSom(fixa ? "torre" : "morte");
     } else if (t === "explode") {
@@ -572,15 +609,15 @@ export class Cena {
       Q.soma = 0; Q.n = 0;
     }
     if (this.cenario) this.cenario.quadro(agora, dt);
+    this.uTempo.value = agora;
     for (const b of this.bonecos.values()) b.quadro(dt, agora);
     for (const p of this.projs.values()) p.quadro(dt);
     for (const z of this.zonasVis.values()) z.quadro(dt, agora);
     // partículas: tamanho em pixels de acordo com a tela; fogo que fica; clima
     const esc = this.r.getDrawingBufferSize(this._v2).y / (2 * Math.tan(THREE.MathUtils.degToRad(this.cam.fov / 2)));
-    this.faiscas.mat.uniforms.escala.value = this.poeiraP.mat.uniforms.escala.value = this.clima.luz.mat.uniforms.escala.value = this.clima.cobre.mat.uniforms.escala.value = esc;
+    this.faiscas.mat.uniforms.escala.value = this.poeiraP.mat.uniforms.escala.value = esc;
     this.emissores = this.emissores.filter(e => { e.t += dt; e.acc += dt * e.taxa; while (e.acc >= 1) { e.acc--; e.fn(); } return e.t < e.dur; });
     this.faiscas.quadro(dt); this.poeiraP.quadro(dt);
-    this.clima.quadro(dt, true);
     this.efeitos = this.efeitos.filter(e => { e.t += dt; const q = Math.min(1, e.t / e.dur); e.passo(q); if (q >= 1) { this.cena.remove(e.o); return false; } return true; });
     if (this.camBase) {
       this.tremor = Math.max(0, this.tremor - dt * 1.6);
@@ -722,7 +759,13 @@ class Boneco {
     this.barra.visible = this.fixa && !c.demo;
     this.largBarra = larg; this.altBarra = alt;
     this.g.add(this.barra);
-    if (this.fixa) {
+    if (this.fixa) {                                // mastro com a bandeira do time
+      const alto = this.altura, mastro = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 1.5, 6), c.matPeca);
+      mastro.position.set(0, alto + 0.35, 0);
+      const pano = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.75, 12, 4).translate(0.6, 0, 0), c.matBandeira[time]);
+      pano.position.set(0.03, alto + 0.78, 0); pano.rotation.y = -0.5; pano.castShadow = true;
+      this.g.add(mastro, pano);
+      this.barra.position.y = alto + 1.35;
       const cv = document.createElement("canvas"); cv.width = 128; cv.height = 48;
       this.cvNum = cv; this.texNum = new THREE.CanvasTexture(cv); this.texNum.colorSpace = THREE.SRGBColorSpace;
       const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.texNum, depthTest: false })); sp.scale.set(1.9, 0.72, 1); sp.position.y = 0.62; sp.renderOrder = 12;

@@ -1,5 +1,5 @@
 // Partículas da arena: faíscas dos golpes, almas das tropas que morrem, brasas das explosões, fogo e fumaça das torres
-// caídas, fogos de artifício da vitória e o clima de cada arena (pétalas, folhas, vaga-lumes, neve, brasas, brilhos).
+// caídas e fogos de artifício da vitória (o clima de cada arena fica em cenario.js).
 // Tudo num só THREE.Points por tipo de mistura (somando luz ou por cima), para ficar leve no celular.
 import * as THREE from "three";
 
@@ -82,38 +82,4 @@ export class Particulas {
     for (const arr of [this.tam, this.vida, this.vidaMax, this.grav, this.arrasto, this.tam0, this.alfa0, this.cresce, this.vagar, this.chao]) arr[a] = arr[b];
   }
   limpar() { this.n = 0; this.geo.setDrawRange(0, 0); }
-}
-
-// clima de cada arena (na ordem das arenas de cenario.js)
-const CLIMA = [
-  { n: 34, somaLuz: false, cores: [0xffffff, 0xffd6e8, 0xfff2a8], tam: [0.16, 0.26], grav: -0.25, vel: [0.3, 0.8], dir: [0.6, -0.4, 0.2], vagar: 1.6, alto: [4, 9] },        // pétalas
-  { n: 38, somaLuz: false, cores: [0xe8902e, 0xd9671f, 0xf2c14e], tam: [0.2, 0.32], grav: -0.3, vel: [0.4, 1], dir: [0.8, -0.3, 0.3], vagar: 2, alto: [4, 9] },            // folhas
-  { n: 42, somaLuz: true, cores: [0xd8ff6a, 0xfff07a], tam: [0.16, 0.3], grav: 0, vel: [0.1, 0.4], vagar: 1.4, alto: [0.4, 3.2] },                                       // vaga-lumes
-  { n: 46, somaLuz: false, cores: [0xffffff, 0xe8f4ff], tam: [0.1, 0.2], grav: -0.35, vel: [0.2, 0.5], dir: [0.3, -1, 0.1], vagar: 0.8, alto: [5, 10] },                  // neve fina
-  { n: 50, somaLuz: true, cores: [0xff7a2e, 0xffb347, 0xff4a2a], tam: [0.12, 0.24], grav: 0.35, vel: [0.3, 0.9], dir: [0.2, 1, 0.1], vagar: 1.6, alto: [0, 2] },           // brasas
-  { n: 40, somaLuz: true, cores: [0xffe28a, 0xfff6c8, 0xffc94d], tam: [0.12, 0.22], grav: 0.12, vel: [0.1, 0.4], vagar: 1.0, alto: [0.5, 6] },                           // brilhos dourados
-];
-
-export class Clima {
-  constructor(cena, tex) {
-    this.luz = new Particulas(cena, tex, 80, true);
-    this.cobre = new Particulas(cena, tex, 80, false);
-    this.tema = 0;
-  }
-  trocar(i) { this.tema = i; this.luz.limpar(); this.cobre.limpar(); this.encher = true; }
-  quadro(dt, ligado) {
-    const c = CLIMA[this.tema] || CLIMA[0], p = c.somaLuz ? this.luz : this.cobre;
-    if (ligado) {
-      const falta = c.n - p.n;
-      // no começo enche de uma vez (espalhado pela altura); depois vai repondo aos poucos
-      const quantas = this.encher ? falta : Math.min(falta, Math.random() < dt * 6 ? 1 : 0);
-      for (let k = 0; k < quantas; k++) {
-        const x = ac(-11, 11), z = ac(-17, 17), y = ac(c.alto[0], c.alto[1]);
-        p.emitir(x, y, z, 1, { cores: c.cores, tam: c.tam, grav: c.grav, vel: c.vel, dir: c.dir, vagar: c.vagar, vida: [7, 12], arrasto: 0.4, alfa: c.somaLuz ? 0.9 : 0.85 });
-        if (this.encher) p.vida[p.n - 1] *= Math.random();
-      }
-      this.encher = false;
-    }
-    this.luz.quadro(dt); this.cobre.quadro(dt);
-  }
 }

@@ -6,22 +6,22 @@ import * as THREE from "three";
 import { L, C, RIO0, RIO1, PONTES } from "./sim.js";
 
 export const TEMAS = [
-  { nome: "Campo de Treino", fundo: "#9fd3ef", hemi: [0xffffff, 0x7d8a6a, 1.15], sol: [0xfff1d6, 1.9], neblina: "#a9d8ee",
+  { nome: "Campo de Treino", praca: [176, 150, 112], fundo: "#9fd3ef", hemi: [0xffffff, 0x7d8a6a, 1.15], sol: [0xfff1d6, 1.9], neblina: "#a9d8ee",
     grama: ["#7FC65A", "#74BC51"], fora: "#5f9e47", terra: "#c4a46c", agua: ["#3FA9E0", "#2C8FD0"], tufo: [0x4f9a3a, 0x8fd468],
     flores: ["#ffffff", "#ffe066"], borda: "madeira", part: "folhas", tinta: 0xffffff },
-  { nome: "Vila dos Camponeses", fundo: "#a6d8f0", hemi: [0xffffff, 0x8a7d5a, 1.1], sol: [0xffe2b8, 2.0], neblina: "#b8dcea",
+  { nome: "Vila dos Camponeses", praca: [186, 168, 138], fundo: "#a6d8f0", hemi: [0xffffff, 0x8a7d5a, 1.1], sol: [0xffe2b8, 2.0], neblina: "#b8dcea",
     grama: ["#86c55a", "#7bbb50"], fora: "#6aa14a", terra: "#c9a46a", agua: ["#46b0e3", "#2f92d2"], tufo: [0x5a9d3c, 0x9fdc6c],
     flores: ["#ff8fb1", "#ffffff", "#ffd23f", "#b48cff"], borda: "pedra", part: "petalas", tinta: 0xffffff },
-  { nome: "Floresta Sombria", fundo: "#2b3d4f", hemi: [0x9fb6ff, 0x2d3b2a, 0.95], sol: [0xb9c8ff, 1.1], neblina: "#33485a",
+  { nome: "Floresta Sombria", praca: [104, 108, 112], fundo: "#2b3d4f", hemi: [0x9fb6ff, 0x2d3b2a, 0.95], sol: [0xb9c8ff, 1.1], neblina: "#33485a",
     grama: ["#4f8a45", "#477f3f"], fora: "#2f5a32", terra: "#7d6a4f", agua: ["#2c6f8f", "#215a77"], tufo: [0x2f5f2c, 0x5f9a4c],
     flores: ["#b9f3ff", "#d6b8ff"], cogumelos: true, borda: "madeira", part: "vagalumes", tinta: 0xc9d4ff },
-  { nome: "Castelo de Pedra", fundo: "#a9c6dc", hemi: [0xffffff, 0x7a7a70, 1.1], sol: [0xfff4e0, 1.9], neblina: "#b4c9d8",
+  { nome: "Castelo de Pedra", praca: [160, 158, 152], fundo: "#a9c6dc", hemi: [0xffffff, 0x7a7a70, 1.1], sol: [0xfff4e0, 1.9], neblina: "#b4c9d8",
     grama: ["#78b956", "#6fae4e"], fora: "#5e8f48", terra: "#a9a49a", pedras: true, agua: ["#3a9fd6", "#2a83bd"], tufo: [0x4f8a38, 0x8ccc62],
     flores: ["#ffffff"], borda: "muralha", part: "poeira", tinta: 0xffffff },
-  { nome: "Reino dos Dragões", fundo: "#3a1f1c", hemi: [0xffb08a, 0x3a2020, 0.85], sol: [0xffa36b, 1.7], neblina: "#4a2620",
+  { nome: "Reino dos Dragões", praca: [92, 72, 64], fundo: "#3a1f1c", hemi: [0xffb08a, 0x3a2020, 0.85], sol: [0xffa36b, 1.7], neblina: "#4a2620",
     grama: ["#6e6250", "#655a49"], fora: "#3b302b", terra: "#4a3c36", lava: true, agua: ["#ff7a1a", "#ff3d00"], tufo: [0x5a4a35, 0x8a7550],
     flores: [], rachas: true, borda: "ruina", part: "brasas", tinta: 0x9a8a80 },
-  { nome: "Lenda dos Reinos", fundo: "#f6c27a", hemi: [0xfff0d0, 0x8a6a4a, 1.15], sol: [0xffc27a, 2.1], neblina: "#f2c48a",
+  { nome: "Lenda dos Reinos", praca: [214, 196, 160], fundo: "#f6c27a", hemi: [0xfff0d0, 0x8a6a4a, 1.15], sol: [0xffc27a, 2.1], neblina: "#f2c48a",
     grama: ["#8bc85c", "#80be53"], fora: "#6b9a45", terra: "#d8b46a", pedras: true, ouro: true, agua: ["#4fc0ea", "#36a2db"], tufo: [0x5d9a3c, 0xb7e070],
     flores: ["#ffd23f", "#ffffff", "#ff8fb1"], borda: "muralha", part: "brilhos", tinta: 0xfff2dc },
 ];
@@ -123,7 +123,64 @@ function chaoArena(T, tema) {
   return tex(cv);
 }
 
-// textura da água (ou lava) que corre
+// ------------------------------------------------------------------ água (ou lava) com shader
+const AGUA_VERT = `#include <common>
+#include <fog_pars_vertex>
+uniform float uTempo; varying vec2 vUv; varying vec3 vMundo;
+void main() {
+  vUv = uv;
+  vec4 mundo = modelMatrix * vec4(position, 1.0);
+  float meio = 1.0 - abs(uv.y - 0.5) * 2.0;
+  mundo.y += (sin(mundo.x * 1.3 + uTempo * 2.0) * 0.03 + sin(mundo.x * 2.9 - uTempo * 1.6 + mundo.z * 3.0) * 0.015) * meio;
+  vMundo = mundo.xyz;
+  vec4 mvPosition = viewMatrix * mundo;
+  gl_Position = projectionMatrix * mvPosition;
+  #include <fog_vertex>
+}`;
+const AGUA_FRAG = `#include <common>
+#include <fog_pars_fragment>
+uniform float uTempo, uLava; uniform vec3 uFundo, uRaso, uCeu, uEspuma;
+varying vec2 vUv; varying vec3 vMundo;
+float h21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float ruido(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(h21(i), h21(i + vec2(1.0, 0.0)), f.x), mix(h21(i + vec2(0.0, 1.0)), h21(i + vec2(1.0, 1.0)), f.x), f.y); }
+float fbm(vec2 p) { float s = 0.0, a = 0.5; for (int i = 0; i < 4; i++) { s += a * ruido(p); p = p * 2.03 + 1.7; a *= 0.5; } return s; }
+void main() {
+  vec2 p = vMundo.xz;
+  float borda = abs(vUv.y - 0.5) * 2.0;
+  vec2 fluxo = vec2(uTempo * 0.45, 0.0);
+  float n1 = fbm(p * 1.3 - fluxo), n2 = fbm(p * 2.7 + vec2(-uTempo * 0.6, uTempo * 0.15));
+  vec3 cor;
+  if (uLava > 0.5) {
+    float crosta = smoothstep(0.45, 0.66, fbm(p * 1.6 - fluxo * 0.35));
+    vec3 quente = mix(vec3(1.0, 0.22, 0.02), vec3(1.0, 0.72, 0.18), smoothstep(0.35, 0.8, n2));
+    cor = mix(quente * (1.4 + 0.3 * sin(uTempo * 2.0 + p.x)), vec3(0.06, 0.03, 0.02), crosta * 0.88);
+    cor = mix(cor, vec3(0.05, 0.02, 0.02), smoothstep(0.8, 1.0, borda));
+  } else {
+    cor = mix(uFundo, uRaso, smoothstep(0.3, 1.0, borda));
+    cor = mix(cor, uCeu, smoothstep(0.5, 0.85, n1 * 0.7 + n2 * 0.5) * 0.4);          // o céu refletido nas cristas
+    float brilho = smoothstep(0.86, 0.93, n2 * 0.55 + n1 * 0.6) * (1.0 - borda * 0.7);
+    cor += vec3(1.0, 0.98, 0.9) * brilho * 1.2;                                       // reflexos do sol (brilham com o bloom)
+    float faixa = fract(n1 * 4.0 - uTempo * 0.25);
+    cor += uEspuma * smoothstep(0.46, 0.5, faixa) * smoothstep(0.54, 0.5, faixa) * 0.12 * (1.0 - borda);
+    float espuma = smoothstep(0.72, 0.97, borda + (n2 - 0.5) * 0.4);                 // espuma nas margens
+    cor = mix(cor, uEspuma, espuma * 0.9);
+  }
+  gl_FragColor = vec4(cor, 1.0);
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+  #include <fog_fragment>
+}`;
+function materialAgua(T) {
+  const uniforms = THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
+    uTempo: { value: 0 }, uLava: { value: T.lava ? 1 : 0 },
+    uFundo: { value: new THREE.Color(T.agua[1]).multiplyScalar(0.85) }, uRaso: { value: new THREE.Color(T.agua[0]) },
+    uCeu: { value: new THREE.Color(T.neblina) }, uEspuma: { value: new THREE.Color("#f2fbff") },
+  }]);
+  return new THREE.ShaderMaterial({ uniforms, vertexShader: AGUA_VERT, fragmentShader: AGUA_FRAG, fog: true });
+}
+
+// textura da água (ou lava) que corre (antes do shader; fica de reserva)
 function texturaRio(T) {
   const cv = document.createElement("canvas"); cv.width = 256; cv.height = 64;
   const g = cv.getContext("2d"), r = sorteio(5);
@@ -138,16 +195,26 @@ function texturaRio(T) {
   const t = tex(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
 }
 
+// 1.x: em volta da arena é uma praça de pedra (pedido do João: construções em volta, não tudo verde)
 function texturaFora(T) {
-  const cv = document.createElement("canvas"); cv.width = cv.height = 128;
-  const g = cv.getContext("2d"), r = sorteio(3);
-  g.fillStyle = T.fora; g.fillRect(0, 0, 128, 128);
-  for (let k = 0; k < 160; k++) {
-    g.fillStyle = r() < 0.5 ? "rgba(0,0,0,0.07)" : "rgba(255,255,255,0.06)";
-    const x = r() * 128, y = r() * 128, w = 3 + r() * 10;
-    for (const [dx, dy] of [[0, 0], [128, 0], [-128, 0], [0, 128], [0, -128]]) { g.beginPath(); g.ellipse(x + dx, y + dy, w, w * 0.6, r() * 3, 0, 7); g.fill(); }
+  const cv = document.createElement("canvas"); cv.width = cv.height = 256;
+  const g = cv.getContext("2d"), r = sorteio(3), [fr, fg, fb] = T.praca || [150, 140, 125];
+  g.fillStyle = `rgb(${fr * 0.62},${fg * 0.62},${fb * 0.62})`; g.fillRect(0, 0, 256, 256);   // rejunte
+  // paralelepípedos de tamanhos diferentes, fileira por fileira (a textura emenda nos quatro lados)
+  for (let y = 0; y < 256; y += 16) {
+    let x = -r() * 20;
+    while (x < 256) {
+      const w = 12 + r() * 14, v = 0.84 + r() * 0.26;
+      g.fillStyle = `rgb(${Math.min(255, fr * v)},${Math.min(255, fg * v)},${Math.min(255, fb * v)})`;
+      for (const ox of [0, 256, -256]) for (const oy of [0, 256, -256]) { g.beginPath(); g.roundRect(x + 1.2 + ox, y + 1.2 + oy, w - 2.4, 13.6, 5); g.fill(); }
+      x += w;
+    }
   }
-  return tex(cv, 60);
+  for (let k = 0; k < 500; k++) {                       // sujeira e brilho nas pedras
+    g.fillStyle = r() < 0.6 ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.07)";
+    const x = r() * 256, y = r() * 256; g.beginPath(); g.ellipse(x, y, 2 + r() * 7, 1 + r() * 4, r() * 3, 0, 7); g.fill();
+  }
+  return tex(cv, 110);
 }
 
 function texturaFundo(T) {
@@ -194,22 +261,11 @@ export function montarCenario(cena, i, pecas) {
   const fora = new THREE.Mesh(new THREE.PlaneGeometry(420, 420).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ map: texturaFora(T) }));
   fora.position.y = -0.04; fora.receiveShadow = true; grupo.add(fora);
   const zRio = C / 2 - (RIO0 + RIO1) / 2, largRio = RIO1 - RIO0;
-  const tRio = texturaRio(T); tRio.repeat.set(16, 1);
-  const matRio = new THREE.MeshLambertMaterial({ map: tRio, emissive: T.lava ? 0xff4a00 : 0x0a2a40, emissiveIntensity: T.lava ? 0.9 : 0.25 });
-  if (T.lava) matRio.emissiveMap = tRio;
-  const rio = new THREE.Mesh(new THREE.PlaneGeometry(240, largRio).rotateX(-Math.PI / 2), matRio);
-  rio.position.set(0, 0.012, zRio); rio.receiveShadow = !T.lava; grupo.add(rio);
-  animados.push({ f: (t, dt) => { tRio.offset.x += dt * (T.lava ? 0.02 : 0.05); if (T.lava) matRio.emissiveIntensity = 0.75 + Math.sin(t * 2) * 0.2; } });
-  // brilho por cima da água
-  if (!T.lava) {
-    const cv = document.createElement("canvas"); cv.width = 128; cv.height = 32; const g = cv.getContext("2d"), rr = sorteio(9);
-    for (let k = 0; k < 26; k++) { g.fillStyle = "rgba(255,255,255,0.5)"; g.fillRect(rr() * 128, rr() * 32, 6 + rr() * 10, 1.5); }
-    const tb = tex(cv); tb.wrapS = tb.wrapT = THREE.RepeatWrapping; tb.repeat.set(30, 1);
-    const brilho = new THREE.Mesh(new THREE.PlaneGeometry(240, largRio).rotateX(-Math.PI / 2),
-      new THREE.MeshBasicMaterial({ map: tb, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending }));
-    brilho.position.set(0, 0.02, zRio); grupo.add(brilho);
-    animados.push({ f: (t, dt) => { tb.offset.x -= dt * 0.03; tb.offset.y = Math.sin(t * 0.7) * 0.05; } });
-  } else {
+  const matRio = materialAgua(T);
+  const rio = new THREE.Mesh(new THREE.PlaneGeometry(240, largRio, 240, 6).rotateX(-Math.PI / 2), matRio);
+  rio.position.set(0, 0.012, zRio); grupo.add(rio);
+  animados.push({ f: (t) => { matRio.uniforms.uTempo.value = t; } });
+  if (T.lava) {
     const luz = new THREE.PointLight(0xff5a1a, 3, 14, 1.6); luz.position.set(0, 1.5, zRio); grupo.add(luz);
     animados.push({ f: (t) => { luz.intensity = 2.5 + Math.sin(t * 3.1) * 0.6 + Math.sin(t * 7.3) * 0.3; } });
   }
@@ -221,9 +277,12 @@ export function montarCenario(cena, i, pecas) {
   }
 
   // helpers para pôr peças
+  const ocupado = [];             // retângulos [x0, x1, z0, z1] das arquibancadas
+  const livre = (x, z) => !ocupado.some(([a, b, c, d]) => x > a && x < b && z > c && z < d);
   const dentro = (x, z, folga = 0.8) => Math.abs(x) < L / 2 + folga && Math.abs(z) < C / 2 + folga;
   const noRio = (z, folga = 0.6) => Math.abs(z - zRio) < largRio / 2 + folga;
   const por = (nome, x, z, esc = 1, giro = r() * 6.28, y = 0) => {
+    if (y === 0 && !livre(x, z)) return null;
     const o = pecas(nome); if (!o) return null;
     o.position.set(x, y, z); o.scale.setScalar(esc); o.rotation.y = giro; grupo.add(sombra(o)); return o;
   };
@@ -259,11 +318,22 @@ export function montarCenario(cena, i, pecas) {
   }
 
   // ---- tufos de grama e flores (dentro e fora da arena)
-  const geo = geoTufo(), n = 1500;
+  const geo = geoTufo(), n = 760;
   const matTufo = new THREE.MeshLambertMaterial({ side: THREE.DoubleSide });
+  const uVento = { value: 0 };
+  animados.push({ f: (t) => { uVento.value = t; } });
   const cb = new THREE.Color(T.tufo[0]), cp = new THREE.Color(T.tufo[1]);
   matTufo.onBeforeCompile = (sh) => {
-    sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute vec3 cor;\nvarying float vAlt;").replace("#include <begin_vertex>", "#include <begin_vertex>\nvAlt = cor.x;");
+    sh.uniforms.uVento = uVento;
+    sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nattribute vec3 cor;\nvarying float vAlt;\nuniform float uVento;").replace("#include <begin_vertex>", "#include <begin_vertex>\nvAlt = cor.x;")
+      .replace("#include <project_vertex>", `vec4 mvPosition = vec4( transformed, 1.0 );
+#ifdef USE_INSTANCING
+mvPosition = instanceMatrix * mvPosition;
+#endif
+float bal = sin(uVento * 1.8 + mvPosition.x * 0.45 + mvPosition.z * 0.3) * 0.65 + sin(uVento * 3.1 + mvPosition.x * 1.1) * 0.25;
+mvPosition.x += bal * vAlt * vAlt * 0.09; mvPosition.z += bal * vAlt * vAlt * 0.04;
+mvPosition = modelViewMatrix * mvPosition;
+gl_Position = projectionMatrix * mvPosition;`);
     sh.fragmentShader = sh.fragmentShader.replace("#include <common>", `#include <common>\nvarying float vAlt;`)
       .replace("vec4 diffuseColor = vec4( diffuse, opacity );", `vec4 diffuseColor = vec4( mix(vec3(${cb.r.toFixed(3)},${cb.g.toFixed(3)},${cb.b.toFixed(3)}), vec3(${cp.r.toFixed(3)},${cp.g.toFixed(3)},${cp.b.toFixed(3)}), vAlt), opacity );`);
   };
@@ -272,7 +342,7 @@ export function montarCenario(cena, i, pecas) {
   let k = 0;
   const torres = [[-5.5, 9.5], [5.5, 9.5], [0, 13], [-5.5, -9.5], [5.5, -9.5], [0, -13]];
   for (let t = 0; t < n * 4 && k < n; t++) {
-    const naArena = k < n * 0.45;
+    const naArena = true;                 // fora da arena agora é praça de pedra
     const x = naArena ? (r() - 0.5) * (L - 0.6) : (r() - 0.5) * 60, z = naArena ? (r() - 0.5) * (C - 0.6) : -C / 2 - 30 + r() * (C + 34);
     if (!naArena && dentro(x, z, 0.3)) continue;
     if (noRio(z, 0.3)) continue;
@@ -283,16 +353,123 @@ export function montarCenario(cena, i, pecas) {
   }
   tufos.count = k; grupo.add(tufos);
 
+  // ---- a arena fica fechada (pedido do João: nada de chão plano em volta, só a arena e as construções):
+  // arquibancadas com público dos quatro lados, muros altos com ameias atrás delas e torres nos cantos
+  const ESTILO = ["madeira", "madeira", "escura", "pedra", "escura", "ouro"][i];
+  const CORES_DEG = { madeira: [0xa0703f, 0x8c5f35, 0x6e4a2a, 0x8a8178], pedra: [0xb8b0a3, 0xa8a094, 0x8d867b, 0x9c958a], escura: [0x5c544e, 0x4e4743, 0x3e3835, 0x4a4440], ouro: [0xece0c2, 0xdccfae, 0xc9a24a, 0xd8cdb4] };
+  const [c1, c2, cFrente, cMuro] = CORES_DEG[ESTILO];
+  const matDeg = [new THREE.MeshLambertMaterial({ color: c1 }), new THREE.MeshLambertMaterial({ color: c2 })], matFrente = new THREE.MeshLambertMaterial({ color: cFrente });
+  const matMuro = new THREE.MeshLambertMaterial({ color: cMuro });
+  const lugares = [];               // onde senta cada torcedor: [x, y, z, time]
+  const ALT = 0.46, LARG = 1.0, NIV = 5, X0 = L / 2 + 1.2, Z0 = C / 2 + 1.2;
+  const XF = X0 + NIV * LARG, ZF = Z0 + NIV * LARG;           // onde ficam os muros de trás
+  const caixa = (cx, cy, cz, sx, sy, sz, mat) => { const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), mat); m.position.set(cx, cy, cz); m.castShadow = true; m.receiveShadow = true; grupo.add(m); return m; };
+  const timeDe = (z) => (z > zRio ? 0 : 1);                       // embaixo (perto da câmera) é o seu lado: torcida azul
+  // dos lados: degraus contínuos (o rio passa por baixo)
+  lados(sx => {
+    for (let k = 0; k < NIV; k++) {
+      const h = (k + 1) * ALT, cx = sx * (X0 + (k + 0.5) * LARG), z0 = -Z0 + 0.1, z1 = Z0 - 0.1;
+      caixa(cx, h / 2, 0, LARG, h, z1 - z0, matDeg[k % 2]);
+      caixa(cx, h - 0.035, 0, LARG + 0.02, 0.07, z1 - z0 + 0.02, matFrente);
+      for (let z = z0 + 0.3; z < z1 - 0.2; z += 0.48 + r() * 0.1) if (r() < 0.9) lugares.push([cx + (r() - 0.5) * 0.25, h, z, timeDe(z)]);
+    }
+    ocupado.push(sx < 0 ? [-XF - 0.6, -X0 + 0.2, -ZF - 0.6, ZF + 0.6] : [X0 - 0.2, XF + 0.6, -ZF - 0.6, ZF + 0.6]);
+  });
+  // atrás dos castelos: degraus de ponta a ponta; o de cima tem o camarote do rei no meio
+  for (const sz of [-1, 1]) {
+    for (let k = 0; k < NIV; k++) {
+      const h = (k + 1) * ALT, cz = sz * (Z0 + (k + 0.5) * LARG), x0 = -XF + 0.05, x1 = XF - 0.05;
+      caixa(0, h / 2, cz, x1 - x0, h, LARG, matDeg[k % 2]);
+      caixa(0, h - 0.035, cz, x1 - x0 + 0.02, 0.07, LARG + 0.02, matFrente);
+      for (let x = x0 + 0.3; x < x1 - 0.2; x += 0.48 + r() * 0.1) {
+        if (sz < 0 && Math.abs(x) < 1.7 && k >= 2) continue;          // o camarote
+        if (r() < 0.9) lugares.push([x, h, cz + (r() - 0.5) * 0.25, sz > 0 ? 0 : 1]);
+      }
+    }
+    ocupado.push([-XF - 0.6, XF + 0.6, sz < 0 ? -ZF - 0.6 : Z0 - 0.2, sz < 0 ? -Z0 + 0.2 : ZF + 0.6]);
+  }
+  // camarote: piso alto, colunas e um toldo vermelho e dourado
+  {
+    const zc = -(Z0 + 3.5 * LARG), h = 3 * ALT + 0.3;
+    caixa(0, h / 2, zc, 3.4, h, 2.2, matFrente);
+    for (const x of [-1.5, 1.5]) caixa(x, h + 0.9, zc - 0.9, 0.16, 1.8, 0.16, matMuro);
+    const cv = document.createElement("canvas"); cv.width = 128; cv.height = 32; const g = cv.getContext("2d");
+    for (let k = 0; k < 8; k++) { g.fillStyle = k % 2 ? "#f2c14e" : "#c0392b"; g.fillRect(k * 16, 0, 16, 32); }
+    const toldo = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 1.6), new THREE.MeshLambertMaterial({ map: tex(cv), side: THREE.DoubleSide }));
+    toldo.position.set(0, h + 1.85, zc - 0.3); toldo.rotation.x = -Math.PI / 2 + 0.35; toldo.castShadow = true; grupo.add(toldo);
+    for (const x of [-0.7, 0.7]) lugares.push([x, h, zc + 0.3, 1]);
+    bandeira("bandeira_vermelho", 0, zc - 1.2, 5.5);
+  }
+  // muros altos com ameias atrás de tudo, e uma torre em cada canto
+  const HM = NIV * ALT + 2.4;
+  const muro = (cx, cz, sx, sz) => {
+    caixa(cx, HM / 2, cz, sx, HM, sz, matMuro);
+    const n = Math.floor(Math.max(sx, sz) / 0.9);
+    for (let k = 0; k < n; k++) {                                   // ameias
+      const q = (k + 0.5) / n - 0.5;
+      caixa(cx + (sx > sz ? q * sx : 0), HM + 0.22, cz + (sz > sx ? q * sz : 0), sx > sz ? 0.45 : sx, 0.44, sz > sx ? 0.45 : sz, matMuro);
+    }
+  };
+  lados(sx => muro(sx * (XF + 0.2), 0, 0.4, 2 * ZF + 0.8));
+  for (const sz of [-1, 1]) muro(0, sz * (ZF + 0.2), 2 * XF + 0.8, 0.4);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    const t = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.45, HM + 1.6, 12), matMuro); t.position.set(sx * (XF + 0.2), (HM + 1.6) / 2, sz * (ZF + 0.2)); t.castShadow = true; grupo.add(t);
+    const teto = new THREE.Mesh(new THREE.ConeGeometry(1.6, 1.8, 12), new THREE.MeshLambertMaterial({ color: sz > 0 ? 0x2f6fe0 : 0xc0392b })); teto.position.set(sx * (XF + 0.2), HM + 2.5, sz * (ZF + 0.2)); teto.castShadow = true; grupo.add(teto);
+  }
+  // bandeiras do time em cima dos muros
+  lados(sx => { for (let z = -ZF + 2; z < ZF - 1; z += 3.4) bandeira(timeDe(z) === 0 ? "bandeira_azul" : "bandeira_vermelho", sx * (XF + 0.75), z, 4.4); });
+  for (const sz of [-1, 1]) for (const x of [-7, -3.5, 3.5, 7]) bandeira(sz > 0 ? "bandeira_azul" : "bandeira_vermelho", x, sz * (ZF + 0.75), 4.4);
+  // o público: corpo e cabeça (dois InstancedMesh), pulando de leve; quando uma torre cai, todo mundo pula
+  const uPub = { tempo: { value: 0 }, festa: { value: 0 } };
+  const matPub = () => {
+    const m = new THREE.MeshLambertMaterial();
+    m.onBeforeCompile = (sh) => {
+      sh.uniforms.uTempoP = uPub.tempo; sh.uniforms.uFesta = uPub.festa;
+      sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nuniform float uTempoP, uFesta;").replace("#include <project_vertex>", `vec4 mvPosition = vec4( transformed, 1.0 );
+#ifdef USE_INSTANCING
+mvPosition = instanceMatrix * mvPosition;
+float fase = instanceMatrix[3].x * 1.7 + instanceMatrix[3].z * 2.3;
+float mexe = step(0.4, fract(fase * 0.37)) + uFesta;
+mvPosition.y += abs(sin(uTempoP * (2.4 + uFesta * 5.0) + fase)) * (0.035 + uFesta * 0.24) * min(1.0, mexe);
+#endif
+mvPosition = modelViewMatrix * mvPosition;
+gl_Position = projectionMatrix * mvPosition;`);
+    };
+    return m;
+  };
+  const corpos = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.15, 0.19, 0.44, 7).translate(0, 0.22, 0), matPub(), lugares.length);
+  const cabecas = new THREE.InstancedMesh(new THREE.SphereGeometry(0.125, 9, 7).translate(0, 0.56, 0), matPub(), lugares.length);
+  const ROUPA = [[0x3a7bd5, 0x2f5fb3, 0x5aa0f2, 0x1f3f7a, 0xffffff, 0xe8d9b5], [0xd94a3a, 0xb8352a, 0xf06a50, 0x7a1f1a, 0xffffff, 0xe8d9b5]];
+  const PELE = [0xf1c27d, 0xe0ac69, 0xc68642, 0x8d5524, 0xffdbac];
+  const cc = new THREE.Color(), mm = new THREE.Matrix4();
+  lugares.forEach(([x, y, z, t], k) => {
+    mm.makeTranslation(x, y, z); corpos.setMatrixAt(k, mm); cabecas.setMatrixAt(k, mm);
+    corpos.setColorAt(k, cc.set(ROUPA[t][Math.floor(r() * ROUPA[t].length)])); cabecas.setColorAt(k, cc.set(PELE[Math.floor(r() * PELE.length)]));
+  });
+  corpos.castShadow = true; grupo.add(corpos, cabecas);
+  animados.push({ f: (t, dt) => { uPub.tempo.value = t; uPub.festa.value = Math.max(0, uPub.festa.value - dt * 0.35); } });
+  // rua de construções atrás das arquibancadas dos lados (o tema escolhe quais)
+  const RUA = [["tenda", "quartel", "arquearia", "tenda", "celeiro", "tenda"], ["casa_a", "taverna", "casa_b", "mercado", "casa_c", "igreja", "ferreiro", "casa_a"],
+    ["casa_c", "serraria", "celeiro", "casa_a", "ferreiro"], ["quartel", "casa_b", "torre_vigia", "ferreiro", "taverna", "igreja", "torre_vigia"],
+    ["torre_vigia", "quartel", "ferreiro", "torre_vigia", "serraria"], ["igreja", "casa_b", "mercado", "taverna", "torre_vigia", "casa_b"]][i];
+  lados(sx => {
+    let j = 0;
+    for (let z = -ZF - 2; z < ZF + 3; z += 3.3 + r() * 0.8) {
+      const nome = RUA[(j++ + (sx > 0 ? 3 : 0)) % RUA.length], esc = nome === "torre_vigia" ? 1.35 : nome === "igreja" ? 2.9 : 2.6;
+      por(nome, sx * (XF + 3.2 + r() * 0.8), z, esc, (sx < 0 ? Math.PI / 2 : -Math.PI / 2) + (r() - 0.5) * 0.3);
+    }
+  });
+
   // ---- temas
   const nuvens = [];
   const nuvem = (x, z, y, esc) => { const o = por(r() < 0.5 ? "nuvem" : "nuvem_p", x, z, esc, 0, y); if (o) { o.traverse(m => { if (m.isMesh) m.castShadow = false; }); nuvens.push(o); } };
   const fundoMontanhas = (nomes, n, esc) => { for (let j = 0; j < n; j++) por(nomes[j % nomes.length], -46 + j * (92 / (n - 1)) + (r() - 0.5) * 6, -C / 2 - 26 - r() * 14, esc[0] + r() * (esc[1] - esc[0])); };
-  const lateral = (nomes, n, esc) => lados(s => espalhar(nomes, n, s < 0 ? [-30, -L / 2 - 1.5, -C / 2 - 4, C / 2 + 4] : [L / 2 + 1.5, 30, -C / 2 - 4, C / 2 + 4], esc));
-  const arvoresNat = (n) => lados(s => { for (let j = 0; j < n; j++) { const x = s * (L / 2 + 2 + r() * 14), z = (r() - 0.5) * (C + 10); if (noRio(z, 1.2)) continue; const tipo = ["arvore", "pinheiro", "bosque", "arvore", "pinheiro"][Math.floor(r() * 5)]; const o = cena.novo(tipo); o.position.set(x, 0, z); o.scale.setScalar(0.8 + r() * 0.6); o.rotation.y = r() * 6.28; grupo.add(sombra(o)); } });
+  const lateral = (nomes, n, esc) => lados(s => espalhar(nomes, n, s < 0 ? [-34, -X0 - NIV * LARG - 5.5, -C / 2 - 4, C / 2 + 4] : [X0 + NIV * LARG + 5.5, 34, -C / 2 - 4, C / 2 + 4], esc));
+  const arvoresNat = (n) => lados(s => { for (let j = 0; j < Math.ceil(n / 2); j++) { const x = s * (X0 + NIV * LARG + 6 + r() * 14), z = (r() - 0.5) * (C + 10); if (noRio(z, 1.2)) continue; const tipo = ["arvore", "pinheiro", "bosque", "arvore", "pinheiro"][Math.floor(r() * 5)]; const o = cena.novo(tipo); o.position.set(x, 0, z); o.scale.setScalar(0.8 + r() * 0.6); o.rotation.y = r() * 6.28; grupo.add(sombra(o)); } });
   const juncos = () => lados(s => { for (let j = 0; j < 22; j++) { const x = s * (L / 2 + 1 + r() * 22), lado = r() < 0.5 ? -1 : 1; por(r() < 0.5 ? "junco" : "planta_agua", x, zRio + lado * (largRio / 2 + 0.1 + r() * 0.3), 2.4 + r()); } });
   const lirios = () => { for (let j = 0; j < 26; j++) { const x = (r() < 0.5 ? -1 : 1) * (L / 2 + 0.8 + r() * 24); por(r() < 0.5 ? "lirio" : "lirio_b", x, zRio + (r() - 0.5) * (largRio - 0.6), 2.2 + r(), r() * 6.28, 0.03); } };
   const moinhoGira = (o, vel) => o && o.traverse(m => { if (/fan|wheel/.test(m.name)) animados.push({ f: (t, dt) => { if (/fan/.test(m.name)) m.rotation.z -= dt * vel; else m.rotation.x -= dt * vel; } }); });
-  const bandeira = (nome, x, z, esc) => { const o = por(nome, x, z, esc, Math.PI / 2 + (r() - 0.5) * 0.3); if (o) { const f = r() * 6; animados.push({ f: (t) => { o.rotation.y = Math.PI / 2 + Math.sin(t * 2.2 + f) * 0.18; } }); } return o; };
+  function bandeira(nome, x, z, esc) { const o = por(nome, x, z, esc, Math.PI / 2 + (r() - 0.5) * 0.3); if (o) { const f = r() * 6; animados.push({ f: (t) => { o.rotation.y = Math.PI / 2 + Math.sin(t * 2.2 + f) * 0.18; } }); } return o; };
   const zLonge = -C / 2 - 1.2;    // logo atrás da borda de cima
 
   if (i === 0) {               // Campo de Treino: barracas, alvos, armas e colinas
@@ -437,5 +614,5 @@ export function montarCenario(cena, i, pecas) {
   }
 
   cena.cena.add(grupo);
-  return { grupo, tema: T, quadro: (t, dt) => { for (const a of animados) a.f(t, dt); } };
+  return { grupo, tema: T, quadro: (t, dt) => { for (const a of animados) a.f(t, dt); }, comemorar: () => { uPub.festa.value = 1; } };
 }
