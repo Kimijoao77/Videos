@@ -651,9 +651,12 @@ transformed.y += sin(position.x * 4.0 - uTempo * 5.0) * 0.04 * pano;`);
     Q.soma += dtReal; Q.n++;
     if (Q.soma > 3) {
       const fps = Q.n / Q.soma;
+      // celular fraco: primeiro sai o brilho, depois a sombra; a nitidez só cai um pouco e nunca abaixo de 1,5 (era 0,75 e
+      // deixava a arena borrada)
+      const piso = Math.min(window.devicePixelRatio || 1, 1.5);
       if (fps < 40 && this.comBrilho) this.comBrilho = false;
-      else if (fps < 40 && Q.razao > 0.75) { Q.razao = Math.max(0.75, Q.razao - 0.35); this.r.setPixelRatio(Q.razao); this.ajustar(); }
-      else if (fps < 34 && this.sol.castShadow) this.sol.castShadow = false;
+      else if (fps < 36 && this.sol.castShadow) this.sol.castShadow = false;
+      else if (fps < 30 && Q.razao > piso) { Q.razao = Math.max(piso, Q.razao - 0.25); this.r.setPixelRatio(Q.razao); this.ajustar(); }
       Q.soma = 0; Q.n = 0;
     }
     if (this.cenario) this.cenario.quadro(agora, dt);

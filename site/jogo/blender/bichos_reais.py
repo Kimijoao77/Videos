@@ -46,30 +46,30 @@ def pena(larg, comp, esp=0.03):
 # arq, comprimento no jogo (casas), animações, cores (material → cor; ("cor", "pelo") = com manchas, dorso vivo e barriga
 # clara) e as faixas do time: [(osso, posição ao longo do osso 0..1, largura em casas, cor)]
 BICHOS = {
-    "lobo": dict(arq="animals_pack/Wolf", compr=1.75,
+    "lobo": dict(tris=4500, arq="animals_pack/Wolf", compr=1.75,
                  anim={"parado": "Idle", "andar": "Gallop", "atacar": "Attack"},
                  cores={"Main": ("#7B838F", "pelo"), "Main_Light": ("#DADFE6", "pelo"), "Eyes_Black": "#131316", "Nose": "#222228"},
                  faixas=[("Neck2", 0.5, 0.11, TIME)]),
-    "touro": dict(arq="animals_pack/Bull", compr=2.5,
+    "touro": dict(tris=6500, arq="animals_pack/Bull", compr=2.5,
                   anim={"parado": "Idle", "andar": "Gallop", "atacar": "Attack_Headbutt"},
                   cores={"Main": ("#4B3A32", "pelo"), "Muzzle": "#C8A385", "Hooves": "#2A2320", "Main_Light": ("#7A6254", "pelo"), "Eye_Black": "#141416",
                          "Eye_White": "#F2EEE6", "Horns": "#EFE6D0"},
                   faixas=[("Torso2", 0.5, 0.5, TIME)]),
-    "aranha": dict(arq="easy_enemies_pack/Spider", compr=1.2,
+    "aranha": dict(tris=3600, arq="easy_enemies_pack/Spider", compr=1.2,
                    anim={"parado": "Spider_Idle", "andar": "Spider_Walk", "atacar": "Spider_Attack"},
                    cores={"Material": ("#3A3344", "pelo"), "Material.001": TIME}, faixas=[]),
-    "vespa": dict(arq="easy_enemies_pack/Wasp", compr=0.95,
+    "vespa": dict(tris=4200, arq="easy_enemies_pack/Wasp", compr=0.95,
                   anim={"parado": "Wasp_Flying", "andar": "Wasp_Flying", "atacar": "Wasp_Attack"},
                   cores={"Black": "#241E26", "Orange": TIME, "Yellow": "#F7C21E", "LightBlue": "#DCEFFF"}, faixas=[]),
-    "raptor": dict(arq="dinosaurs_pack/Velociraptor", compr=2.0,
+    "raptor": dict(tris=4500, arq="dinosaurs_pack/Velociraptor", compr=2.0,
                    anim={"parado": "Velociraptor_Idle", "andar": "Velociraptor_Run", "atacar": "Velociraptor_Attack", "saltar": "Velociraptor_Jump"},
                    cores={"LightBrown": "#F0D9A8", "Brown": ("#C9813F", "pelo"), "Black": "#17151A"},
                    faixas=[("Neck", 0.45, 0.12, TIME)]),
-    "rex": dict(arq="dinosaurs_pack/Trex", compr=4.4,
+    "rex": dict(tris=8000, arq="dinosaurs_pack/Trex", compr=4.4,
                 anim={"parado": "TRex_Idle", "andar": "TRex_Walk", "atacar": "TRex_Attack"},
                 cores={"LightYellow": "#E8D7A2", "LightGreen": ("#7DAA58", "pelo"), "Green": ("#4A7A36", "pelo"), "Black": "#17151A", "Red": "#9A3644"},
                 faixas=[("Neck", 0.5, 0.22, TIME), ("Torso", 0.5, 0.3, TIME)]),
-    "triceratops": dict(arq="dinosaurs_pack/Triceratops", compr=3.0,
+    "triceratops": dict(tris=6500, arq="dinosaurs_pack/Triceratops", compr=3.0,
                         anim={"parado": "Triceratops_Idle", "andar": "Triceratops_Walk", "atacar": "Triceratops_Attack"},
                         cores={"LightBrown": "#D9CDB4", "Purple": ("#6F7F90", "pelo"), "Brown": "#F0E6CC"},
                         faixas=[("Neck", 0.5, 0.22, TIME)]),
@@ -133,6 +133,12 @@ def preparar(nome, cor_time=None):
     while malha.modifiers[0].name != "suave":
         bpy.ops.object.modifier_move_up(modifier="suave")
     bpy.ops.object.modifier_apply(modifier="suave")
+    if len(me.polygons) * 2 > B["tris"]:                  # celular: enxuga a malha até o teto de triângulos do bicho
+        md = malha.modifiers.new("enxuga", "DECIMATE")
+        md.ratio = B["tris"] / (len(me.polygons) * 2)
+        while malha.modifiers[0].name != "enxuga":
+            bpy.ops.object.modifier_move_up(modifier="enxuga")
+        bpy.ops.object.modifier_apply(modifier="enxuga")
     for p in me.polygons:
         p.use_smooth = True
     # 2) tamanho e lugar pelo bicho parado (a pose de descanso de alguns vem deitada)

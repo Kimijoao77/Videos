@@ -4,6 +4,7 @@
 // As peças vêm de modelos/cenario.glb (KayKit Medieval Hexagon, CC0) e dos modelos de natureza que o jogo já usa.
 import * as THREE from "three";
 import { L, C, RIO0, RIO1, PONTES } from "./sim.js";
+import { mergeGeometries } from "../vendor/BufferGeometryUtils.js";
 
 export const TEMAS = [
   { nome: "Campo de Treino", morro: { grama: "#7cc25a", escura: "#5c9a45", pedra: "#9a9488", terra: "#b89a6a", alto: 7 }, praca: [176, 150, 112], fundo: "#9fd3ef", hemi: [0xffffff, 0x7d8a6a, 1.15], sol: [0xfff1d6, 1.9], neblina: "#a9d8ee",
@@ -337,13 +338,13 @@ export function montarCenario(cena, i, pecas) {
 
   // moitas de grama nos morros (balançam com o vento, como as da arena)
   const moitas = [];
-  for (let k = 0; k < 900; k++) {
+  for (let k = 0; k < 420; k++) {
     const a = r() * Math.PI * 2, d = 0.4 + Math.pow(r(), 1.2) * 16, bx = Math.cos(a), bz = Math.sin(a), esc = Math.max(Math.abs(bx) / (XF + d), Math.abs(bz) / (ZF + d));
     const x = bx / esc, z = bz / esc; if (Math.abs(z - zRio) < largRio / 2 + 0.8) continue;
     moitas.push([x, altChao(x, z), z]);
   }
   // ---- tufos de grama e flores (dentro e fora da arena)
-  const geo = geoTufo(), n = 760;
+  const geo = geoTufo(), n = 440;
   const matTufo = new THREE.MeshLambertMaterial({ side: THREE.DoubleSide });
   const uVento = { value: 0 };
   animados.push({ f: (t) => { uVento.value = t; } });
@@ -427,7 +428,7 @@ gl_Position = projectionMatrix * mvPosition;`);
   }
   // os morros: uma malha só, com cor por vértice (grama clara e escura, terra e pedra nas partes íngremes e no alto)
   {
-    const W = 104, D = 116, geo = new THREE.PlaneGeometry(W, D, 208, 232).rotateX(-Math.PI / 2), pos = geo.attributes.position;
+    const W = 104, D = 116, geo = new THREE.PlaneGeometry(W, D, 140, 156).rotateX(-Math.PI / 2), pos = geo.attributes.position;
     for (let k = 0; k < pos.count; k++) { const x = pos.getX(k), z = pos.getZ(k); pos.setY(k, Math.abs(x) <= XF + 0.02 && Math.abs(z) <= ZF + 0.02 ? -0.6 : altChao(x, z)); }
     geo.computeVertexNormals();
     const nor = geo.attributes.normal, cores = new Float32Array(pos.count * 3);
@@ -495,19 +496,19 @@ gl_Position = projectionMatrix * mvPosition;`);
     mm.makeTranslation(x, y, z); corpos.setMatrixAt(k, mm); cabecas.setMatrixAt(k, mm);
     corpos.setColorAt(k, cc.set(ROUPA[t][Math.floor(r() * ROUPA[t].length)])); cabecas.setColorAt(k, cc.set(PELE[Math.floor(r() * PELE.length)]));
   });
-  corpos.castShadow = true; grupo.add(corpos, cabecas);
+  grupo.add(corpos, cabecas);                          // a torcida não faz sombra (são centenas de bonequinhos)
   animados.push({ f: (t, dt) => { uPub.tempo.value = t; uPub.festa.value = Math.max(0, uPub.festa.value - dt * 0.35); } });
 
   // ---- temas
   const nuvens = [];
-  const nuvem = (x, z, y, esc) => { const o = por(r() < 0.5 ? "nuvem" : "nuvem_p", x, z, esc, 0, y); if (o) { o.traverse(m => { if (m.isMesh) m.castShadow = false; }); nuvens.push(o); } };
+  const nuvem = (x, z, y, esc) => { const o = por(r() < 0.5 ? "nuvem" : "nuvem_p", x, z, esc, 0, y); if (o) { o.userData.vivo = true; o.traverse(m => { if (m.isMesh) m.castShadow = false; }); nuvens.push(o); } };
   const fundoMontanhas = (nomes, n, esc) => { for (let j = 0; j < n; j++) por(nomes[j % nomes.length], -46 + j * (92 / (n - 1)) + (r() - 0.5) * 6, -C / 2 - 26 - r() * 14, esc[0] + r() * (esc[1] - esc[0])); };
   const lateral = (nomes, n, esc) => lados(s => espalhar(nomes, n, s < 0 ? [-34, -X0 - NIV * LARG - 5.5, -C / 2 - 4, C / 2 + 4] : [X0 + NIV * LARG + 5.5, 34, -C / 2 - 4, C / 2 + 4], esc));
   const arvoresNat = (n) => lados(s => { for (let j = 0; j < Math.ceil(n / 2); j++) { const x = s * (X0 + NIV * LARG + 6 + r() * 14), z = (r() - 0.5) * (C + 10); if (noRio(z, 1.2)) continue; const tipo = ["arvore", "pinheiro", "bosque", "arvore", "pinheiro"][Math.floor(r() * 5)]; if (!livre(x, z)) continue; const o = cena.novo(tipo); o.position.set(x, altChao(x, z) - 0.05, z); o.scale.setScalar(0.8 + r() * 0.6); o.rotation.y = r() * 6.28; grupo.add(sombra(o)); } });
   const juncos = () => lados(s => { for (let j = 0; j < 22; j++) { const x = s * (L / 2 + 1 + r() * 22), lado = r() < 0.5 ? -1 : 1; por(r() < 0.5 ? "junco" : "planta_agua", x, zRio + lado * (largRio / 2 + 0.1 + r() * 0.3), 2.4 + r()); } });
   const lirios = () => { for (let j = 0; j < 26; j++) { const x = (r() < 0.5 ? -1 : 1) * (L / 2 + 0.8 + r() * 24); por(r() < 0.5 ? "lirio" : "lirio_b", x, zRio + (r() - 0.5) * (largRio - 0.6), 2.2 + r(), r() * 6.28, 0.03); } };
-  function moinhoGira(o, vel) { return o && o.traverse(m => { if (/fan|wheel/.test(m.name)) animados.push({ f: (t, dt) => { if (/fan/.test(m.name)) m.rotation.z -= dt * vel; else m.rotation.x -= dt * vel; } }); }); }
-  function bandeira(nome, x, z, esc) { const o = por(nome, x, z, esc, Math.PI / 2 + (r() - 0.5) * 0.3); if (o) { const f = r() * 6; animados.push({ f: (t) => { o.rotation.y = Math.PI / 2 + Math.sin(t * 2.2 + f) * 0.18; } }); } return o; };
+  function moinhoGira(o, vel) { return o && o.traverse(m => { if (/fan|wheel/.test(m.name)) m.userData.vivo = true; if (/fan|wheel/.test(m.name)) animados.push({ f: (t, dt) => { if (/fan/.test(m.name)) m.rotation.z -= dt * vel; else m.rotation.x -= dt * vel; } }); }); }
+  function bandeira(nome, x, z, esc) { const o = por(nome, x, z, esc, Math.PI / 2 + (r() - 0.5) * 0.3); if (o) { o.userData.vivo = true; const f = r() * 6; animados.push({ f: (t) => { o.rotation.y = Math.PI / 2 + Math.sin(t * 2.2 + f) * 0.18; } }); } return o; };
   const zLonge = -C / 2 - 1.2;    // logo atrás da borda de cima
 
   if (i === 0) {               // Campo de Treino: barracas, alvos, armas e colinas
@@ -652,6 +653,40 @@ gl_Position = projectionMatrix * mvPosition;`);
     } });
   }
 
+  // junta tudo o que não se mexe e usa o mesmo material numa malha só: centenas de peças viram meia dúzia de desenhos
+  // (o celular agradece). O cenário de fora não faz sombra; só recebe.
+  grupo.updateMatrixWorld(true);
+  const inv = grupo.matrixWorld.clone().invert(), lotes = new Map();
+  const vivo = (o) => { for (let n = o; n && n !== grupo; n = n.parent) if (n.userData.vivo) return true; return false; };
+  grupo.traverse(o => {
+    if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || vivo(o)) return;
+    const m = o.material;
+    if (Array.isArray(m) || !m.isMeshLambertMaterial || m.transparent || !o.geometry.attributes.normal) return;
+    const g0 = o.geometry;
+    if (g0.attributes.position.count > 20000) return;                       // chão e morros ficam como estão
+    const chave = m.uuid + "|" + Object.keys(g0.attributes).sort().join(",");
+    const g = g0.index ? g0.toNonIndexed() : g0.clone();
+    for (const k of Object.keys(g.attributes)) {
+      if (!["position", "normal", "uv", "color"].includes(k)) { g.deleteAttribute(k); continue; }
+      const at = g.attributes[k];                                           // alguns arquivos vêm com números inteiros (compactados): passa para decimal
+      if (!(at.array instanceof Float32Array) || at.isInterleavedBufferAttribute) {
+        const f = new Float32Array(at.count * at.itemSize);
+        for (let i = 0; i < at.count; i++) for (let c = 0; c < at.itemSize; c++) f[i * at.itemSize + c] = at.getComponent(i, c);
+        g.setAttribute(k, new THREE.BufferAttribute(f, at.itemSize));
+      }
+    }
+    g.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld));
+    if (!lotes.has(chave)) lotes.set(chave, { m, gs: [], os: [] });
+    const l = lotes.get(chave); l.gs.push(g); l.os.push(o);
+  });
+  for (const l of lotes.values()) {
+    const junto = l.gs.length > 1 ? mergeGeometries(l.gs, false) : null;
+    for (const g of l.gs) g.dispose();
+    if (!junto) continue;                                                   // peça única (ou que não deu para juntar) fica como está
+    const malha = new THREE.Mesh(junto, l.m); malha.receiveShadow = true; malha.castShadow = false;
+    grupo.add(malha);
+    for (const o of l.os) if (o.parent) o.parent.remove(o);
+  }
   cena.cena.add(grupo);
   return { grupo, tema: T, quadro: (t, dt) => { for (const a of animados) a.f(t, dt); }, comemorar: () => { uPub.festa.value = 1; } };
 }
