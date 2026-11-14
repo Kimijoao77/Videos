@@ -6,22 +6,22 @@ import * as THREE from "three";
 import { L, C, RIO0, RIO1, PONTES } from "./sim.js";
 
 export const TEMAS = [
-  { nome: "Campo de Treino", praca: [176, 150, 112], fundo: "#9fd3ef", hemi: [0xffffff, 0x7d8a6a, 1.15], sol: [0xfff1d6, 1.9], neblina: "#a9d8ee",
+  { nome: "Campo de Treino", morro: { grama: "#7cc25a", escura: "#5c9a45", pedra: "#9a9488", terra: "#b89a6a", alto: 7 }, praca: [176, 150, 112], fundo: "#9fd3ef", hemi: [0xffffff, 0x7d8a6a, 1.15], sol: [0xfff1d6, 1.9], neblina: "#a9d8ee",
     grama: ["#7FC65A", "#74BC51"], fora: "#5f9e47", terra: "#c4a46c", agua: ["#3FA9E0", "#2C8FD0"], tufo: [0x4f9a3a, 0x8fd468],
     flores: ["#ffffff", "#ffe066"], borda: "madeira", part: "folhas", tinta: 0xffffff },
-  { nome: "Vila dos Camponeses", praca: [186, 168, 138], fundo: "#a6d8f0", hemi: [0xffffff, 0x8a7d5a, 1.1], sol: [0xffe2b8, 2.0], neblina: "#b8dcea",
+  { nome: "Vila dos Camponeses", morro: { grama: "#86c55a", escura: "#669e48", pedra: "#a39c90", terra: "#c4a46c", alto: 6.5 }, praca: [186, 168, 138], fundo: "#a6d8f0", hemi: [0xffffff, 0x8a7d5a, 1.1], sol: [0xffe2b8, 2.0], neblina: "#b8dcea",
     grama: ["#86c55a", "#7bbb50"], fora: "#6aa14a", terra: "#c9a46a", agua: ["#46b0e3", "#2f92d2"], tufo: [0x5a9d3c, 0x9fdc6c],
     flores: ["#ff8fb1", "#ffffff", "#ffd23f", "#b48cff"], borda: "pedra", part: "petalas", tinta: 0xffffff },
-  { nome: "Floresta Sombria", praca: [104, 108, 112], fundo: "#2b3d4f", hemi: [0x9fb6ff, 0x2d3b2a, 0.95], sol: [0xb9c8ff, 1.1], neblina: "#33485a",
+  { nome: "Floresta Sombria", morro: { grama: "#4a7f40", escura: "#2f5a2d", pedra: "#5f6466", terra: "#6e5c45", alto: 8.5 }, praca: [104, 108, 112], fundo: "#2b3d4f", hemi: [0x9fb6ff, 0x2d3b2a, 0.95], sol: [0xb9c8ff, 1.1], neblina: "#33485a",
     grama: ["#4f8a45", "#477f3f"], fora: "#2f5a32", terra: "#7d6a4f", agua: ["#2c6f8f", "#215a77"], tufo: [0x2f5f2c, 0x5f9a4c],
     flores: ["#b9f3ff", "#d6b8ff"], cogumelos: true, borda: "madeira", part: "vagalumes", tinta: 0xc9d4ff },
-  { nome: "Castelo de Pedra", praca: [160, 158, 152], fundo: "#a9c6dc", hemi: [0xffffff, 0x7a7a70, 1.1], sol: [0xfff4e0, 1.9], neblina: "#b4c9d8",
+  { nome: "Castelo de Pedra", morro: { grama: "#7ab45a", escura: "#5e8f48", pedra: "#a8a49c", terra: "#9a8a72", alto: 8 }, praca: [160, 158, 152], fundo: "#a9c6dc", hemi: [0xffffff, 0x7a7a70, 1.1], sol: [0xfff4e0, 1.9], neblina: "#b4c9d8",
     grama: ["#78b956", "#6fae4e"], fora: "#5e8f48", terra: "#a9a49a", pedras: true, agua: ["#3a9fd6", "#2a83bd"], tufo: [0x4f8a38, 0x8ccc62],
     flores: ["#ffffff"], borda: "muralha", part: "poeira", tinta: 0xffffff },
-  { nome: "Reino dos Dragões", praca: [92, 72, 64], fundo: "#3a1f1c", hemi: [0xffb08a, 0x3a2020, 0.85], sol: [0xffa36b, 1.7], neblina: "#4a2620",
+  { nome: "Reino dos Dragões", morro: { grama: "#5a4a40", escura: "#3a2e29", pedra: "#4a403c", terra: "#2e2420", alto: 9 }, praca: [92, 72, 64], fundo: "#3a1f1c", hemi: [0xffb08a, 0x3a2020, 0.85], sol: [0xffa36b, 1.7], neblina: "#4a2620",
     grama: ["#6e6250", "#655a49"], fora: "#3b302b", terra: "#4a3c36", lava: true, agua: ["#ff7a1a", "#ff3d00"], tufo: [0x5a4a35, 0x8a7550],
     flores: [], rachas: true, borda: "ruina", part: "brasas", tinta: 0x9a8a80 },
-  { nome: "Lenda dos Reinos", praca: [214, 196, 160], fundo: "#f6c27a", hemi: [0xfff0d0, 0x8a6a4a, 1.15], sol: [0xffc27a, 2.1], neblina: "#f2c48a",
+  { nome: "Lenda dos Reinos", morro: { grama: "#a4cc62", escura: "#d2bc6a", pedra: "#c8b89a", terra: "#d4b26a", alto: 7 }, praca: [214, 196, 160], fundo: "#f6c27a", hemi: [0xfff0d0, 0x8a6a4a, 1.15], sol: [0xffc27a, 2.1], neblina: "#f2c48a",
     grama: ["#8bc85c", "#80be53"], fora: "#6b9a45", terra: "#d8b46a", pedras: true, ouro: true, agua: ["#4fc0ea", "#36a2db"], tufo: [0x5d9a3c, 0xb7e070],
     flores: ["#ffd23f", "#ffffff", "#ff8fb1"], borda: "muralha", part: "brilhos", tinta: 0xfff2dc },
 ];
@@ -276,6 +276,23 @@ export function montarCenario(cena, i, pecas) {
     m.position.set(0, -0.01, zRio + s * (largRio / 2 + 0.2)); grupo.add(m);
   }
 
+  // ---- medidas da arquibancada e o relevo em volta (um vale: morros que sobem a partir da arquibancada)
+  const ALT = 0.46, LARG = 1.0, NIV = 5, X0 = L / 2 + 1.2, Z0 = C / 2 + 1.2;
+  const XF = X0 + NIV * LARG, ZF = Z0 + NIV * LARG, HTOPO = NIV * ALT;
+  const hash = (x, z) => { const v = Math.sin(x * 127.1 + z * 311.7 + i * 17.3) * 43758.5453; return v - Math.floor(v); };
+  const vruido = (x, z) => { const xi = Math.floor(x), zi = Math.floor(z), fx = x - xi, fz = z - zi, u = fx * fx * (3 - 2 * fx), v = fz * fz * (3 - 2 * fz);
+    const a = hash(xi, zi), b = hash(xi + 1, zi), c = hash(xi, zi + 1), d = hash(xi + 1, zi + 1); return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v; };
+  const fbm2 = (x, z) => vruido(x, z) * 0.5 + vruido(x * 2.1 + 5, z * 2.1 + 3) * 0.3 + vruido(x * 4.3 + 11, z * 4.3 + 7) * 0.2;
+  const M = T.morro;
+  const altChao = (x, z) => {
+    if (Math.abs(x) <= XF + 0.02 && Math.abs(z) <= ZF + 0.02) return 0;     // dentro: a arena e a arquibancada têm chão próprio
+    const d = Math.hypot(Math.max(Math.abs(x) - XF, 0), Math.max(Math.abs(z) - ZF, 0));
+    let h = HTOPO + 0.12 + M.alto * (1 - Math.exp(-d / 6.5)) + (fbm2(x * 0.12, z * 0.12) - 0.5) * (0.4 + Math.min(d, 14) * 0.28);
+    const rio = Math.abs(z - zRio), larg = largRio / 2 + 0.5 + d * 0.06;        // o rio sai entre os morros
+    if (rio < larg + 2.4) h = h * Math.min(1, Math.max(0, (rio - larg) / 2.4)) - 0.18 * (rio < larg ? 1 : 0);
+    return h;
+  };
+
   // helpers para pôr peças
   const ocupado = [];             // retângulos [x0, x1, z0, z1] das arquibancadas
   const livre = (x, z) => !ocupado.some(([a, b, c, d]) => x > a && x < b && z > c && z < d);
@@ -283,6 +300,7 @@ export function montarCenario(cena, i, pecas) {
   const noRio = (z, folga = 0.6) => Math.abs(z - zRio) < largRio / 2 + folga;
   const por = (nome, x, z, esc = 1, giro = r() * 6.28, y = 0) => {
     if (y === 0 && !livre(x, z)) return null;
+    if (y === 0) y = altChao(x, z) - 0.05;
     const o = pecas(nome); if (!o) return null;
     o.position.set(x, y, z); o.scale.setScalar(esc); o.rotation.y = giro; grupo.add(sombra(o)); return o;
   };
@@ -317,6 +335,13 @@ export function montarCenario(cena, i, pecas) {
     for (const zb of zBorda) for (let x = -L / 2 + passo / 2; x < L / 2; x += passo) por(nome, x, zb - esc, esc, Math.PI / 2);
   }
 
+  // moitas de grama nos morros (balançam com o vento, como as da arena)
+  const moitas = [];
+  for (let k = 0; k < 900; k++) {
+    const a = r() * Math.PI * 2, d = 0.4 + Math.pow(r(), 1.2) * 16, bx = Math.cos(a), bz = Math.sin(a), esc = Math.max(Math.abs(bx) / (XF + d), Math.abs(bz) / (ZF + d));
+    const x = bx / esc, z = bz / esc; if (Math.abs(z - zRio) < largRio / 2 + 0.8) continue;
+    moitas.push([x, altChao(x, z), z]);
+  }
   // ---- tufos de grama e flores (dentro e fora da arena)
   const geo = geoTufo(), n = 760;
   const matTufo = new THREE.MeshLambertMaterial({ side: THREE.DoubleSide });
@@ -337,7 +362,7 @@ gl_Position = projectionMatrix * mvPosition;`);
     sh.fragmentShader = sh.fragmentShader.replace("#include <common>", `#include <common>\nvarying float vAlt;`)
       .replace("vec4 diffuseColor = vec4( diffuse, opacity );", `vec4 diffuseColor = vec4( mix(vec3(${cb.r.toFixed(3)},${cb.g.toFixed(3)},${cb.b.toFixed(3)}), vec3(${cp.r.toFixed(3)},${cp.g.toFixed(3)},${cp.b.toFixed(3)}), vAlt), opacity );`);
   };
-  const tufos = new THREE.InstancedMesh(geo, matTufo, n);
+  const tufos = new THREE.InstancedMesh(geo, matTufo, n + moitas.length);
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(), e = new THREE.Vector3();
   let k = 0;
   const torres = [[-5.5, 9.5], [5.5, 9.5], [0, 13], [-5.5, -9.5], [5.5, -9.5], [0, -13]];
@@ -351,74 +376,98 @@ gl_Position = projectionMatrix * mvPosition;`);
     const h = (naArena ? 0.16 : 0.28) + r() * 0.16; m4.compose(v, q, e.set(h * 1.4, h, h * 1.4));
     tufos.setMatrixAt(k++, m4);
   }
+  for (const [x, y, z] of moitas) { v.set(x, y - 0.02, z); q.setFromAxisAngle(e.set(0, 1, 0), r() * 6.28); const h = 0.32 + r() * 0.3; m4.compose(v, q, e.set(h * 1.5, h, h * 1.5)); tufos.setMatrixAt(k++, m4); }
   tufos.count = k; grupo.add(tufos);
 
-  // ---- a arena fica fechada (pedido do João: nada de chão plano em volta, só a arena e as construções):
-  // arquibancadas com público dos quatro lados, muros altos com ameias atrás delas e torres nos cantos
-  const ESTILO = ["madeira", "madeira", "escura", "pedra", "escura", "ouro"][i];
-  const CORES_DEG = { madeira: [0xa0703f, 0x8c5f35, 0x6e4a2a, 0x8a8178], pedra: [0xb8b0a3, 0xa8a094, 0x8d867b, 0x9c958a], escura: [0x5c544e, 0x4e4743, 0x3e3835, 0x4a4440], ouro: [0xece0c2, 0xdccfae, 0xc9a24a, 0xd8cdb4] };
-  const [c1, c2, cFrente, cMuro] = CORES_DEG[ESTILO];
-  const matDeg = [new THREE.MeshLambertMaterial({ color: c1 }), new THREE.MeshLambertMaterial({ color: c2 })], matFrente = new THREE.MeshLambertMaterial({ color: cFrente });
-  const matMuro = new THREE.MeshLambertMaterial({ color: cMuro });
+  // ---- a arena fica num vale (pedido do João: fechada e cheia, mas com cara de natureza): degraus de grama e pedra
+  // com a torcida sentada em bancos de madeira, e morros com árvores, pedras e algumas casas subindo atrás
+  const corM = (h) => new THREE.Color(h);
+  const matPedra = new THREE.MeshLambertMaterial({ color: corM(M.pedra) }), matPedra2 = new THREE.MeshLambertMaterial({ color: corM(M.pedra).multiplyScalar(0.86) });
+  const matGrama = new THREE.MeshLambertMaterial({ color: corM(M.grama) }), matBanco = new THREE.MeshLambertMaterial({ color: 0x8a5a32 });
   const lugares = [];               // onde senta cada torcedor: [x, y, z, time]
-  const ALT = 0.46, LARG = 1.0, NIV = 5, X0 = L / 2 + 1.2, Z0 = C / 2 + 1.2;
-  const XF = X0 + NIV * LARG, ZF = Z0 + NIV * LARG;           // onde ficam os muros de trás
-  const caixa = (cx, cy, cz, sx, sy, sz, mat) => { const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), mat); m.position.set(cx, cy, cz); m.castShadow = true; m.receiveShadow = true; grupo.add(m); return m; };
+  const caixa = (cx, cy, cz, sx, sy, sz, mat, sombraP = true) => { const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), mat); m.position.set(cx, cy, cz); m.castShadow = sombraP; m.receiveShadow = true; grupo.add(m); return m; };
   const timeDe = (z) => (z > zRio ? 0 : 1);                       // embaixo (perto da câmera) é o seu lado: torcida azul
-  // dos lados: degraus contínuos (o rio passa por baixo)
+  // um degrau: pedra na frente, grama em cima e um banco comprido na beira
+  const degrau = (cx, cz, sx, sz, k, eixoX) => {
+    const h = (k + 1) * ALT;
+    caixa(cx, h / 2, cz, sx, h, sz, k % 2 ? matPedra2 : matPedra, k === NIV - 1);
+    caixa(cx, h + 0.03, cz, sx + 0.02, 0.06, sz + 0.02, matGrama, false);
+    const bx = eixoX ? cx - Math.sign(cx) * (LARG * 0.5 - 0.22) : cx, bz = eixoX ? cz : cz - Math.sign(cz) * (LARG * 0.5 - 0.22);
+    caixa(bx, h + 0.16, bz, eixoX ? 0.26 : sx - 0.4, 0.1, eixoX ? sz - 0.4 : 0.26, matBanco, false);
+    return [h + 0.2, bx, bz];
+  };
   lados(sx => {
     for (let k = 0; k < NIV; k++) {
-      const h = (k + 1) * ALT, cx = sx * (X0 + (k + 0.5) * LARG), z0 = -Z0 + 0.1, z1 = Z0 - 0.1;
-      caixa(cx, h / 2, 0, LARG, h, z1 - z0, matDeg[k % 2]);
-      caixa(cx, h - 0.035, 0, LARG + 0.02, 0.07, z1 - z0 + 0.02, matFrente);
-      for (let z = z0 + 0.3; z < z1 - 0.2; z += 0.48 + r() * 0.1) if (r() < 0.9) lugares.push([cx + (r() - 0.5) * 0.25, h, z, timeDe(z)]);
+      const [y, bx] = degrau(sx * (X0 + (k + 0.5) * LARG), 0, LARG, 2 * Z0 - 0.2, k, true);
+      for (let z = -Z0 + 0.4; z < Z0 - 0.3; z += 0.48 + r() * 0.12) if (r() < 0.86) lugares.push([bx + (r() - 0.5) * 0.12, y, z, timeDe(z)]);
     }
     ocupado.push(sx < 0 ? [-XF - 0.6, -X0 + 0.2, -ZF - 0.6, ZF + 0.6] : [X0 - 0.2, XF + 0.6, -ZF - 0.6, ZF + 0.6]);
   });
-  // atrás dos castelos: degraus de ponta a ponta; o de cima tem o camarote do rei no meio
   for (const sz of [-1, 1]) {
     for (let k = 0; k < NIV; k++) {
-      const h = (k + 1) * ALT, cz = sz * (Z0 + (k + 0.5) * LARG), x0 = -XF + 0.05, x1 = XF - 0.05;
-      caixa(0, h / 2, cz, x1 - x0, h, LARG, matDeg[k % 2]);
-      caixa(0, h - 0.035, cz, x1 - x0 + 0.02, 0.07, LARG + 0.02, matFrente);
-      for (let x = x0 + 0.3; x < x1 - 0.2; x += 0.48 + r() * 0.1) {
+      const [y, , bz] = degrau(0, sz * (Z0 + (k + 0.5) * LARG), 2 * XF - 0.1, LARG, k, false);
+      for (let x = -XF + 0.4; x < XF - 0.3; x += 0.48 + r() * 0.12) {
         if (sz < 0 && Math.abs(x) < 1.7 && k >= 2) continue;          // o camarote
-        if (r() < 0.9) lugares.push([x, h, cz + (r() - 0.5) * 0.25, sz > 0 ? 0 : 1]);
+        if (Math.abs(x) > X0 - 0.2 && Math.abs(x) < X0 + 0.2) continue;
+        if (r() < 0.86) lugares.push([x, y, bz + (r() - 0.5) * 0.12, sz > 0 ? 0 : 1]);
       }
     }
     ocupado.push([-XF - 0.6, XF + 0.6, sz < 0 ? -ZF - 0.6 : Z0 - 0.2, sz < 0 ? -Z0 + 0.2 : ZF + 0.6]);
   }
-  // camarote: piso alto, colunas e um toldo vermelho e dourado
+  // camarote do rei (de madeira, com toldo vermelho e dourado), no meio dos degraus de cima
   {
     const zc = -(Z0 + 3.5 * LARG), h = 3 * ALT + 0.3;
-    caixa(0, h / 2, zc, 3.4, h, 2.2, matFrente);
-    for (const x of [-1.5, 1.5]) caixa(x, h + 0.9, zc - 0.9, 0.16, 1.8, 0.16, matMuro);
+    caixa(0, h / 2, zc, 3.4, h, 2.2, matBanco);
+    for (const x of [-1.5, 1.5]) caixa(x, h + 0.9, zc - 0.9, 0.16, 1.8, 0.16, matBanco);
     const cv = document.createElement("canvas"); cv.width = 128; cv.height = 32; const g = cv.getContext("2d");
     for (let k = 0; k < 8; k++) { g.fillStyle = k % 2 ? "#f2c14e" : "#c0392b"; g.fillRect(k * 16, 0, 16, 32); }
     const toldo = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 1.6), new THREE.MeshLambertMaterial({ map: tex(cv), side: THREE.DoubleSide }));
     toldo.position.set(0, h + 1.85, zc - 0.3); toldo.rotation.x = -Math.PI / 2 + 0.35; toldo.castShadow = true; grupo.add(toldo);
     for (const x of [-0.7, 0.7]) lugares.push([x, h, zc + 0.3, 1]);
-    bandeira("bandeira_vermelho", 0, zc - 1.2, 5.5);
   }
-  // muros altos com ameias atrás de tudo, e uma torre em cada canto
-  const HM = NIV * ALT + 2.4;
-  const muro = (cx, cz, sx, sz) => {
-    caixa(cx, HM / 2, cz, sx, HM, sz, matMuro);
-    const n = Math.floor(Math.max(sx, sz) / 0.9);
-    for (let k = 0; k < n; k++) {                                   // ameias
-      const q = (k + 0.5) / n - 0.5;
-      caixa(cx + (sx > sz ? q * sx : 0), HM + 0.22, cz + (sz > sx ? q * sz : 0), sx > sz ? 0.45 : sx, 0.44, sz > sx ? 0.45 : sz, matMuro);
+  // os morros: uma malha só, com cor por vértice (grama clara e escura, terra e pedra nas partes íngremes e no alto)
+  {
+    const W = 104, D = 116, geo = new THREE.PlaneGeometry(W, D, 208, 232).rotateX(-Math.PI / 2), pos = geo.attributes.position;
+    for (let k = 0; k < pos.count; k++) { const x = pos.getX(k), z = pos.getZ(k); pos.setY(k, Math.abs(x) <= XF + 0.02 && Math.abs(z) <= ZF + 0.02 ? -0.6 : altChao(x, z)); }
+    geo.computeVertexNormals();
+    const nor = geo.attributes.normal, cores = new Float32Array(pos.count * 3);
+    const cG = corM(M.grama), cE = corM(M.escura), cP = corM(M.pedra), cT = corM(M.terra), tmp = new THREE.Color();
+    for (let k = 0; k < pos.count; k++) {
+      const x = pos.getX(k), y = pos.getY(k), z = pos.getZ(k), ny = nor.getY(k), n = fbm2(x * 0.35, z * 0.35);
+      tmp.copy(cG).lerp(cE, Math.min(1, Math.max(0, (n - 0.35) * 2.2)));
+      if (n > 0.66) tmp.lerp(cT, Math.min(1, (n - 0.66) * 3));                                   // terra
+      const ingreme = Math.min(1, Math.max(0, (0.86 - ny) * 5)), alto = Math.min(1, Math.max(0, (y - HTOPO - M.alto * 0.82) * 0.8));
+      tmp.lerp(cP, Math.max(ingreme, alto, Math.abs(z - zRio) < largRio / 2 + 1.4 ? 0.85 : 0));    // pedra
+      cores[k * 3] = tmp.r; cores[k * 3 + 1] = tmp.g; cores[k * 3 + 2] = tmp.b;
     }
-  };
-  lados(sx => muro(sx * (XF + 0.2), 0, 0.4, 2 * ZF + 0.8));
-  for (const sz of [-1, 1]) muro(0, sz * (ZF + 0.2), 2 * XF + 0.8, 0.4);
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-    const t = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.45, HM + 1.6, 12), matMuro); t.position.set(sx * (XF + 0.2), (HM + 1.6) / 2, sz * (ZF + 0.2)); t.castShadow = true; grupo.add(t);
-    const teto = new THREE.Mesh(new THREE.ConeGeometry(1.6, 1.8, 12), new THREE.MeshLambertMaterial({ color: sz > 0 ? 0x2f6fe0 : 0xc0392b })); teto.position.set(sx * (XF + 0.2), HM + 2.5, sz * (ZF + 0.2)); teto.castShadow = true; grupo.add(teto);
+    geo.setAttribute("color", new THREE.BufferAttribute(cores, 3));
+    const morros = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true }));
+    morros.receiveShadow = true; grupo.add(morros);
   }
-  // bandeiras do time em cima dos muros
-  lados(sx => { for (let z = -ZF + 2; z < ZF - 1; z += 3.4) bandeira(timeDe(z) === 0 ? "bandeira_azul" : "bandeira_vermelho", sx * (XF + 0.75), z, 4.4); });
-  for (const sz of [-1, 1]) for (const x of [-7, -3.5, 3.5, 7]) bandeira(sz > 0 ? "bandeira_azul" : "bandeira_vermelho", x, sz * (ZF + 0.75), 4.4);
+  // natureza nos morros: árvores em grupos, pedras e moitas; algumas casas e torres no meio
+  const ARV = i === 4 ? ["rocha_c", "rocha_d", "rocha_e", "toco", "tocos"] : i === 2 ? ["arvores_g", "arvores_m", "arvores_g", "rocha_c"] : ["arvores_g", "arvores_m", "arvores_p", "arvores_m", "rocha_c", "rocha_e"];
+  const naturezaEm = (x, z) => {
+    if (Math.abs(z - zRio) < largRio / 2 + 1.2) return;
+    const nome = ARV[Math.floor(r() * ARV.length)], esc = nome.startsWith("arvores") ? 2.4 + r() * 0.9 : nome.startsWith("rocha") ? 2.6 + r() * 1.6 : 2.4 + r();
+    por(nome, x, z, esc);
+  };
+  for (let k = 0; k < 230; k++) {
+    const a = r() * Math.PI * 2, d = 0.8 + Math.pow(r(), 1.4) * 22;                     // mais perto da arquibancada, mais denso
+    const bx = Math.cos(a), bz = Math.sin(a), esc = Math.max(Math.abs(bx) / (XF + d), Math.abs(bz) / (ZF + d));
+    naturezaEm(bx / esc, bz / esc);
+  }
+  const RUA = [["tenda", "arquearia", "tenda", "celeiro"], ["casa_a", "taverna", "casa_b", "moinho", "casa_c", "igreja"], ["casa_c", "serraria", "celeiro"],
+    ["torre_vigia", "igreja", "quartel", "torre_vigia"], ["torre_vigia", "ferreiro", "torre_vigia"], ["igreja", "casa_b", "torre_vigia", "mercado"]][i];
+  for (let k = 0; k < 9; k++) {
+    const a = (k / 9) * Math.PI * 2 + r() * 0.4, d = 2.5 + r() * 5, bx = Math.cos(a), bz = Math.sin(a), esc = Math.max(Math.abs(bx) / (XF + d), Math.abs(bz) / (ZF + d));
+    const x = bx / esc, z = bz / esc;
+    if (Math.abs(z - zRio) < largRio / 2 + 2.5) continue;
+    const nome = RUA[k % RUA.length], o = por(nome, x, z, nome === "torre_vigia" ? 1.5 : 2.7, Math.atan2(-x, -z) + (r() - 0.5) * 0.4);
+    if (o && nome === "moinho") moinhoGira(o, 0.8);
+  }
+  // bandeiras dos times na beira de cima dos degraus
+  lados(sx => { for (let z = -ZF + 2.5; z < ZF - 2; z += 4.2) bandeira(timeDe(z) === 0 ? "bandeira_azul" : "bandeira_vermelho", sx * (XF + 0.9), z, 4.4); });
+  for (const sz of [-1, 1]) for (const x of [-7, -3.5, 3.5, 7]) bandeira(sz > 0 ? "bandeira_azul" : "bandeira_vermelho", x, sz * (ZF + 0.9), 4.4);
   // o público: corpo e cabeça (dois InstancedMesh), pulando de leve; quando uma torre cai, todo mundo pula
   const uPub = { tempo: { value: 0 }, festa: { value: 0 } };
   const matPub = () => {
@@ -448,36 +497,16 @@ gl_Position = projectionMatrix * mvPosition;`);
   });
   corpos.castShadow = true; grupo.add(corpos, cabecas);
   animados.push({ f: (t, dt) => { uPub.tempo.value = t; uPub.festa.value = Math.max(0, uPub.festa.value - dt * 0.35); } });
-  // rua de construções atrás das arquibancadas dos lados (o tema escolhe quais)
-  const RUA = [["tenda", "quartel", "arquearia", "tenda", "celeiro", "tenda"], ["casa_a", "taverna", "casa_b", "mercado", "casa_c", "igreja", "ferreiro", "casa_a"],
-    ["casa_c", "serraria", "celeiro", "casa_a", "ferreiro"], ["quartel", "casa_b", "torre_vigia", "ferreiro", "taverna", "igreja", "torre_vigia"],
-    ["torre_vigia", "quartel", "ferreiro", "torre_vigia", "serraria"], ["igreja", "casa_b", "mercado", "taverna", "torre_vigia", "casa_b"]][i];
-  // atrás dos muros de cima e de baixo: uma fileira de construções coladas, para não sobrar chão à vista
-  for (const sz of [-1, 1]) {
-    let j = sz < 0 ? 0 : 2;
-    for (let x = -XF - 1.5; x <= XF + 1.6; x += 3.0 + r() * 0.5) {
-      const nome = RUA[j++ % RUA.length], esc = nome === "torre_vigia" ? 1.6 : nome === "igreja" ? 3.2 : 2.9;
-      por(nome, x, sz * (ZF + 2.4 + r() * 0.6), esc, (sz < 0 ? 0 : Math.PI) + (r() - 0.5) * 0.25);
-    }
-    for (let x = -XF; x <= XF; x += 4.2 + r()) por(RUA[j++ % RUA.length], x + 1.5, sz * (ZF + 5.6 + r()), 3.1, (sz < 0 ? 0 : Math.PI) + (r() - 0.5) * 0.3);
-  }
-  lados(sx => {
-    let j = 0;
-    for (let z = -ZF - 2; z < ZF + 3; z += 3.3 + r() * 0.8) {
-      const nome = RUA[(j++ + (sx > 0 ? 3 : 0)) % RUA.length], esc = nome === "torre_vigia" ? 1.35 : nome === "igreja" ? 2.9 : 2.6;
-      por(nome, sx * (XF + 3.2 + r() * 0.8), z, esc, (sx < 0 ? Math.PI / 2 : -Math.PI / 2) + (r() - 0.5) * 0.3);
-    }
-  });
 
   // ---- temas
   const nuvens = [];
   const nuvem = (x, z, y, esc) => { const o = por(r() < 0.5 ? "nuvem" : "nuvem_p", x, z, esc, 0, y); if (o) { o.traverse(m => { if (m.isMesh) m.castShadow = false; }); nuvens.push(o); } };
   const fundoMontanhas = (nomes, n, esc) => { for (let j = 0; j < n; j++) por(nomes[j % nomes.length], -46 + j * (92 / (n - 1)) + (r() - 0.5) * 6, -C / 2 - 26 - r() * 14, esc[0] + r() * (esc[1] - esc[0])); };
   const lateral = (nomes, n, esc) => lados(s => espalhar(nomes, n, s < 0 ? [-34, -X0 - NIV * LARG - 5.5, -C / 2 - 4, C / 2 + 4] : [X0 + NIV * LARG + 5.5, 34, -C / 2 - 4, C / 2 + 4], esc));
-  const arvoresNat = (n) => lados(s => { for (let j = 0; j < Math.ceil(n / 2); j++) { const x = s * (X0 + NIV * LARG + 6 + r() * 14), z = (r() - 0.5) * (C + 10); if (noRio(z, 1.2)) continue; const tipo = ["arvore", "pinheiro", "bosque", "arvore", "pinheiro"][Math.floor(r() * 5)]; const o = cena.novo(tipo); o.position.set(x, 0, z); o.scale.setScalar(0.8 + r() * 0.6); o.rotation.y = r() * 6.28; grupo.add(sombra(o)); } });
+  const arvoresNat = (n) => lados(s => { for (let j = 0; j < Math.ceil(n / 2); j++) { const x = s * (X0 + NIV * LARG + 6 + r() * 14), z = (r() - 0.5) * (C + 10); if (noRio(z, 1.2)) continue; const tipo = ["arvore", "pinheiro", "bosque", "arvore", "pinheiro"][Math.floor(r() * 5)]; if (!livre(x, z)) continue; const o = cena.novo(tipo); o.position.set(x, altChao(x, z) - 0.05, z); o.scale.setScalar(0.8 + r() * 0.6); o.rotation.y = r() * 6.28; grupo.add(sombra(o)); } });
   const juncos = () => lados(s => { for (let j = 0; j < 22; j++) { const x = s * (L / 2 + 1 + r() * 22), lado = r() < 0.5 ? -1 : 1; por(r() < 0.5 ? "junco" : "planta_agua", x, zRio + lado * (largRio / 2 + 0.1 + r() * 0.3), 2.4 + r()); } });
   const lirios = () => { for (let j = 0; j < 26; j++) { const x = (r() < 0.5 ? -1 : 1) * (L / 2 + 0.8 + r() * 24); por(r() < 0.5 ? "lirio" : "lirio_b", x, zRio + (r() - 0.5) * (largRio - 0.6), 2.2 + r(), r() * 6.28, 0.03); } };
-  const moinhoGira = (o, vel) => o && o.traverse(m => { if (/fan|wheel/.test(m.name)) animados.push({ f: (t, dt) => { if (/fan/.test(m.name)) m.rotation.z -= dt * vel; else m.rotation.x -= dt * vel; } }); });
+  function moinhoGira(o, vel) { return o && o.traverse(m => { if (/fan|wheel/.test(m.name)) animados.push({ f: (t, dt) => { if (/fan/.test(m.name)) m.rotation.z -= dt * vel; else m.rotation.x -= dt * vel; } }); }); }
   function bandeira(nome, x, z, esc) { const o = por(nome, x, z, esc, Math.PI / 2 + (r() - 0.5) * 0.3); if (o) { const f = r() * 6; animados.push({ f: (t) => { o.rotation.y = Math.PI / 2 + Math.sin(t * 2.2 + f) * 0.18; } }); } return o; };
   const zLonge = -C / 2 - 1.2;    // logo atrás da borda de cima
 
@@ -509,13 +538,14 @@ gl_Position = projectionMatrix * mvPosition;`);
     for (let j = 0; j < 70; j++) {
       const x = (r() - 0.5) * 70, z = -C / 2 - 1.6 - r() * 26;
       if (dentro(x, z, 1.6)) continue;
+      if (!livre(x, z)) continue;
       const tipo = ["bosque", "pinheiro", "arvore", "bosque"][Math.floor(r() * 4)], o = cena.novo(tipo);
-      o.position.set(x, 0, z); o.scale.setScalar(1 + r() * 0.8); o.rotation.y = r() * 6.28; grupo.add(sombra(o));
+      o.position.set(x, altChao(x, z) - 0.05, z); o.scale.setScalar(1 + r() * 0.8); o.rotation.y = r() * 6.28; grupo.add(sombra(o));
     }
     arvoresNat(40);
     for (const [x, z, n, esc, g] of [[-6, -18.5, "ruina", 1.6, 0.4], [6.5, -19, "ruina", 1.7, -0.6], [0, -21, "mina", 2.6, 0], [-12, 6, "ruina", 1.5, 1.2], [11.5, -6, "ruina", 1.4, 2.5],
       [-3, -18.3, "rocha_e", 3.5, 0], [3, -18.4, "rocha_d", 3.5, 1], [-11, -3, "tocos", 3, 0.5], [11, 3, "tocos", 3, 1.5], [11.6, 12, "toco", 3, 0], [-11.5, 13, "rocha_c", 3.5, 0]]) {
-      const o = n === "ruina" ? (() => { const a = cena.novo("ruina"); a.position.set(x, 0, z); a.scale.setScalar(esc); a.rotation.y = g; grupo.add(sombra(a)); return a; })() : por(n, x, z, esc, g);
+      const o = n === "ruina" ? (() => { if (!livre(x, z)) return null; const a = cena.novo("ruina"); a.position.set(x, altChao(x, z) - 0.05, z); a.scale.setScalar(esc); a.rotation.y = g; grupo.add(sombra(a)); return a; })() : por(n, x, z, esc, g);
     }
     fundoMontanhas(["montanha", "montanha_b", "montanha"], 8, [6, 8]);
     juncos();
@@ -542,7 +572,7 @@ gl_Position = projectionMatrix * mvPosition;`);
   } else if (i === 4) {        // Reino dos Dragões: montanhas peladas, ruínas, rochas e fumaça
     fundoMontanhas(["montanha_nua", "montanha_c", "montanha_nua"], 10, [6, 9]);
     lateral(["montanha_c", "montanha_nua"], 3, [3.5, 5]);
-    for (let j = 0; j < 14; j++) { const x = (r() - 0.5) * 50, z = -C / 2 - 2 - r() * 16; if (dentro(x, z, 1.6)) continue; const a = cena.novo("ruina"); a.position.set(x, 0, z); a.scale.setScalar(1.2 + r() * 0.7); a.rotation.y = r() * 6.28; grupo.add(sombra(a)); }
+    for (let j = 0; j < 14; j++) { const x = (r() - 0.5) * 50, z = -C / 2 - 2 - r() * 16; if (dentro(x, z, 1.6) || !livre(x, z)) continue; const a = cena.novo("ruina"); a.position.set(x, altChao(x, z) - 0.05, z); a.scale.setScalar(1.2 + r() * 0.7); a.rotation.y = r() * 6.28; grupo.add(sombra(a)); }
     lateral(["rocha_c", "rocha_d", "rocha_e", "toco", "tocos"], 18, [2.5, 4]);
     espalhar(["rocha_c", "rocha_e", "pedras_cortadas"], 14, [-28, 28, -C / 2 - 16, -C / 2 - 1.5], [2.5, 4]);
     // colunas de fumaça

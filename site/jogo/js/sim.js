@@ -63,6 +63,49 @@ export const CARTAS = {
     texto: "Nuvem venenosa por 8 segundos: tira vida de tudo o que fica dentro e deixa mais lento." },
   furia: { nome: "Fúria", custo: 2, tipo: "magia", raridade: "epico", area: 3.0, instante: true, zona: { dur: 6, cada: 0.25, furia: true },
     texto: "Por 6 segundos, as suas tropas dentro da área andam e atacam 40% mais rápido." },
+  // ---------- leva 3: bichos, dinossauros, construções e magias novas
+  barbaros: { nome: "Bárbaros", custo: 5, tipo: "tropa", raridade: "comum", n: 4, modelo: "barbaro", hp: 640, dano: 150, cad: 1.4, vel: 1.0, alc: 0.5, raio: 0.45, visao: 5.5, massa: 5,
+    texto: "Quatro bárbaros de machado. Muita vida e golpe forte, mas lentos." },
+  cacadora: { nome: "Caçadora", custo: 4, tipo: "tropa", raridade: "raro", n: 1, hp: 620, dano: 210, cad: 1.7, vel: 1.0, alc: 6.5, raio: 0.42, visao: 7, ar: true, proj: "virote", massa: 4,
+    texto: "Atira mais longe que qualquer tropa, em quem anda e em quem voa." },
+  lobos: { nome: "Lobos", custo: 3, tipo: "tropa", raridade: "comum", n: 3, modelo: "lobo", hp: 340, dano: 95, cad: 0.9, vel: 2.0, alc: 0.5, raio: 0.42, visao: 6, massa: 3,
+    texto: "Três lobos muito rápidos. Chegam primeiro e mordem sem parar." },
+  touro: { nome: "Touro Bravo", custo: 4, tipo: "tropa", raridade: "raro", n: 1, hp: 1500, dano: 240, cad: 1.6, vel: 1.9, alc: 0.5, raio: 0.6, visao: 7, soPredio: true, pulaRio: true, massa: 10,
+    texto: "Corre direto nas construções e pula o rio em qualquer lugar, sem precisar da ponte." },
+  aranhas: { nome: "Aranhas", custo: 3, tipo: "tropa", raridade: "comum", n: 4, modelo: "aranha", hp: 170, dano: 60, cad: 1.0, vel: 1.5, alc: 0.5, raio: 0.36, visao: 5.5, lentoGolpe: 1.4, massa: 2,
+    texto: "Quatro aranhas. A picada deixa o inimigo lento por um instante." },
+  vespas: { nome: "Vespas", custo: 3, tipo: "tropa", raridade: "raro", n: 3, modelo: "vespa", hp: 190, dano: 85, cad: 1.0, vel: 1.7, alc: 1.2, raio: 0.36, visao: 6, voa: true, ar: true, massa: 1,
+    texto: "Três vespas voando. Ferroam quem anda e quem voa." },
+  raptores: { nome: "Raptores", custo: 4, tipo: "tropa", raridade: "raro", n: 2, modelo: "raptor", hp: 520, dano: 135, cad: 0.8, vel: 1.9, alc: 0.5, raio: 0.45, visao: 6.5, massa: 4,
+    salto: { min: 2, max: 4.5, mult: 1.6, dur: 0.42, espera: 4 },
+    texto: "Dois raptores rápidos que dão um bote em quem estiver perto." },
+  rex: { nome: "Tiranossauro", custo: 7, tipo: "tropa", raridade: "epico", n: 1, hp: 4000, dano: 330, cad: 1.8, vel: 0.75, alc: 0.8, raio: 1.0, visao: 6, area: 1.1, massa: 25,
+    texto: "Enorme. Cada mordida pega todo mundo em volta do alvo." },
+  triceratops: { nome: "Tricerátops", custo: 5, tipo: "tropa", raridade: "epico", n: 1, hp: 2300, dano: 250, cad: 1.5, vel: 1.0, alc: 0.6, raio: 0.75, visao: 6, massa: 16,
+    investida: { dist: 2.5, vel: 2.0, mult: 2 }, empurra: 1.6,
+    texto: "Dispara numa investida e joga as tropas longe com os chifres." },
+  espiritos: { nome: "Espíritos de Fogo", custo: 2, tipo: "tropa", raridade: "comum", n: 3, modelo: "espirito", hp: 90, dano: 160, cad: 1.0, vel: 2.2, alc: 0.6, raio: 0.32, visao: 6, ar: true, area: 1.4, kamikaze: true, massa: 1,
+    texto: "Três chamas que correm e explodem em quem encostar." },
+  canhao: { nome: "Canhão", custo: 3, tipo: "predio", raridade: "comum", n: 1, hp: 850, dano: 170, cad: 1.0, vel: 0, alc: 5.5, raio: 0.7, visao: 5.5, proj: "bala", vida: 30, massa: 999,
+    texto: "Defesa barata com tiros fortes em quem anda (não acerta quem voa). Dura 30 segundos." },
+  estabulo: { nome: "Estábulo", custo: 5, tipo: "predio", raridade: "raro", n: 1, hp: 1100, dano: 0, cad: 1, vel: 0, alc: 0, raio: 1.0, visao: 0, vida: 45, massa: 999, semAtaque: true,
+    invoca: { carta: "lobos", n: 1, cada: 5, frente: 1.4 },
+    texto: "Solta um lobo a cada 5 segundos durante 45 segundos." },
+  poco: { nome: "Poço Mágico", custo: 4, tipo: "predio", raridade: "raro", n: 1, hp: 900, dano: 0, cad: 1, vel: 0, alc: 0, raio: 0.8, visao: 0, vida: 40, massa: 999, semAtaque: true,
+    aura: { cura: 55, raio: 3.5, cada: 0.5 },
+    texto: "Cura as suas tropas em volta dele, sem parar, durante 40 segundos." },
+  tornado: { nome: "Tornado", custo: 3, tipo: "magia", raridade: "epico", dano: 45, area: 3.2, danoTorre: 0.3, instante: true, zona: { dur: 2.6, cada: 0.05, puxa: 2.8 },
+    texto: "Puxa as tropas inimigas para o meio por 2,6 segundos (e tira um pouco de vida)." },
+  terremoto: { nome: "Terremoto", custo: 3, tipo: "magia", raridade: "raro", dano: 65, area: 3.2, danoTorre: 2.8, danoPredio: 4, instante: true, zona: { dur: 3, cada: 0.5, lento: true },
+    texto: "Treme o chão por 3 segundos: estraga muito as construções e deixa as tropas lentas." },
+  cemiterio: { nome: "Cemitério", custo: 5, tipo: "magia", raridade: "epico", area: 3.0, instante: true, zona: { dur: 9, cada: 0.55, invoca: "esqueletos" },
+    texto: "Por 9 segundos, esqueletos saem da terra em qualquer lugar da área." },
+  escudo: { nome: "Escudo", custo: 2, tipo: "magia", raridade: "raro", area: 3.0, escudo: 260, instante: true,
+    texto: "As suas tropas na área ganham um escudo que segura 260 de dano." },
+  meteoro: { nome: "Meteoro", custo: 5, tipo: "magia", raridade: "epico", dano: 900, area: 2.6, danoTorre: 0.35, meteoro: 2.0,
+    texto: "Cai do céu 2 segundos depois: o maior estrago de todos (avisa onde vai cair)." },
+  barril: { nome: "Barril de Bandidos", custo: 3, tipo: "magia", raridade: "comum", dano: 80, area: 1.5, danoTorre: 1, solta: { carta: "bandidos", n: 3 },
+    texto: "Arremessa um barril em qualquer lugar da arena: ele quebra e saem três bandidos." },
   exercito: { nome: "Exército de Esqueletos", custo: 3, tipo: "tropa", raridade: "epico", n: 12, modelo: "esqueleto", hp: 75, dano: 70, cad: 1.0, vel: 1.4, alc: 0.5, raio: 0.32, visao: 5.5, massa: 1,
     texto: "Doze esqueletos de uma vez. Cercam e derrubam qualquer tropa sozinha." },
 };
@@ -89,14 +132,15 @@ export function lugaresDe(n, dir = 1) {
 }
 export const BARALHO = ["cavaleiro", "besteiros", "gigante", "mago", "bandidos", "dragao", "catapulta", "bola_fogo"];
 export const TODAS = ["cavaleiro", "besteiros", "gigante", "mago", "bandidos", "dragao", "catapulta", "bola_fogo", "esqueletos", "guerreiro", "necromante", "flechas",
-  "relampago", "gelo", "cura", "exercito", "paladino", "mago_gelo", "assassino", "balao", "quartel", "mina", "torre_arq", "veneno", "furia"];
+  "relampago", "gelo", "cura", "exercito", "paladino", "mago_gelo", "assassino", "balao", "quartel", "mina", "torre_arq", "veneno", "furia",
+  "barbaros", "cacadora", "lobos", "touro", "aranhas", "vespas", "raptores", "rex", "triceratops", "espiritos", "canhao", "estabulo", "poco", "tornado", "terremoto", "cemiterio", "escudo", "meteoro", "barril"];
 // um baralho válido tem 8 cartas diferentes que existem; se não, usa o padrão
 export function baralhoValido(b) {
   return Array.isArray(b) && b.length === 8 && new Set(b).size === 8 && b.every(k => CARTAS[k]) ? b.slice() : BARALHO.slice();
 }
 const TORRE = { hp: 2600, dano: 105, cad: 0.8, alc: 7.5, raio: 1.3, ar: true, proj: "flecha", massa: 999 };
 const REI = { hp: 4200, dano: 105, cad: 1.0, alc: 7.0, raio: 1.85, ar: true, proj: "flecha", massa: 999 };
-const VEL_PROJ = { flecha: 14, magia: 10, fogo: 9, virote: 16, pedra: 12, sombra: 10, geada: 11 };
+const VEL_PROJ = { flecha: 14, magia: 10, fogo: 9, virote: 16, pedra: 12, sombra: 10, geada: 11, bala: 15 };
 const LENTO = 0.65, FURIA = 1.4;                            // lento: anda e ataca a 65%; fúria: 140%
 // fora do jogo agora: morto, nascendo ou no meio do salto (ninguém mira nem acerta)
 const fora = (o) => o.hp <= 0 || o.tn > 0 || !!o.pulo;
@@ -169,6 +213,12 @@ export function jogar(s, lado, i, x, y) {
   s.filas[lado].push(carta);
   s.maos[lado][i] = s.filas[lado].shift();
   if (c.tipo === "magia" && c.instante) { magia(s, lado, carta, x, y); return true; }
+  if (c.meteoro) {                                          // meteoro: cai do céu depois de um tempo (a marca avisa onde)
+    const d = dados(s, lado, carta);
+    s.proj.push({ id: s.prox++, tipo: "queda", lado, x, y, tx: x, ty: y, t: 0, dur: c.meteoro, dano: d.dano, area: c.area, ar: true, torre: c.danoTorre, carta });
+    s.ev.push(["magia", lado, x, y]); s.ev.push(["aviso", x, y, c.area, c.meteoro]);
+    return true;
+  }
   if (c.tipo === "magia") {
     const rei = s.ent.find(e => e.k === "rei" && e.lado === lado) || { x: 9, y: lado === 0 ? 3 : C - 3 };
     const d = Math.hypot(x - rei.x, y - rei.y);
@@ -183,9 +233,14 @@ export function jogar(s, lado, i, x, y) {
 // magia que acontece na hora (relâmpago, gelo, cura)
 function magia(s, lado, carta, x, y) {
   const c = dados(s, lado, carta);
-  if (c.zona) {                                             // veneno e fúria: uma área que fica um tempo na arena
+  if (c.escudo) {                                           // escudo: segura dano antes da vida
+    for (const o of s.ent) if (o.lado === lado && !o.fixa && o.hp > 0 && Math.hypot(o.x - x, o.y - y) <= c.area + o.c.raio * 0.6) { o.escudo = c.escudo; o.tEscudo = 10; s.ev.push(["escudo", o.id]); }
+    s.ev.push(["magia", lado, x, y]); s.ev.push(["explode", x, y, c.area, "escudo"]);
+    return;
+  }
+  if (c.zona) {                                             // veneno, fúria, tornado, terremoto e cemitério: áreas que ficam um tempo
     s.zonas.push({ id: s.prox++, k: carta, lado, x, y, area: c.area, t: c.zona.dur, tick: 0, cada: c.zona.cada, dano: c.dano || 0, danoTorre: c.danoTorre || 1,
-      lento: !!c.zona.lento, furia: !!c.zona.furia });
+      danoPredio: c.danoPredio || 1, lento: !!c.zona.lento, furia: !!c.zona.furia, puxa: c.zona.puxa || 0, invoca: c.zona.invoca || null });
     s.ev.push(["magia", lado, x, y]); s.ev.push(["zona", carta, x, y, c.area]);
     return;
   }
@@ -220,7 +275,7 @@ const pontePerto = (x) => Math.abs(x - PONTES[0]) < Math.abs(x - PONTES[1]) ? PO
 
 // para onde andar agora para chegar em (tx, ty): quem anda no chão tem de passar por uma ponte
 function rumo(e, tx, ty) {
-  if (e.c.voa) return [tx, ty];
+  if (e.c.voa || e.c.pulaRio) return [tx, ty];
   const de = ladoDoRio(e.y), para = ladoDoRio(ty);
   if (de === para && de !== -1) return [tx, ty];
   if (de === -1) {                                          // já está em cima da ponte: segue reto até sair
@@ -237,6 +292,7 @@ function rumo(e, tx, ty) {
 
 function dano(s, alvo, v, autor, aos = false) {
   if (alvo.hp <= 0) return;
+  if (alvo.escudo > 0) { const seg = Math.min(alvo.escudo, v); alvo.escudo -= seg; v -= seg; if (alvo.escudo <= 0) s.ev.push(["quebraEscudo", alvo.id]); if (v <= 0) { s.ev.push(["dano", alvo.id, 0, "e"]); return; } }
   alvo.hp -= v;
   if (alvo.k === "rei") s.reiAtivo[alvo.lado] = true;
   s.ev.push(aos ? ["dano", alvo.id, Math.round(v), "z"] : ["dano", alvo.id, Math.round(v)]);   // "z": aos poucos (veneno), pisca de leve
@@ -277,7 +333,7 @@ function escolherAlvo(s, e) {
   for (const o of s.ent) {
     if (o.lado === e.lado || fora(o) || !o.predio) continue;
     let d = Math.hypot(o.x - e.x, o.y - e.y);
-    if (!c.voa && ladoDoRio(o.y) !== ladoDoRio(e.y) && ladoDoRio(e.y) !== -1) {
+    if (!c.voa && !c.pulaRio && ladoDoRio(o.y) !== ladoDoRio(e.y) && ladoDoRio(e.y) !== -1) {
       let via = 1e9;
       for (const p of PONTES) via = Math.min(via, Math.hypot(p - e.x, 16 - e.y) + Math.hypot(o.x - p, o.y - 16));
       d = via;
@@ -301,12 +357,22 @@ export function passo(s) {
     z.t -= DT; z.tick -= DT;
     if (z.tick > 0) continue;
     z.tick += z.cada;
+    if (z.invoca) {                                         // cemitério: um esqueleto num ponto qualquer da área
+      const a = s.r() * Math.PI * 2, d = Math.sqrt(s.r()) * z.area * 0.9;
+      nascer(s, z.invoca, z.lado, Math.min(L - 0.5, Math.max(0.5, z.x + Math.cos(a) * d)), Math.min(C - 0.5, Math.max(0.5, z.y + Math.sin(a) * d)), 1);
+      continue;
+    }
     for (const o of s.ent) {
       if (fora(o) || Math.hypot(o.x - z.x, o.y - z.y) > z.area + o.c.raio * 0.6) continue;
       if (z.furia) { if (o.lado === z.lado && !o.fixa) o.furia = Math.max(o.furia || 0, z.cada + 0.8); }
       else if (o.lado !== z.lado) {
-        dano(s, o, (o.fixa ? z.dano * z.danoTorre : z.dano) * z.cada, null, true);
+        const f = o.fixa ? z.danoTorre : o.predio ? z.danoPredio : 1;
+        if (z.dano) dano(s, o, z.dano * f * z.cada, null, true);
         if (z.lento && !o.fixa) o.lento = Math.max(o.lento || 0, z.cada + 0.3);
+        if (z.puxa && !o.predio) {                          // tornado: puxa para o meio
+          const dx = z.x - o.x, dy = z.y - o.y, d = Math.hypot(dx, dy);
+          if (d > 0.25) { const v = Math.min(d, z.puxa * z.cada * Math.min(1.6, 6 / Math.max(3, o.c.massa))); o.x += dx / d * v; o.y += dy / d * v; }
+        }
       }
     }
   }
@@ -333,6 +399,14 @@ export function passo(s) {
     if (e.para > 0) { e.para -= DT; e.investe = false; e.corrida = 0; if (e.para <= 0) { e.para = 0; e.gelo = false; } continue; }
     if (e.lento > 0) e.lento -= DT;
     if (e.furia > 0) e.furia -= DT;
+    if (e.tEscudo > 0) { e.tEscudo -= DT; if (e.tEscudo <= 0) e.escudo = 0; }
+    if (c.aura) {                                           // poço mágico: cura quem é do time em volta
+      e.tAura = (e.tAura || 0) - DT;
+      if (e.tAura <= 0) {
+        e.tAura = c.aura.cada;
+        for (const o of s.ent) if (o.lado === e.lado && !o.predio && o.hp > 0 && o.hp < o.hpMax && Math.hypot(o.x - e.x, o.y - e.y) <= c.aura.raio) { o.hp = Math.min(o.hpMax, o.hp + c.aura.cura * c.aura.cada); s.ev.push(["curou", o.id]); }
+      }
+    }
     if (e.esperaSalto > 0) e.esperaSalto -= DT;
     const rit = (e.lento > 0 ? LENTO : 1) * (e.furia > 0 ? FURIA : 1);   // ritmo: anda e ataca mais devagar ou mais rápido
     e.cd = Math.max(0, e.cd - DT * rit);
@@ -387,6 +461,13 @@ export function passo(s) {
         } else if (c.giro) { danoArea(s, e.lado, e.x, e.y, c.giro + c.raio, v, !!c.ar); s.ev.push(["giro", e.id]); }
         else if (c.area) danoArea(s, e.lado, alvo.x, alvo.y, c.area, v, !!c.ar);
         else dano(s, alvo, v, e);
+        if (c.kamikaze) { e.hp = 0; s.ev.push(["explode", e.x, e.y, c.area, "fogo"]); }   // espírito de fogo: explode junto
+        if (c.lentoGolpe && !alvo.fixa) alvo.lento = Math.max(alvo.lento || 0, c.lentoGolpe);
+        if (c.empurra && !alvo.predio && alvo.hp > 0 && alvo.c.massa < c.massa) {          // chifrada: joga a tropa para trás
+          const d = Math.hypot(dx, dy) || 1, f = c.empurra * (v > c.dano ? 1.5 : 1);
+          alvo.x = Math.min(L - 0.4, Math.max(0.4, alvo.x + dx / d * f)); alvo.y = Math.min(C - 0.4, Math.max(0.4, alvo.y + dy / d * f));
+          s.ev.push(["empurrao", alvo.id]);
+        }
       }
     } else if (!e.predio) {                                 // longe: anda
       e.est = 1;
@@ -436,7 +517,7 @@ export function passo(s) {
           }
         }
       }
-      if (e.y > RIO0 && e.y < RIO1) {
+      if (e.y > RIO0 && e.y < RIO1 && !e.c.pulaRio) {
         const bx = pontePerto(e.x);
         if (Math.abs(e.x - bx) <= MEIA_PONTE + 0.6) e.x = Math.min(bx + MEIA_PONTE - 0.25, Math.max(bx - MEIA_PONTE + 0.25, e.x));
         else e.y = e.y < 16 ? RIO0 : RIO1;
@@ -449,7 +530,7 @@ export function passo(s) {
   for (const p of s.proj) {
     if (p.tipo === "queda") {                               // bomba do balão caindo
       p.t += DT;
-      if (p.t >= p.dur) { danoArea(s, p.lado, p.tx, p.ty, p.area, p.dano, p.ar); s.ev.push(["explode", p.tx, p.ty, p.area, "queda"]); p.fim = true; }
+      if (p.t >= p.dur) { danoArea(s, p.lado, p.tx, p.ty, p.area, p.dano, p.ar, p.torre ?? 1); s.ev.push(["explode", p.tx, p.ty, p.area, p.carta === "meteoro" ? "meteoro" : "queda"]); p.fim = true; }
       continue;
     }
     if (p.tipo === "bola") {
@@ -459,7 +540,8 @@ export function passo(s) {
       if (q >= 1) {
         const c = dados(s, p.lado, p.carta);
         danoArea(s, p.lado, p.tx, p.ty, c.area, c.dano, true, c.danoTorre);
-        s.ev.push(["explode", p.tx, p.ty, c.area, p.carta === "flechas" ? "flechas" : undefined]);
+        if (c.solta) nascer(s, c.solta.carta, p.lado, p.tx, p.ty, c.solta.n);          // barril: saem os bandidos
+        s.ev.push(["explode", p.tx, p.ty, c.area, p.carta === "flechas" ? "flechas" : p.carta === "barril" ? "barril" : undefined]);
         p.fim = true;
       }
       continue;
@@ -515,7 +597,7 @@ export function foto(s, lado, ev) {
     dobro: s.fase === "extra" || s.tempo <= 60, mao: s.maos[lado].slice(), prox: s.filas[lado][0], rei: s.reiAtivo.slice(),
     ent: s.ent.map(e => [e.id, e.k, e.lado, Math.round(e.x * 100) / 100, Math.round(e.y * 100) / 100, Math.max(0, Math.round(e.hp)), e.hpMax, e.est, Math.round(e.a * 100) / 100,
       e.tn > 0 ? Math.round(e.tn * 100) / 100 : 0, e.para > 0 ? (e.gelo ? 2 : 1) : 0,
-      (e.investe ? 1 : 0) | (e.lento > 0 ? 2 : 0) | (e.furia > 0 ? 4 : 0) | (e.pulo ? 8 : 0)]),
+      (e.investe ? 1 : 0) | (e.lento > 0 ? 2 : 0) | (e.furia > 0 ? 4 : 0) | (e.pulo ? 8 : 0) | (e.escudo > 0 ? 16 : 0)]),
     proj: s.proj.map(p => p.tipo === "bola" || p.tipo === "queda" ? [p.id, p.tipo, Math.round(p.x * 100) / 100, Math.round(p.y * 100) / 100, Math.round(Math.min(1, p.t / p.dur) * 100) / 100, p.lado, p.carta,
       Math.round(p.tx * 100) / 100, Math.round(p.ty * 100) / 100]
       : [p.id, p.tipo, Math.round(p.x * 100) / 100, Math.round(p.y * 100) / 100, p.alto, p.lado, p.voaAlvo ? 1 : 0, Math.round(p.tx * 100) / 100, Math.round(p.ty * 100) / 100]),
