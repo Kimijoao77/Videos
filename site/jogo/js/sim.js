@@ -132,8 +132,10 @@ export function lugaresDe(n, dir = 1) {
 }
 export const BARALHO = ["cavaleiro", "besteiros", "gigante", "mago", "bandidos", "dragao", "catapulta", "bola_fogo"];
 export const TODAS = ["cavaleiro", "besteiros", "gigante", "mago", "bandidos", "dragao", "catapulta", "bola_fogo", "esqueletos", "guerreiro", "necromante", "flechas",
-  "relampago", "gelo", "cura", "exercito", "paladino", "mago_gelo", "assassino", "balao", "quartel", "mina", "torre_arq", "veneno", "furia",
-  "barbaros", "cacadora", "lobos", "touro", "aranhas", "vespas", "raptores", "rex", "triceratops", "espiritos", "canhao", "estabulo", "poco", "tornado", "terremoto", "cemiterio", "escudo", "meteoro", "barril"];
+  "relampago", "gelo", "cura", "exercito", "paladino", "mago_gelo", "assassino", "balao", "quartel", "mina", "torre_arq", "veneno", "furia"];
+// leva 3 (entram em TODAS quando os desenhos e as cartas estiverem prontos)
+export const LEVA3 = ["barbaros", "cacadora", "lobos", "touro", "aranhas", "vespas", "raptores", "rex", "triceratops", "espiritos", "canhao", "estabulo", "poco",
+  "tornado", "terremoto", "cemiterio", "escudo", "meteoro", "barril"];
 // um baralho válido tem 8 cartas diferentes que existem; se não, usa o padrão
 export function baralhoValido(b) {
   return Array.isArray(b) && b.length === 8 && new Set(b).size === 8 && b.every(k => CARTAS[k]) ? b.slice() : BARALHO.slice();
