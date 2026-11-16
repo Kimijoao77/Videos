@@ -1,0 +1,42 @@
+# Lince Lunar: a evolução do canal (16/11/2026). Só contas, sem IA e sem chave: lê os números dos vídeos (que o fluxo
+# "Canal números" grava a cada 3 h), calcula a nota de cada Short (views em 48 h ÷ a régua), o ranking de cada escolha
+# do DNA e, quando a semana fecha, planeja a geração seguinte (canal/lince/evolucao.py no Engfy). O resultado vai para
+# canal/lince/dados/evolucao.json no Engfy, que o app mostra em Canais → Lince → Evolução. Respeita a pausa do app.
+name: "Lince: evolução"
+
+on:
+  schedule:
+    - cron: "52 */3 * * *"   # 15 minutos depois dos números
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lince-evolucao
+  cancel-in-progress: false
+
+jobs:
+  evoluir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: Kimijoao77/Engfy
+          token: ${{ secrets.ENGFY_TOKEN }}
+          sparse-checkout: |
+            canal/dados
+            canal/lince/dados
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Notas, ranking e próxima geração
+        run: python3 canal/lince/evolucao.py
+      - name: Salvar no Engfy
+        run: |
+          git config user.name Kimijoao77
+          git config user.email Kimijoao77@users.noreply.github.com
+          git add canal/lince/dados/evolucao.json
+          git commit -q -m "Lince: evolução (notas e gerações)" || exit 0
+          for i in 1 2 3 4; do git pull -q --rebase origin main && git push -q origin HEAD:main && break; sleep 7; done
