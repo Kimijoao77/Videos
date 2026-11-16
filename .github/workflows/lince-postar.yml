@@ -1,0 +1,59 @@
+# Lince Lunar: posta no YouTube um vídeo pronto do canal (16/11/2026: veio do repositório privado Engfy, que gastou os
+# 2.000 minutos grátis do mês; aqui, no repositório público, os minutos são livres).
+# O código, os roteiros e o estado (canal/lince/dados/canal.json) continuam no Engfy; o vídeo vem da Release dele.
+# Pedido pelo app (Finanças → Canais → Lince): o app grava canal/lince/dados/pedido.json no Engfy e este fluxo confere
+# a cada 10 minutos (o pedido vale por 2 h; vídeo já enviado não sobe de novo). À mão: Actions → Run workflow.
+# Segredos deste repositório: ENGFY_TOKEN (já existia), YT_CLIENT_ID, YT_CLIENT_SECRET e YT_TOKEN_LINCE (a autorização do
+# canal Lince Lunar). O registro mostra só o nome do vídeo e o link; as chaves ficam escondidas.
+name: "Lince Lunar: postar"
+run-name: "Lince Lunar: postar ${{ inputs.slug }} ${{ inputs.quando }}"
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+    inputs:
+      slug:
+        description: "Vídeo (ex.: lince-as-meninas). Em branco = o pedido do app"
+        required: false
+        default: ""
+      quando:
+        description: "agora (público na hora), 18h (agendado para as 18:00 de Brasília), conferir (só testa a chave) ou cancelar"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lince-postar
+  cancel-in-progress: false
+
+env:
+  CANAL_REPO: Kimijoao77/Engfy
+  CANAL_PUBLICO: "1"
+
+jobs:
+  postar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Código, roteiros e estado (repositório do canal)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CANAL_REPO }}
+          token: ${{ secrets.ENGFY_TOKEN }}
+          sparse-checkout: |
+            canal/lince/dados
+            canal/lince/roteiros
+            canal/lince/capas
+      - name: Postar
+        env:
+          GH_TOKEN: ${{ secrets.ENGFY_TOKEN }}
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_TOKEN_LINCE: ${{ secrets.YT_TOKEN_LINCE }}
+          LINCE_SLUG: ${{ inputs.slug }}
+          LINCE_QUANDO: ${{ inputs.quando }}
+          LINCE_PEDIDO: canal/lince/dados/pedido.json
+        run: python3 canal/lince/postar.py
