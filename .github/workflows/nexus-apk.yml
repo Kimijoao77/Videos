@@ -1,0 +1,105 @@
+# Nexus: gera o APK do app (16/11/2026: veio do repositório privado Engfy, onde rodava a cada envio e gastou mais de
+# 500 dos 2.000 minutos grátis do mês; aqui, no repositório público, os minutos são livres).
+# A cada 30 minutos confere a versão do app no Engfy (app/package.json): se a Release v<versão> ainda não tem o
+# Nexus-<versão>.apk, monta e publica lá (uma vez por versão, não a cada envio). À mão: Actions → Run workflow
+# (forcar = monta de novo mesmo se já existir). Não precisa de chave nova: usa o ENGFY_TOKEN.
+name: "Nexus: gerar APK"
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+    inputs:
+      forcar:
+        description: "Montar de novo mesmo se o APK desta versão já existir (sim/não)"
+        required: false
+        default: "não"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nexus-apk
+  cancel-in-progress: false
+
+env:
+  APP_REPO: Kimijoao77/Engfy
+  GH_TOKEN: ${{ secrets.ENGFY_TOKEN }}
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Código do app (repositório Engfy)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.APP_REPO }}
+          token: ${{ secrets.ENGFY_TOKEN }}
+          persist-credentials: false
+          sparse-checkout: app
+
+      - name: Precisa montar?
+        id: precisa
+        run: |
+          V=$(node -p "require('./app/package.json').version")
+          echo "versao=$V" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          if [ "${{ inputs.forcar }}" = "sim" ]; then echo "fazer=1" >> "$GITHUB_OUTPUT"; echo "Versão $V: montar de novo (pedido à mão)"; exit 0; fi
+          if gh release view "v$V" -R "$APP_REPO" --json assets --jq '.assets[].name' 2>/dev/null | grep -qx "Nexus-$V.apk"; then
+            echo "fazer=0" >> "$GITHUB_OUTPUT"; echo "Versão $V: o APK já existe"
+          else
+            echo "fazer=1" >> "$GITHUB_OUTPUT"; echo "Versão $V: falta o APK, montando"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.precisa.outputs.fazer == '1'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - uses: actions/setup-java@v4
+        if: steps.precisa.outputs.fazer == '1'
+        with:
+          distribution: microsoft
+          java-version: '21'
+          cache: gradle
+
+      - name: Versão (package.json → build.gradle) e conferir www/js/versao.js
+        if: steps.precisa.outputs.fazer == '1'
+        working-directory: app
+        run: |
+          V=${{ steps.precisa.outputs.versao }}
+          IFS=. read -r A B C <<< "$V"
+          CODE=$((A*10000 + B*100 + C))
+          sed -i -E "s/versionCode [0-9]+/versionCode $CODE/; s/versionName \"[^\"]*\"/versionName \"$V\"/" android/app/build.gradle
+          echo "Versão $V (versionCode $CODE)"
+          grep -q "VERSAO = \"$V\"" www/js/versao.js || { echo "www/js/versao.js não está em $V: suba a versão nos dois arquivos"; exit 1; }
+
+      - name: Montar
+        if: steps.precisa.outputs.fazer == '1'
+        working-directory: app
+        run: |
+          npm ci
+          npx cap sync android
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --console=plain -q
+          cp app/build/outputs/apk/debug/app-debug.apk "../Nexus-${{ steps.precisa.outputs.versao }}.apk"
+
+      - name: Publicar na Release do Engfy
+        if: steps.precisa.outputs.fazer == '1'
+        working-directory: app
+        env:
+          V: ${{ steps.precisa.outputs.versao }}
+          SHA: ${{ steps.precisa.outputs.sha }}
+        run: |
+          TAG="v$V"
+          NOTA="APK gerado automaticamente a partir do commit ${SHA::7}. Para instalar: baixe o .apk no celular e abra."
+          if gh release view "$TAG" -R "$APP_REPO" >/dev/null 2>&1; then
+            gh release upload "$TAG" "Nexus-$V.apk" -R "$APP_REPO" --clobber
+            gh release edit "$TAG" -R "$APP_REPO" --notes "$NOTA" --latest
+          else
+            gh release create "$TAG" "Nexus-$V.apk" -R "$APP_REPO" --title "Nexus $V" --notes "$NOTA" --target "$SHA" --latest
+          fi

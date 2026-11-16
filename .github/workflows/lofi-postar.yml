@@ -1,0 +1,72 @@
+# Lince Lofi: posta no YouTube um vídeo pronto do canal ou só confere a chave (16/11/2026: veio do repositório privado
+# Engfy, que gastou os 2.000 minutos grátis do mês; aqui, no repositório público, os minutos são livres).
+# O código e o estado (canal/pixel/) continuam no Engfy; o vídeo vem da Release "lince-lofi" de lá.
+# Pedido pelo app (Canais → Lofi): o app grava canal/pixel/dados/pedido.json no Engfy e este fluxo confere a cada
+# 10 minutos (o pedido vale por 2 h; vídeo já enviado não sobe de novo). À mão: Actions → Run workflow.
+# Segredos deste repositório: ENGFY_TOKEN (já existia), YT_CLIENT_ID_LOFI, YT_CLIENT_SECRET_LOFI e YT_TOKEN_LOFI.
+name: "Lince Lofi: postar"
+run-name: "Lince Lofi: postar ${{ inputs.slug }} ${{ inputs.quando }}"
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+    inputs:
+      slug:
+        description: "Vídeo (ex.: lince-lofi-manha). Em branco = o pedido do app"
+        required: false
+        default: ""
+      quando:
+        description: "agora (público na hora), 18h (agendado para as 18:00 de Brasília) ou conferir (só testa a chave)"
+        required: false
+        default: "conferir"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lofi-postar
+  cancel-in-progress: false
+
+env:
+  CANAL_REPO: Kimijoao77/Engfy
+  CANAL_PUBLICO: "1"
+
+jobs:
+  postar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Código e estado do canal (repositório do canal)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.CANAL_REPO }}
+          token: ${{ secrets.ENGFY_TOKEN }}
+          sparse-checkout: canal/pixel
+      - name: Conferir as chaves (só se existem e têm o formato certo; nada delas aparece)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID_LOFI }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET_LOFI }}
+          YT_TOKEN_LOFI: ${{ secrets.YT_TOKEN_LOFI }}
+        run: |
+          python3 - <<'PY'
+          import os
+          i, c, t = (os.environ.get(k, "") for k in ("YT_CLIENT_ID", "YT_CLIENT_SECRET", "YT_TOKEN_LOFI"))
+          print("YT_CLIENT_ID_LOFI:", "falta" if not i.strip() else ("formato ok" if i.strip().endswith(".apps.googleusercontent.com") else "formato estranho"),
+                "(tem espaço/Enter nas pontas)" if i != i.strip() else "")
+          print("YT_CLIENT_SECRET_LOFI:", "falta" if not c.strip() else ("formato ok" if c.strip().startswith("GOCSPX-") else "formato estranho"),
+                "(tem espaço/Enter nas pontas)" if c != c.strip() else "")
+          print("YT_TOKEN_LOFI:", "falta" if not t.strip() else ("formato ok" if t.strip().startswith("1//") else ("é o código de autorização (4/0...), não o refresh token" if t.strip().startswith("4/") else "formato estranho")))
+          PY
+      - name: Postar
+        env:
+          GH_TOKEN: ${{ secrets.ENGFY_TOKEN }}
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID_LOFI }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET_LOFI }}
+          YT_TOKEN_LOFI: ${{ secrets.YT_TOKEN_LOFI }}
+          LOFI_SLUG: ${{ inputs.slug }}
+          LOFI_QUANDO: ${{ inputs.quando }}
+        run: |
+          pip install -q pillow
+          python3 canal/pixel/postar.py
