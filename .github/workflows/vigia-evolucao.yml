@@ -1,0 +1,44 @@
+# Vigia da Evolução (17/11/2026). O repositório evolucao-hyperliquid roda em corrente (cada rodada chama a próxima,
+# porque lá o agendamento do GitHub não dispara): se a corrente quebrar, nada recomeça sozinho. Daqui, onde o
+# agendamento funciona, de hora em hora: se o resumo público está parado há 5 h ou mais, dispara a rodada de novo.
+# Usa o ENGFY_TOKEN (o mesmo do APK). À mão, com "disparar", dispara mesmo sem estar parado (para testar).
+name: "Vigia da Evolução"
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+    inputs:
+      disparar:
+        description: "Disparar a rodada mesmo se não estiver parada (teste)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vigia-evolucao
+  cancel-in-progress: true
+
+jobs:
+  vigiar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      REPO: Kimijoao77/evolucao-hyperliquid
+    steps:
+      - name: Conferir se a Evolução está andando
+        id: c
+        run: |
+          gerado=$(curl -fsSL "https://raw.githubusercontent.com/$REPO/estado/evolucao.json?t=$(date +%s)" | jq -r '.gerado // 0' || echo 0)
+          idade=$(( ( $(date +%s) * 1000 - gerado ) / 3600000 ))
+          echo "último resumo da Evolução: há ${idade} h"
+          if [ "$idade" -ge 5 ] || [ "${{ inputs.disparar }}" = "true" ]; then echo "parado=1" >> "$GITHUB_OUTPUT"; fi
+      - name: Disparar a rodada
+        if: steps.c.outputs.parado == '1'
+        env:
+          GH_TOKEN: ${{ secrets.ENGFY_TOKEN }}
+        run: |
+          gh workflow run evolucao.yml --repo "$REPO" --ref main
+          echo "rodada da Evolução disparada"
