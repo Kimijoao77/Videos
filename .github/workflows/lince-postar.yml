@@ -47,6 +47,42 @@ jobs:
             canal/lince/dados
             canal/lince/roteiros
             canal/lince/capas
+      - name: Conferir as chaves (só se existem e têm o formato certo; nada delas aparece)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_TOKEN_LINCE: ${{ secrets.YT_TOKEN_LINCE }}
+        run: |
+          python3 - <<'PY'
+          import os, re
+          def ver(nome, v, tipo):
+              s = v.strip()
+              if not s:
+                  return f"{nome}: falta"
+              nota = []
+              if v != s: nota.append("tem espaço/Enter nas pontas (sem problema)")
+              if any(q in s for q in "\"'"): nota.append("TEM ASPAS: cole sem as aspas")
+              if " " in s or "\n" in s: nota.append("TEM ESPAÇO OU ENTER NO MEIO: cole numa linha só")
+              if tipo == "id":
+                  if s.startswith("GOCSPX-"): r = "ERRADO: aqui está a chave secreta (ID e chave trocados)"
+                  elif re.fullmatch(r"\d+-[a-z0-9]+\.apps\.googleusercontent\.com", s): r = "formato ok"
+                  elif ".apps.googleusercontent.com" in s: r = "quase: tem algo a mais ou a menos em volta do ID"
+                  else: r = "formato estranho (o ID termina com .apps.googleusercontent.com)"
+              elif tipo == "chave":
+                  if s.endswith(".apps.googleusercontent.com"): r = "ERRADO: aqui está o ID do cliente (ID e chave trocados)"
+                  elif re.fullmatch(r"GOCSPX-[A-Za-z0-9_-]{20,40}", s): r = "formato ok"
+                  elif "GOCSPX-" in s: r = "quase: tem algo a mais ou a menos em volta da chave"
+                  else: r = "formato estranho (a chave secreta começa com GOCSPX-)"
+              else:
+                  if s.startswith("1//"): r = "formato ok"
+                  elif s.startswith("4/"): r = "ERRADO: é o código de autorização (4/0...), não o refresh token (1//...)"
+                  elif s.startswith("ya29."): r = "ERRADO: é o access token (ya29...), não o refresh token (1//...)"
+                  else: r = "formato estranho (o refresh token começa com 1//)"
+              return f"{nome}: {r}" + (f" [{'; '.join(nota)}]" if nota else "")
+          for nome, var, tipo in (("YT_CLIENT_ID", "YT_CLIENT_ID", "id"), ("YT_CLIENT_SECRET", "YT_CLIENT_SECRET", "chave"), ("YT_TOKEN_LINCE", "YT_TOKEN_LINCE", "token")):
+              print(ver(nome, os.environ.get(var, ""), tipo))
+          PY
       - name: Postar
         env:
           GH_TOKEN: ${{ secrets.ENGFY_TOKEN }}
