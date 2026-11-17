@@ -1,0 +1,47 @@
+# Cópia da Evolução no Google Drive (17/11/2026): todo dia confere as cópias públicas do repositório
+# evolucao-hyperliquid e manda para a pasta "Evolução - cópias" do Drive o que ainda não está lá (cada geração
+# fechada, uma semanal e a memória das gerações). Detalhes em copias/drive.py. A chave é de um projeto do Google só
+# para isto (separado do YouTube): secrets GDRIVE_CLIENT_ID, GDRIVE_CLIENT_SECRET e GDRIVE_TOKEN. Sem eles, não faz nada.
+# Quando dá certo, deixa a marca drive-<data>.txt na Release "drive-evolucao" daqui, que o app lê para mostrar a data.
+name: "Evolução: cópia no Google Drive"
+
+on:
+  schedule:
+    - cron: "41 6 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: evolucao-drive
+  cancel-in-progress: false
+
+jobs:
+  copiar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: copias
+      - run: pip install -q requests
+      - name: Copiar para o Drive
+        id: d
+        env:
+          GDRIVE_CLIENT_ID: ${{ secrets.GDRIVE_CLIENT_ID }}
+          GDRIVE_CLIENT_SECRET: ${{ secrets.GDRIVE_CLIENT_SECRET }}
+          GDRIVE_TOKEN: ${{ secrets.GDRIVE_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: python3 copias/drive.py
+      - name: Marcar para o app
+        if: steps.d.outputs.ok == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view drive-evolucao >/dev/null 2>&1 || gh release create drive-evolucao --latest=false \
+            --title "Cópia da Evolução no Drive" --notes "Marca da última vez que a cópia no Google Drive foi conferida (o app lê a data)."
+          for a in $(gh release view drive-evolucao --json assets --jq '.assets[].name'); do gh release delete-asset drive-evolucao "$a" -y; done
+          f="$RUNNER_TEMP/drive-$(date -u +%F).txt"
+          echo "ok $(date -u +%FT%TZ)" > "$f"
+          gh release upload drive-evolucao "$f"
