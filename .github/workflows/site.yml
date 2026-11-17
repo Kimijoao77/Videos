@@ -68,6 +68,10 @@ jobs:
           python3 site/pagina.py site/paginas/sobre.md _site/sobre.html "Nexus Canal" "A ferramenta que publica os vídeos dos canais Aqui Há Dragões e Here Be Dragons."
           python3 site/pagina.py site/paginas/privacidade.md _site/privacidade.html "Política de privacidade" "Que dados o Nexus Canal usa e o que faz com eles."
           python3 site/pagina.py site/paginas/termos.md _site/termos.html "Termos de uso" "As regras de uso do Nexus Canal."
+          # 17/11/2026: as mesmas três páginas para o app das cópias da Evolução no Google Drive (Nexus evolução)
+          python3 site/pagina.py site/paginas/copias-sobre.md _site/copias-sobre.html "Nexus evolução" "Cópias de segurança da Evolução no Google Drive do dono."
+          python3 site/pagina.py site/paginas/copias-privacidade.md _site/copias-privacidade.html "Política de privacidade" "Que dados o Nexus evolução usa e o que faz com eles."
+          python3 site/pagina.py site/paginas/copias-termos.md _site/copias-termos.html "Termos de uso" "As regras de uso do Nexus evolução."
           rm -rf privado
           ls -R _site | head -40
       - uses: actions/configure-pages@v5
