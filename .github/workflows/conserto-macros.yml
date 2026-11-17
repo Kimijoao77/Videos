@@ -1,0 +1,52 @@
+# Conserto automático das macros do ping pong (17/11/2026, pedido do João: uma tentativa por falha, 5 minutos depois
+# dela). Quando uma macro falha, o Nexus manda o registro e o print para o Engfy e chama este fluxo com a hora da
+# falha. Ele espera completar 5 minutos desde a falha e dispara a tarefa agendada "Nexus: conserto automático das
+# macros" pela URL de disparo dela. A chave fica só no segredo CONSERTO_TOKEN (o João gera em claude.ai/code/routines,
+# na tarefa, Gatilho → API → Gerar token). Este repositório é público: o registro não mostra nada além do resultado.
+name: "Nexus: conserto das macros"
+
+on:
+  workflow_dispatch:
+    inputs:
+      quando:
+        description: "Hora da falha (AAAA-MM-DDTHH:MM:SS, horário de Brasília)"
+        required: true
+
+permissions: {}
+
+concurrency:
+  group: conserto-macros
+  cancel-in-progress: false
+
+jobs:
+  disparar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Esperar completar 5 minutos desde a falha
+        env:
+          QUANDO: ${{ inputs.quando }}
+        run: |
+          if ! [[ "$QUANDO" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$ ]]; then
+            echo "::error::hora da falha fora do formato"; exit 1
+          fi
+          alvo=$(( $(TZ=America/Sao_Paulo date -d "${QUANDO/T/ }" +%s) + 300 ))
+          espera=$(( alvo - $(date +%s) ))
+          if [ "$espera" -gt 600 ]; then espera=600; fi
+          if [ "$espera" -gt 0 ]; then echo "esperando ${espera} s"; sleep "$espera"; fi
+      - name: Chamar o conserto do Claude
+        env:
+          TOKEN: ${{ secrets.CONSERTO_TOKEN }}
+          QUANDO: ${{ inputs.quando }}
+        run: |
+          if [ -z "$TOKEN" ]; then echo "::error::falta o segredo CONSERTO_TOKEN"; exit 1; fi
+          corpo=$(jq -cn --arg q "$QUANDO" '{text: ("Uma macro falhou às " + $q + " (hora de Brasília).")}')
+          codigo=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+            "https://api.anthropic.com/v1/claude_code/routines/trig_01P83zjgRf9D8TfuZSMcmewe/fire" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "anthropic-beta: experimental-cc-routine-2026-04-01" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "Content-Type: application/json" \
+            -d "$corpo")
+          echo "resposta: $codigo"
+          [ "$codigo" = "200" ] || { echo "::error::o disparo não foi aceito ($codigo)"; exit 1; }
