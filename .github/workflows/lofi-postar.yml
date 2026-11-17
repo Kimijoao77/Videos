@@ -64,7 +64,15 @@ jobs:
               if tipo == "id":
                   if s.startswith("GOCSPX-"): r = "ERRADO: aqui está a chave secreta (ID e chave trocados)"
                   elif re.fullmatch(r"\d+-[a-z0-9]+\.apps\.googleusercontent\.com", s): r = "formato ok"
-                  elif ".apps.googleusercontent.com" in s: r = "quase: tem algo a mais ou a menos em volta do ID"
+                  elif ".apps.googleusercontent.com" in s:
+                      det = []
+                      n = s.count(".apps.googleusercontent.com")
+                      if n > 1: det.append(f"o ID aparece {n} vezes (colado repetido)")
+                      if not s[0].isdigit(): det.append("tem algo ANTES do ID (ele começa com números)")
+                      if not s.endswith(".apps.googleusercontent.com"): det.append("tem algo DEPOIS de .apps.googleusercontent.com")
+                      if re.search(r"[A-Z]", s.split(".apps.")[0]): det.append("tem letra maiúscula (o ID é todo minúsculo)")
+                      if re.search(r"[^a-z0-9.-]", s.lower()): det.append("tem símbolo estranho (:, =, / ou outro)")
+                      r = "quase: " + ("; ".join(det) or "tem algo a mais ou a menos no ID")
                   else: r = "formato estranho (o ID termina com .apps.googleusercontent.com)"
               elif tipo == "chave":
                   if s.endswith(".apps.googleusercontent.com"): r = "ERRADO: aqui está o ID do cliente (ID e chave trocados)"
