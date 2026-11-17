@@ -63,7 +63,7 @@ jobs:
               if " " in s or "\n" in s: nota.append("TEM ESPAÇO OU ENTER NO MEIO: cole numa linha só")
               if tipo == "id":
                   if s.startswith("GOCSPX-"): r = "ERRADO: aqui está a chave secreta (ID e chave trocados)"
-                  elif re.fullmatch(r"\d+-[a-z0-9]+\.apps\.googleusercontent\.com", s): r = "formato ok"
+                  elif re.fullmatch(r"\d+-[a-z0-9]+\.apps\.googleusercontent\.com", s): r = f"formato ok (termina em ...{s.split('.apps.')[0][-4:]}.apps.googleusercontent.com, para comparar com o Google Cloud)"
                   elif ".apps.googleusercontent.com" in s:
                       det = []
                       n = s.count(".apps.googleusercontent.com")
