@@ -1,5 +1,5 @@
 # Cópia da Evolução no Google Drive (17/11/2026): todo dia confere as cópias públicas do repositório
-# evolucao-hyperliquid e manda para a pasta "Evolução - cópias" do Drive o que ainda não está lá (cada geração
+# evolucao-hyperliquid e manda para a pasta "Nexus/Evolução - cópias" do Drive o que ainda não está lá (cada geração
 # fechada, uma semanal e a memória das gerações). Detalhes em copias/drive.py. A chave é de um projeto do Google só
 # para isto (separado do YouTube): secrets GDRIVE_CLIENT_ID, GDRIVE_CLIENT_SECRET e GDRIVE_TOKEN. Sem eles, não faz nada.
 # Quando dá certo, deixa a marca drive-<data>.txt na Release "drive-evolucao" daqui, que o app lê para mostrar a data.

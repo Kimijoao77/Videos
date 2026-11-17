@@ -3,7 +3,7 @@ da conta do GitHub. Roda uma vez por dia no Actions deste repositório (evolucao
 
 - baixa as cópias públicas do repositório evolucao-hyperliquid (Releases copias-geracoes e copias-diarias) e a
   memória das gerações (a pasta memoria/ da main, com o histórico inteiro de todos os robôs);
-- manda para a pasta "Evolução - cópias" do Drive toda cópia de geração fechada que ainda não está lá e, uma vez por
+- manda para a pasta "Nexus/Evolução - cópias" do Drive toda cópia de geração fechada que ainda não está lá e, uma vez por
   semana, a cópia diária mais nova; a memória das gerações é regravada por cima a cada vez (é pequena);
 - guarda as 12 cópias completas mais novas e manda as mais velhas para a lixeira do Drive.
 
@@ -24,7 +24,21 @@ from datetime import datetime, timedelta, timezone
 import requests
 
 REPO = "Kimijoao77/evolucao-hyperliquid"
+RAIZ = "Nexus"                    # 17/11: a pasta do Nexus no Drive, para guardar as cópias (e o que vier depois)
 PASTA = "Evolução - cópias"
+LEIA = """Pasta do Nexus no Google Drive (criada pelo app "Nexus evolução").
+
+Evolução - cópias/
+  estado-<data>-geracao-....tgz   cópia completa da simulação no fim de cada geração (a cada 14 dias)
+  estado-semana-<data>.tgz        cópia completa semanal
+  memoria-das-geracoes.tgz        o histórico de todos os robôs que já viveram (DNA, pais, medidas)
+  Ficam as 12 cópias completas mais novas; as mais velhas vão para a lixeira do Drive.
+
+Para voltar a usar uma cópia: a pasta dados/ do repositório evolucao-hyperliquid é o conteúdo do .tgz
+(no GitHub: Actions -> "Restaurar uma cópia", ou suba o arquivo numa Release e restaure por lá).
+
+O app só enxerga os arquivos que ele mesmo criou: arquivos que você puser aqui à mão ele não vê nem apaga.
+"""
 MANTER = 12
 DRIVE = "https://www.googleapis.com/drive/v3/files"
 UPLOAD = "https://www.googleapis.com/upload/drive/v3/files"
@@ -56,15 +70,44 @@ class Drive:
         r.raise_for_status()
         return r.json().get("files", [])
 
-    def pasta(self) -> str:
-        nome = PASTA.replace("'", "\\'")
-        achou = self.listar(f"name = '{nome}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false")
-        if achou:
-            return achou[0]["id"]
-        r = requests.post(DRIVE, headers=self.h, timeout=30, json={"name": PASTA, "mimeType": "application/vnd.google-apps.folder"})
+    def achar_pasta(self, nome: str, pai: str | None = None) -> dict | None:
+        q = f"name = '{nome.replace(chr(39), chr(92) + chr(39))}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+        if pai:
+            q += f" and '{pai}' in parents"
+        r = requests.get(DRIVE, headers=self.h, timeout=30, params={"q": q, "fields": "files(id,name,parents)", "pageSize": 10})
         r.raise_for_status()
-        print(f"Drive: pasta '{PASTA}' criada")
+        achou = r.json().get("files", [])
+        return achou[0] if achou else None
+
+    def criar_pasta(self, nome: str, pai: str | None = None) -> str:
+        corpo = {"name": nome, "mimeType": "application/vnd.google-apps.folder", **({"parents": [pai]} if pai else {})}
+        r = requests.post(DRIVE, headers=self.h, timeout=30, json=corpo)
+        r.raise_for_status()
+        print(f"Drive: pasta '{nome}' criada")
         return r.json()["id"]
+
+    def pasta(self) -> str:
+        """Nexus/Evolução - cópias (a de antes, solta na raiz, é movida para dentro da Nexus)."""
+        raiz = (self.achar_pasta(RAIZ) or {}).get("id") or self.criar_pasta(RAIZ)
+        dentro = self.achar_pasta(PASTA, raiz)
+        if dentro:
+            return dentro["id"]
+        solta = self.achar_pasta(PASTA)
+        if solta:
+            requests.patch(f"{DRIVE}/{solta['id']}", headers=self.h, timeout=30, json={},
+                           params={"addParents": raiz, "removeParents": ",".join(solta.get("parents") or [])}).raise_for_status()
+            print(f"Drive: pasta '{PASTA}' movida para dentro de '{RAIZ}'")
+            return solta["id"]
+        return self.criar_pasta(PASTA, raiz)
+
+    def leia_me(self) -> None:
+        raiz = self.achar_pasta(RAIZ)
+        if not raiz or self.listar(f"name = 'LEIA-ME.txt' and '{raiz['id']}' in parents and trashed = false"):
+            return
+        ini = requests.post(f"{UPLOAD}?uploadType=resumable", headers=self.h, json={"name": "LEIA-ME.txt", "parents": [raiz["id"]]}, timeout=30)
+        ini.raise_for_status()
+        requests.put(ini.headers["Location"], data=LEIA.encode("utf-8"), timeout=60, headers={"Content-Type": "text/plain; charset=utf-8"}).raise_for_status()
+        print("Drive: LEIA-ME.txt criado na pasta Nexus")
 
     def enviar(self, nome: str, dados: bytes, pasta: str, por_cima: str | None = None) -> None:
         if por_cima:
@@ -114,6 +157,7 @@ def main() -> int:
         return 0
     d = Drive(token())
     pasta = d.pasta()
+    d.leia_me()
     tem = d.listar(f"'{pasta}' in parents and trashed = false")
     nomes = {f["name"] for f in tem}
 
@@ -145,7 +189,7 @@ def main() -> int:
         d.lixeira(f["id"])
         print(f"Drive: {f['name']} foi para a lixeira (fica lá 30 dias)")
     total = sum(int(f.get("size") or 0) for f in completas[:MANTER])
-    print(f"Drive: ok, {min(len(completas), MANTER)} cópias completas ({total / 1e6:.0f} MB) e a memória das gerações")
+    print(f"Drive: ok, em {RAIZ}/{PASTA}: {min(len(completas), MANTER)} cópias completas ({total / 1e6:.0f} MB) e a memória das gerações")
     saida("ok", "1")
     return 0
 
