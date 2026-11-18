@@ -31,7 +31,7 @@ android {
     buildTypes {
         release {
             minifyEnabled false
-            signingConfig (chave && senha) ? signingConfigs.fixa : signingConfigs.debug
+            signingConfig((chave && senha) ? signingConfigs.fixa : signingConfigs.debug)
         }
     }
     compileOptions {
