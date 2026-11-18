@@ -1,0 +1,59 @@
+name: Gerar APK da Caderneta Rural
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'caderneta/**'
+      - '.github/workflows/caderneta-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: caderneta-apk
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+          log-accepted-android-sdk-licenses: false
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Chave de assinatura (se existir nos segredos)
+        env:
+          KS: ${{ secrets.CADERNETA_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KS" ]; then echo "$KS" | base64 -d > "$RUNNER_TEMP/caderneta.jks"; echo "CADERNETA_KEYSTORE_ARQ=$RUNNER_TEMP/caderneta.jks" >> "$GITHUB_ENV"; fi
+      - name: Compilar
+        env:
+          CADERNETA_KEYSTORE_SENHA: ${{ secrets.CADERNETA_KEYSTORE_SENHA }}
+        run: gradle -p caderneta/android assembleRelease --no-daemon
+      - name: Preparar APK
+        run: |
+          mkdir -p dist
+          cp caderneta/android/app/build/outputs/apk/release/app-release.apk dist/caderneta-rural.apk
+          unzip -p dist/caderneta-rural.apk assets/index.html | cmp - caderneta/www/index.html
+          (cd dist && sha256sum caderneta-rural.apk > SHA256SUMS.txt)
+          cat > dist/notas.md <<'NOTAS'
+          Caderneta Rural para Android 7 ou superior. Funciona sem internet; as anotações ficam guardadas no celular.
+          Para trocar de aparelho, use Cópia de segurança › Baixar cópia e depois Trazer cópia de volta no outro.
+          NOTAS
+      - name: Publicar download
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          tag="caderneta-${GITHUB_RUN_NUMBER}"
+          gh release create "$tag" dist/caderneta-rural.apk dist/SHA256SUMS.txt --target "$GITHUB_SHA" --title "Caderneta Rural Android ${GITHUB_RUN_NUMBER}" --notes-file dist/notas.md --repo "$REPO"

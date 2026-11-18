@@ -1,0 +1,788 @@
+<!doctype html><html><head><script>
+/* App Android: os downloads (cópia de segurança e PDFs) passam pela ponte CadernetaAndroid; as anotações ficam no aparelho */
+(function () {
+  if (!window.CadernetaAndroid) return;
+  function b64(buf) { var b = new Uint8Array(buf), s = '', n = 0x8000; for (var i = 0; i < b.length; i += n) s += String.fromCharCode.apply(null, b.subarray(i, i + n)); return btoa(s); }
+  function tipo(nome) { return /\.pdf$/i.test(nome) ? 'application/pdf' : /\.json$/i.test(nome) ? 'application/json' : 'application/octet-stream'; }
+  var dl = { save: async function (o) {
+    var d = o.data, buf;
+    if (typeof d === 'string') buf = new TextEncoder().encode(d).buffer;
+    else if (d instanceof Blob) buf = await d.arrayBuffer();
+    else if (d instanceof ArrayBuffer) buf = d;
+    else if (ArrayBuffer.isView(d)) buf = d.buffer.slice(d.byteOffset, d.byteOffset + d.byteLength);
+    else throw new Error('tipo');
+    var r = window.CadernetaAndroid.salvar(o.filename, b64(buf), tipo(o.filename));
+    if (r !== 'ok') { var e = new Error(r); if (r === 'declined') e.code = 'declined'; throw e; }
+  } };
+  window.claude = { use: async function (n) { return n === 'downloads' ? dl : null; } };
+})();
+</script><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Caderneta Rural</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="fontes/nunito.css">
+<style>
+/* Layout: uma coluna larga e calma, abas grandes no topo, cartões por atividade com a cor de cada criação (igual à caderneta em papel). */
+:root {
+  --bg: #F4F1F8; --surface: #FFFFFF; --ink: #2D2340; --muted: #5E5470; --line: #E3DAEE;
+  --brand: #4F3964; --brand-ink: #FFFFFF; --brand-soft: #ECE5F4; --accent: #B52E58; --accent-ink: #FFFFFF;
+  --gado: #4F3964; --gado-l: #ECE6F4; --porco: #B52E58; --porco-l: #F8E4EC;
+  --lavoura: #7E62B3; --lavoura-l: #EEE8F8; --casa: #A85B8E; --casa-l: #F5E6F0;
+  --pos: #2E7A4E; --neg: #C2362F; --warn-bg: #F8E6EE; --warn-ink: #8C2346;
+  --font: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --r: 18px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #1A1424; --surface: #241C31; --ink: #EEE8F6; --muted: #B7AACB; --line: #382D48;
+  --brand: #C9B9DD; --brand-ink: #2D2340; --brand-soft: #33284A; --accent: #F08AAB; --accent-ink: #2D2340;
+  --gado: #C9B9DD; --gado-l: #2E2540; --porco: #F08AAB; --porco-l: #3A1E2B;
+  --lavoura: #A995D6; --lavoura-l: #2B2442; --casa: #DDA0C6; --casa-l: #38232F;
+  --pos: #7FCB97; --neg: #F2928A; --warn-bg: #3A1E2B; --warn-ink: #F6C3D3; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #1A1424; --surface: #241C31; --ink: #EEE8F6; --muted: #B7AACB; --line: #382D48;
+  --brand: #C9B9DD; --brand-ink: #2D2340; --brand-soft: #33284A; --accent: #F08AAB; --accent-ink: #2D2340;
+  --gado: #C9B9DD; --gado-l: #2E2540; --porco: #F08AAB; --porco-l: #3A1E2B;
+  --lavoura: #A995D6; --lavoura-l: #2B2442; --casa: #DDA0C6; --casa-l: #38232F;
+  --pos: #7FCB97; --neg: #F2928A; --warn-bg: #3A1E2B; --warn-ink: #F6C3D3; color-scheme: dark; }
+/* temas escolhidos na própria caderneta (vencem o tema do visualizador) */
+:root[data-tema="claro"] {
+  --bg: #F4F1F8; --surface: #FFFFFF; --ink: #2D2340; --muted: #5E5470; --line: #E3DAEE;
+  --brand: #4F3964; --brand-ink: #FFFFFF; --brand-soft: #ECE5F4; --accent: #B52E58; --accent-ink: #FFFFFF;
+  --gado: #4F3964; --gado-l: #ECE6F4; --porco: #B52E58; --porco-l: #F8E4EC;
+  --lavoura: #7E62B3; --lavoura-l: #EEE8F8; --casa: #A85B8E; --casa-l: #F5E6F0;
+  --pos: #2E7A4E; --neg: #C2362F; --warn-bg: #F8E6EE; --warn-ink: #8C2346; color-scheme: light; }
+:root[data-tema="escuro"] {
+  --bg: #1A1424; --surface: #241C31; --ink: #EEE8F6; --muted: #B7AACB; --line: #382D48;
+  --brand: #C9B9DD; --brand-ink: #2D2340; --brand-soft: #33284A; --accent: #F08AAB; --accent-ink: #2D2340;
+  --gado: #C9B9DD; --gado-l: #2E2540; --porco: #F08AAB; --porco-l: #3A1E2B;
+  --lavoura: #A995D6; --lavoura-l: #2B2442; --casa: #DDA0C6; --casa-l: #38232F;
+  --pos: #7FCB97; --neg: #F2928A; --warn-bg: #3A1E2B; --warn-ink: #F6C3D3; color-scheme: dark; }
+:root[data-tema="amoled"] {
+  --bg: #000000; --surface: #0B0811; --ink: #F3EEF9; --muted: #B4A7C8; --line: #251C31;
+  --brand: #C9B9DD; --brand-ink: #14101C; --brand-soft: #1A1426; --accent: #F08AAB; --accent-ink: #14101C;
+  --gado: #C9B9DD; --gado-l: #15101F; --porco: #F08AAB; --porco-l: #200C15;
+  --lavoura: #A995D6; --lavoura-l: #140F22; --casa: #DDA0C6; --casa-l: #1E0F19;
+  --pos: #7FCB97; --neg: #F2928A; --warn-bg: #200C15; --warn-ink: #F6C3D3; color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 18px; line-height: 1.45;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.app { max-width: 980px; margin: 0 auto; padding-block: 18px 48px; display: flex; flex-direction: column; gap: 18px; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+svg { display: block; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* cabeçalho */
+.top { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.logo { width: 56px; height: 56px; border-radius: 16px; background: var(--brand); color: var(--brand-ink); display: grid; place-items: center; font-size: 32px; flex: none; box-shadow: 6px 6px 0 var(--accent); }
+.brand h1 { margin: 0; font-size: 1.6rem; font-weight: 900; letter-spacing: .2px; line-height: 1.1; }
+.brand p { margin: 2px 0 0; color: var(--muted); font-size: .95rem; }
+.yearbox { margin-left: auto; display: flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 4px; }
+.yearbox span { font-weight: 900; font-size: 1.25rem; min-width: 64px; text-align: center; }
+.iconbtn { width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--brand-soft); color: var(--brand); display: grid; place-items: center; font-size: 18px; }
+.temabtn { width: 52px; height: 52px; border-radius: 16px; border: 1px solid var(--line); background: var(--surface); color: var(--brand); display: grid; place-items: center; font-size: 22px; }
+.temas { width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.temas h3 { font-size: .95rem; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; }
+.tgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.cgrid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+.cor { border: 2px solid var(--line); background: var(--surface); border-radius: 14px; padding: 10px 4px; display: flex; flex-direction: column; align-items: center; gap: 6px; font-weight: 800; font-size: .82rem; text-align: center; line-height: 1.15; }
+.cor .dots { display: flex; }
+.cor .dots i { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--surface); }
+.cor .dots i + i { margin-left: -7px; }
+.cor[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+@media (max-width: 700px) { .cgrid { grid-template-columns: repeat(3, 1fr); } .tgrid { grid-template-columns: repeat(2, 1fr); } }
+.tema { border: 2px solid var(--line); background: var(--surface); border-radius: 14px; padding: 10px 6px; display: flex; flex-direction: column; align-items: center; gap: 6px; font-weight: 800; font-size: .9rem; }
+.tema .sw { width: 44px; height: 30px; border-radius: 8px; border: 1px solid var(--line); display: grid; place-items: center; font-size: 15px; }
+.tema[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.status { width: 100%; display: flex; align-items: center; gap: 8px; font-size: .9rem; color: var(--muted); }
+.status svg { font-size: 16px; color: var(--brand); }
+
+/* abas */
+.tabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.tab { border: 2px solid var(--line); background: var(--surface); border-radius: 16px; padding: 10px 6px; display: flex; flex-direction: column; align-items: center; gap: 4px; font-weight: 800; font-size: .95rem; }
+.tab svg { font-size: 22px; color: var(--brand); }
+.tab[aria-selected="true"] { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
+.tab[aria-selected="true"] svg { color: var(--brand-ink); }
+
+h2 { font-size: 1.35rem; font-weight: 900; margin: 0; text-wrap: balance; }
+h3 { font-size: 1.1rem; font-weight: 800; margin: 0; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.stack { display: flex; flex-direction: column; gap: 16px; }
+.hint { color: var(--muted); font-size: .95rem; margin: 0; }
+.step { display: flex; align-items: center; gap: 10px; font-weight: 900; font-size: 1.05rem; }
+.step b { width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; font-size: .95rem; flex: none; }
+
+/* atividades */
+.ativs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.ativ { --c: var(--brand); --l: var(--brand-soft); border: 3px solid var(--line); border-radius: 18px; background: var(--surface); padding: 14px 8px; display: flex; flex-direction: column; align-items: center; gap: 8px; font-weight: 800; text-align: center; }
+.ativ .ic { width: 64px; height: 64px; border-radius: 50%; background: var(--l); color: var(--c); display: grid; place-items: center; font-size: 38px; }
+.ativ[aria-pressed="true"] { border-color: var(--c); background: var(--l); }
+.ativ[aria-pressed="true"] .ic { background: var(--c); color: var(--surface); }
+.t-gado { --c: var(--gado); --l: var(--gado-l); }
+.t-porco { --c: var(--porco); --l: var(--porco-l); }
+.t-lavoura { --c: var(--lavoura); --l: var(--lavoura-l); }
+.t-casa { --c: var(--casa); --l: var(--casa-l); }
+
+.itens { display: flex; flex-wrap: wrap; gap: 10px; }
+.item { --c: var(--brand); --l: var(--brand-soft); border: 2px solid var(--line); background: var(--surface); border-radius: 999px; padding: 10px 16px 10px 10px; display: flex; align-items: center; gap: 10px; font-weight: 800; }
+.item .ic { width: 34px; height: 34px; border-radius: 50%; background: var(--l); color: var(--c); display: grid; place-items: center; font-size: 17px; }
+.item small { font-weight: 600; color: var(--muted); font-size: .8rem; display: block; line-height: 1.1; }
+.item[aria-pressed="true"] { border-color: var(--c); background: var(--l); }
+.item.entrada .ic { background: color-mix(in srgb, var(--pos) 16%, transparent); color: var(--pos); }
+
+.fields { display: grid; grid-template-columns: 1fr 1.3fr; gap: 12px; }
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.field label { font-weight: 800; font-size: .95rem; }
+.field input { width: 100%; min-height: 58px; border-radius: 14px; border: 2px solid var(--line); background: var(--bg); padding: 10px 14px; font-size: 1.25rem; font-weight: 700; }
+.money { position: relative; }
+.money span { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-weight: 900; color: var(--muted); font-size: 1.15rem; }
+.money input { padding-left: 52px; font-size: 1.6rem; }
+.field.wide { grid-column: 1 / -1; }
+.big { min-height: 64px; border: 0; border-radius: 18px; background: var(--brand); color: var(--brand-ink); font-size: 1.3rem; font-weight: 900; display: flex; align-items: center; justify-content: center; gap: 10px; }
+.big:disabled { opacity: .45; cursor: not-allowed; }
+.big svg { font-size: 22px; }
+.msg { min-height: 1.4em; font-weight: 800; margin: 0; }
+.msg.ok { color: var(--pos); } .msg.err { color: var(--neg); }
+
+/* lista de anotações */
+.list { display: flex; flex-direction: column; }
+.row { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+.row:first-child { border-top: 0; }
+.row .ic { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-size: 21px; background: var(--l); color: var(--c); }
+.row .what { min-width: 0; }
+.row .what b { display: block; }
+.row .what span { color: var(--muted); font-size: .88rem; }
+.row .val { font-weight: 900; }
+.val.in { color: var(--pos); } .val.out { color: var(--neg); }
+.del { border: 0; background: transparent; color: var(--muted); width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; font-size: 18px; }
+.confirm { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; background: var(--warn-bg); color: var(--warn-ink); border-radius: 12px; padding: 8px 12px; font-weight: 700; }
+.confirm button { border: 0; border-radius: 10px; padding: 8px 14px; font-weight: 800; }
+.confirm .yes { background: var(--neg); color: #fff; } .confirm .no { background: var(--surface); }
+.empty { text-align: center; color: var(--muted); padding: 18px 8px; }
+
+/* mês / ano */
+.chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+.chip { flex: none; border: 2px solid var(--line); background: var(--surface); border-radius: 999px; padding: 8px 14px; font-weight: 800; }
+.chip[aria-pressed="true"] { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
+.banner { background: var(--warn-bg); color: var(--warn-ink); border-radius: 14px; padding: 12px 16px; font-weight: 700; display: flex; gap: 10px; align-items: flex-start; }
+.banner svg { font-size: 20px; flex: none; margin-top: 3px; }
+.acard { border-top: 8px solid var(--c); }
+.ahead { display: flex; align-items: center; gap: 12px; }
+.ahead .ic { width: 48px; height: 48px; border-radius: 50%; background: var(--l); color: var(--c); display: grid; place-items: center; font-size: 28px; flex: none; }
+.ahead .res { margin-left: auto; text-align: right; }
+.ahead .res small { display: block; color: var(--muted); font-size: .8rem; font-weight: 700; }
+.ahead .res b { font-size: 1.25rem; }
+.tots { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+.tot { background: var(--l); border-radius: 12px; padding: 10px 12px; }
+.tot small { display: block; font-weight: 700; color: var(--muted); font-size: .85rem; }
+.tot b { font-size: 1.1rem; }
+details summary { cursor: pointer; font-weight: 800; color: var(--c); padding: 6px 0; }
+.scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
+table { border-collapse: collapse; font-size: .85rem; width: 100%; }
+th, td { padding: 8px 8px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
+th { background: var(--c); color: var(--surface); font-weight: 800; }
+th:first-child, td:first-child { text-align: left; position: sticky; left: 0; background: var(--surface); z-index: 1; }
+th:first-child { background: var(--c); color: var(--surface); }
+td.z { color: var(--line); }
+tr.total td { font-weight: 900; background: var(--l); }
+tr.total td:first-child { background: var(--l); }
+td.tt { background: var(--l); font-weight: 800; }
+
+/* resumo */
+.kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; }
+.kpi small { display: block; color: var(--muted); font-weight: 800; font-size: .85rem; text-transform: uppercase; letter-spacing: .6px; }
+.kpi b { font-size: 1.6rem; font-weight: 900; }
+.kpi.main { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); box-shadow: inset 0 -6px 0 var(--accent); }
+.kpi.main small { color: inherit; opacity: .85; }
+.geral { --c: var(--brand); --l: var(--brand-soft); }
+.geral td:first-child { display: flex; align-items: center; gap: 8px; }
+.geral td .ic { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--l); color: var(--c); font-size: 17px; }
+.pos { color: var(--pos); } .neg { color: var(--neg); }
+.bars { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 6px; align-items: end; height: 190px; padding-top: 8px; }
+.bar { display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; min-width: 0; }
+.bar .pair { display: flex; gap: 2px; align-items: flex-end; height: 150px; width: 100%; justify-content: center; }
+.bar .pair i { display: block; width: 42%; max-width: 16px; border-radius: 4px 4px 0 0; min-height: 2px; }
+.bar .pair .e { background: var(--pos); } .bar .pair .s { background: var(--neg); opacity: .8; }
+.bar small { font-size: .72rem; color: var(--muted); font-weight: 800; }
+.legend { display: flex; gap: 16px; font-size: .88rem; color: var(--muted); font-weight: 700; flex-wrap: wrap; }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+
+/* imprimir */
+.prints { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.pbtn { border: 2px solid var(--line); background: var(--surface); border-radius: var(--r); padding: 16px; display: flex; gap: 14px; align-items: flex-start; text-align: left; }
+.pbtn .ic { width: 52px; height: 52px; border-radius: 14px; background: var(--brand-soft); color: var(--brand); display: grid; place-items: center; font-size: 26px; flex: none; }
+.pbtn b { display: block; font-size: 1.05rem; }
+.pbtn span { color: var(--muted); font-size: .9rem; }
+.pbtn:disabled { opacity: .5; cursor: not-allowed; }
+.row2 { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.row2 select { min-height: 48px; border-radius: 12px; border: 2px solid var(--line); background: var(--surface); padding: 6px 12px; font-weight: 800; }
+.filebtn { position: relative; overflow: hidden; }
+.filebtn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+@media (max-width: 700px) {
+  body { font-size: 17px; }
+  .tabs { grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .tab { font-size: .75rem; padding: 8px 2px; border-radius: 12px; }
+  .ativs { grid-template-columns: repeat(2, 1fr); }
+  .fields { grid-template-columns: 1fr; }
+  .kpis { grid-template-columns: 1fr; }
+  .prints { grid-template-columns: 1fr; }
+  .yearbox { margin-left: 0; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .tab, .ativ, .item, .chip, .big { transition: background-color .15s, border-color .15s, transform .1s; }
+  .big:active:not(:disabled), .ativ:active, .item:active { transform: scale(.98); }
+}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="logo" id="logo"></div>
+    <div class="brand"><h1>Caderneta Rural</h1><p>Gado, porcos, lavoura e casa num lugar só</p></div>
+    <div class="yearbox" aria-label="Ano">
+      <button class="iconbtn" id="yPrev" aria-label="Ano anterior"></button>
+      <span id="yLabel" class="num">2026</span>
+      <button class="iconbtn" id="yNext" aria-label="Próximo ano"></button>
+    </div>
+    <button class="temabtn" id="bTema" aria-expanded="false" aria-controls="temaPanel" aria-label="Escolher o tema e a cor"></button>
+    <div class="temas" id="temaPanel" hidden></div>
+    <p class="status" id="status" role="status"></p>
+  </header>
+
+  <nav class="tabs" role="tablist" id="tabs"></nav>
+
+  <main id="main">
+    <section id="v-anotar" class="stack"></section>
+    <section id="v-mes" class="stack" hidden></section>
+    <section id="v-ano" class="stack" hidden></section>
+    <section id="v-resumo" class="stack" hidden></section>
+    <section id="v-imprimir" class="stack" hidden></section>
+  </main>
+</div>
+
+<script>
+const I = {"barn":"<svg stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"0\" viewBox=\"0 0 512 512\" aria-hidden=\"true\" height=\"1em\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M256 23.38L89.844 89.845l-64.9 162.254 14.85 5.943c20.312-50.766 40.62-101.535 60.93-152.304l1.432-3.58L256 40.616l153.844 61.54 1.43 3.58 60.93 152.305 14.853-5.942-64.9-162.254C366.77 67.69 311.386 45.534 256 23.38zm0 36.624l-139.996 55.998L72.8 224h.2v263h78V329h-39v-18h297v176h30V224h.2c-14.402-36-28.802-72-43.204-107.998L256 60.004zM151 135h210v114H151V135zm23.563 18L199 201.873V153h-24.438zM313 153v48.873L337.438 153H313zm-144 29.127V231h24.438L169 182.127zm174 0L318.562 231H343v-48.873zm-98.73 18.69c-1.207-.02-2.31.02-3.288.128-2.823.31-10.76 3.708-16.86 7.3-2.796 1.645-5.23 3.22-7.122 4.484V231h78v-16.97c-4.193-1.675-10.334-4.02-17.578-6.368-11.206-3.63-24.71-6.71-33.152-6.846zM160 263h192v18H160v-18zm15.16 66L208 389.205 240.84 329h-65.68zm144 0L352 389.205 384.84 329h-65.68zM169 355.295v105.41L197.748 408 169 355.295zm78 0L218.252 408 247 460.705v-105.41zm66 0v105.41L341.748 408 313 355.295zm78 0L362.252 408 391 460.705v-105.41zm-183 71.5L175.16 487h65.68L208 426.795zm144 0L319.16 487h65.68L352 426.795z\"></path></svg>","cow":"<svg stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"0\" viewBox=\"0 0 512 512\" aria-hidden=\"true\" height=\"1em\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M468.958 108.958c-27.507 2.08-48.997 7.94-71.375 22.572-5.333-2.214-12.62-17.738-16-16-11.82 6.08-14.892 19.555-4.916 32.817l-59.084 9.916c-24.776 3.341-49.567 4.838-74.187 5.334 1.326 3.832 2.96 7.636 4.812 10.05 5.219 6.802 20.323 6.21 21.07 14.75 1.935 22.098-24.876 47.415-47.056 47.057-15.401-.248-17.017-28.762-31.604-33.713-19.097-6.482-41.62 18.77-59.699 9.832-15.267-7.547-24.992-39.8-27.836-50.41-10.213-.127-20.327-.142-30.316.035-12.564.366-22.902 5.645-29.408 14.239-8.676 11.458-11.652 26.658-13.254 42.925-1.78 18.057 6.147 53.007 5.517 70.282-.504 13.85-7.493 11.87-11.912 18.888-13.52 21.47 8.894 20.83 17.014 5.56 12.482-23.473 4.253-63.11 7.195-92.974 1.855-35.76 10.597-23.937 15.664-24.588-4.2 13.065-6.21 30.962-7 51.334 6.895-2.342 36.498-11.6 42.73-.174 6.872 12.598-27.802 22.016-23.878 35.819 2.464 8.666 22.95 2.378 24.582 11.238 3.322 18.035-32.13 38.713-42.236 44.209.812 23.329 1.564 45.567 1.238 65.086H88.91c-4.234-16.543-12.038-49.944-4.06-55.084 21.425-18.091 29.836-37.484 42.732-56.428 8.755 2.556 16.92 4.787 24.782 6.672 3.553.972 7.244 1.771 10.984 2.44 24.859 4.967 61.553 5.678 90.783-.172 3.76 34.12 7.263 68.452 4.602 102.572h28.957c-12.375-26.902-4.263-65.044 13.892-86.27l44.934-33.462c24.881-16.384 42.93-37.996 55.982-63.38 30.402 3.413 57.086 3.29 77.192-.786l12.84-19.55c-24.257-17.857-43.3-36.585-62.948-58.13 10.063-14.533 25.027-22.765 39.375-32.506zm-39.375 54.572a8 8 0 1 1 0 16 8 8 0 0 1 0-16zM366.2 183.481c5.029 9.822-26.17 10.808-24.933 21.772.998 8.847 22.204 3.839 23.53 12.643 3.818 25.373-28.44 53.805-54.08 54.78-14.262.544-34.902-14.06-32.308-28.093 2.605-14.092 34.551-1.657 40.383-14.748 4.724-10.603-18.352-22.01-12.992-32.307 6.264-12.032 30.364-22.553 41.934-22.646 11.57-.093 15.606 3.347 18.466 8.6zm-26.585 126.346l-34.707 23.96 6.464 69.255h34.414c-11.783-22.454-15.58-55.506-6.171-93.215zm-204.561 1.41c-6.047 12.184-14.147 21.97-22.174 31.242 5.97 3.235 11.648 5.414 17.154 6.614 11.218 2.443 21.636.333 29.948-4.408 10.056-5.737 17.521-14.452 24.115-23.368-14.615-.869-32.96-2.962-49.043-10.08zm24.252 52c-8.737 2.585-17.452 3.7-25.566 2.96 5.167 12.624 10.45 24.152 15.824 36.845h28.306c-10.393-18.48-16.148-29.285-18.564-39.805z\"></path></svg>","pig":"<svg stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"0\" viewBox=\"0 0 512 512\" aria-hidden=\"true\" height=\"1em\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M213.705 344.935l2.7 53.87h-26.24l-19.46-55.41zm150.56.33l-.34 4.38 18.15 49.16h24.44l-5.66-56.51a326.16 326.16 0 0 1-36.57 2.97zm32.79-164.08a90.06 90.06 0 0 0 13.05-1.12c51.2-7.62 36.49-49.56 36.49-49.56s-40.36 9-52.83 23.42c.02 0-28.12 27.26 3.31 27.26zm81.85-25.33s-6.81 0-15.92.82a47 47 0 0 1-13.28 22.9 116.55 116.55 0 0 1 7.44 14.09c25.25-9.43 21.79-37.81 21.79-37.81zm11.8 100.18v41.49s-53.15 31.9-134.5 31.9c-2.19 0-4.44-.15-6.67-.2l-5.48 69.58h-19l-24.45-66.86-162.59-5.87-9.4 72.73h-22.63s-48.15-101.58-23.18-182.06c-5.55-3.84-11.38-8.17-16.73-12.7-5.13 2.65-10.26 4.11-15 3.85-15.76-.85-28.37-12.73-29.78-14.09l11.16-11.46c2.6 2.5 11.21 9.13 19.48 9.57a7.93 7.93 0 0 0 1.7-.11 46.36 46.36 0 0 1-4.59-6.47c-5.65-9.83-7-20.32-3.84-28.79a25.1 25.1 0 0 1 15.94-14.87c11.29-3.81 26.85-3.35 34.75 4.9 2.94 3.07 7.24 9.84 3 20.7-3.59 9.29-10.85 19.34-19.36 27.12 2.87 2.3 5.94 4.61 9.09 6.87 9.46-20.85 24.84-39.58 48.52-53.76a238.9 238.9 0 0 1 124-34.31 259.14 259.14 0 0 1 120.54 30.12 80.94 80.94 0 0 0-7.77 9.25c-7.6 10.67-9.67 20.49-6.15 29.19 2.85 7 10.23 15.42 29.24 15.42a105 105 0 0 0 15.41-1.3 80.49 80.49 0 0 0 24-7.18c15.75 25.72 17.22 58.67 28 61 12.79 2.72 26.29 6.34 26.29 6.34zm-406.69-94.52c.43-1.12 1.05-3.11.32-3.87-1.32-1.38-4.81-2.26-8.92-2.26a29.18 29.18 0 0 0-9.16 1.42c-3.13 1.05-5.12 2.81-6.09 5.38-1.46 3.95-.46 9.62 2.75 15.19a36.3 36.3 0 0 0 4.79 6.25c6.66-5.82 13.19-14.04 16.31-22.11zm331.14 81.55a9.05 9.05 0 1 0-9.05 9.05 9.05 9.05 0 0 0 9.05-9.05z\"></path></svg>","wheat":"<svg stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"0\" viewBox=\"0 0 512 512\" aria-hidden=\"true\" height=\"1em\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M98.344 16.688C79.692 43.785 68.498 69.01 65.5 89.56l23.938 39.157 28.624-33.47c.868-21.213-5.49-48.677-19.718-78.563zM472.5 19.625C444.04 36.055 423.112 54 411.562 71.25l4.75 45.688L456.563 99c9.89-18.777 15.938-46.29 15.938-79.375zm-91.75 27.28c-10.153 21.036-16.8 40.84-20.156 58.314l18.375 57.686 19.78-34.25-6.5-62.22h.03c-3.422-6.392-7.252-12.906-11.53-19.53zM27.25 80.782c-.125 23.364 2.393 44.102 6.875 61.314L75.5 186.25l3.125-39.406L46 93.47l.03-.032c-5.83-4.287-12.08-8.52-18.78-12.657zm132.844 10.532c-8.415 3.504-16.29 7.213-23.594 11.094l-39.25 45.97-3.094 39.374 50.438-39.094c6.712-15.904 12.09-35.263 15.5-57.344zm177.22 21.626c-24.024 58.09-16.16 97.86 7.873 108.5l21.157-36.625-19.594-61.438c-2.973-3.46-6.108-6.943-9.438-10.438zm146.03.218c-4.55-.028-8.97.084-13.28.28L414.935 138l-19.78 34.28 62.343-13.655c12.897-11.47 26.09-26.626 38.656-45.094-4.358-.216-8.64-.348-12.812-.374zm-226.094 8.72c-23.24 23.238-38.832 46.003-45.53 65.655l16.436 42.907 34.22-27.75c4.695-20.704 3.436-48.856-5.126-80.812zM16.406 159.06c3.28 62.77 27.482 95.31 53.75 94.594l3.344-42.22-44.063-47c-4.175-1.844-8.515-3.647-13.03-5.374zm143.22 11.375c-6.457 1.354-12.63 2.896-18.5 4.563l-48.97 37.938-3.312 41.75c26.492 7.51 57.16-20.567 70.78-84.25zm16.06 1.563c-4.36 22.935-5.65 43.762-4.374 61.5l32.688 51 10.22-38.188-22.407-58.437h.03c-4.952-5.28-10.318-10.592-16.155-15.875zm267.408 8.938l-60.563 13.218-20.936 36.25c20.682 18.195 60.438 6.035 100.125-45.625-6.413-1.552-12.62-2.823-18.626-3.843zm-138.688 25.53c-8.912 1.92-17.304 4.16-25.187 6.657l-46.97 38.03-10.22 38.19 56.69-29.283c9.493-14.424 18.323-32.49 25.686-53.593zm155.125 25.063c-25.85 20.324-44.046 41.06-53.03 59.782l11.22 44.532 37.28-23.47c7.126-19.99 9.236-48.088 4.53-80.843zm-123.342 8.595c-34.435 77.573-59.394 159.06-62.97 253.03h18.72c3.558-90.792 27.573-169.428 61.312-245.436l-17.063-7.595zm-185.375 6.906c-8.173 62.347 9.714 98.713 35.687 102.75l10.97-40.874-34.814-54.25c-3.77-2.57-7.713-5.105-11.844-7.625zm221.75 24.532c-7.053 22.243-10.817 42.77-11.657 60.532l26.406 54.594L402 349.967l-15.28-60.687h.06c-4.3-5.848-9.033-11.76-14.217-17.717zm-302.47 1.532c-8.664 74.584-8.13 147.835 12.188 220.062h19.44c-20.877-70.772-21.764-143.02-13.064-217.906l-18.562-2.156zm219.47 11.094c-6.613.16-12.953.54-19.032 1.125L215.5 313.78l-10.844 40.408c24.69 12.23 59.938-9.82 84.906-70zm206.718 36.937c-9.072.844-17.664 2.052-25.78 3.594l-51.156 32.217-14.688 36.657 59.75-22.313c11.14-13.193 22.055-30.075 31.875-50.155zm-157.31 22c-15.528 60.938-2.096 99.19 23.217 106.28l15.72-39.28-28.094-58.03c-3.43-3-7.053-5.985-10.844-8.97zM183.25 368.72c-12.674 41.233-22.26 82.547-26.844 124.436h18.813c4.507-39.722 13.69-79.23 25.905-118.97l-17.875-5.467zm270 26.655l-58 21.688-15.563 38.875c23.056 15.098 60.673-2.606 92.625-59.407-6.594-.627-12.95-1.003-19.062-1.155zM356.5 469.03c-1.874 7.713-3.185 15.757-3.656 24.126h18.687c.45-6.686 1.55-13.206 3.126-19.687l-18.156-4.44z\"></path></svg>","house":"<svg stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"0\" viewBox=\"0 0 576 512\" aria-hidden=\"true\" height=\"1em\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M575.8 255.5c0 18-15 32.1-32 32.1l-32 0 .7 160.2c0 2.7-.2 5.4-.5 8.1l0 16.2c0 22.1-17.9 40-40 40l-16 0c-1.1 0-2.2 0-3.3-.1c-1.4 .1-2.8 .1-4.2 .1L416 512l-24 0c-22.1 0-40-17.9-40-40l0-24 0-64c0-17.7-14.3-32-32-32l-64 0c-17.7 0-32 14.3-32 32l0 64 0 24c0 22.1-17.9 40-40 40l-24 0-31.9 0c-1.5 0-3-.1-4.5-.2c-1.2 .1-2.4 .2-3.6 .2l-16 0c-22.1 0-40-17.9-40-40l0-112c0-.9 0-1.9 .1-2.8l0-69.7-32 0c-18 0-32-14-32-32.1c0-9 3-17 10-24L266.4 8c7-7 15-8 22-8s15 2 21 7L564.8 231.5c8 7 12 15 11 24z\"></path></svg>","racao":"<svg stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"0\" viewBox=\"0 0 512 512\" aria-hidden=\"true\" height=\"1em\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M0 192c0-35.3 28.7-64 64-64c.5 0 1.1 0 1.6 0C73 91.5 105.3 64 144 64c15 0 29 4.1 40.9 11.2C198.2 49.6 225.1 32 256 32s57.8 17.6 71.1 43.2C339 68.1 353 64 368 64c38.7 0 71 27.5 78.4 64c.5 0 1.1 0 1.6 0c35.3 0 64 28.7 64 64c0 11.7-3.1 22.6-8.6 32L8.6 224C3.1 214.6 0 203.7 0 192zm0 91.4C0 268.3 12.3 256 27.4 256l457.1 0c15.1 0 27.4 12.3 27.4 27.4c0 70.5-44.4 130.7-106.7 154.1L403.5 452c-2 16-15.6 28-31.8 28l-231.5 0c-16.1 0-29.8-12-31.8-28l-1.8-14.4C44.4 414.1 0 353.9 0 283.4z\"></path></svg>","alim":"<svg stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"0\" viewBox=\"0 0 512 512\" aria-hidden=\"true\" height=\"1em\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M505 41c9.4-9.4 9.4-24.6 0-33.9s-24.6-9.4-33.9 0L383 95c-9.4 9.4-9.4 24.6 0 33.9s24.6 9.4 33.9 0l88-88zM305.5 27.3c-6.2-6.2-16.4-6.2-22.6 0L271.5 38.6c-37.5 37.5-37.5 98.3 0 135.8l10.4 10.4-30.5 30.5c-3.4-27.3-15.5-53.8-36.5-74.8l-11.3-11.3c-6.2-6.2-16.4-6.2-22.6 0l-11.3 11.3c-37.5 37.5-37.5 98.3 0 135.8l10.4 10.4-30.5 30.5c-3.4-27.3-15.5-53.8-36.5-74.8L101.8 231c-6.2-6.2-16.4-6.2-22.6 0L67.9 242.3c-37.5 37.5-37.5 98.3 0 135.8l10.4 10.4L9.4 457.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0l68.9-68.9 12.2 12.2c37.5 37.5 98.3 37.5 135.8 0l11.3-11.3c6.2-6.2 6.2-16.4 0-22.6l-11.3-11.3c-21.8-21.8-49.6-34.1-78.1-36.9l31.9-31.9 12.2 12.2c37.5 37.5 98.3 37.5 135.8 0l11.3-11.3c6.2-6.2 6.2-16.4 0-22.6l-11.3-11.3c-21.8-21.8-49.6-34.1-78.1-36.9l31.9-31.9 12.2 12.2c37.5 37.5 98.3 37.5 135.8 0L486.5 231c6.2-6.2 6.2-16.4 0-22.6L475.2 197c-5.2-5.2-10.6-9.8-16.4-13.9L505 137c9.4-9.4 9.4-24.6 0-33.9s-24.6-9.4-33.9 0l-59.4 59.4c-20.6-4.4-42-3.7-62.3 2.1c6.1-21.3 6.6-43.8 1.4-65.3L409 41c9.4-9.4 9.4-24.6 0-33.9s-24.6-9.4-33.9 0L329.1 52.9c-3.7-5-7.8-9.8-12.4-14.3L305.5 27.3z\"></path></svg>","supl":"<svg stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"0\" viewBox=\"0 0 576 512\" aria-hidden=\"true\" height=\"1em\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M112 96c-26.5 0-48 21.5-48 48l0 112 96 0 0-112c0-26.5-21.5-48-48-48zM0 144C0 82.1 50.1 32 112 32s112 50.1 112 112l0 224c0 61.9-50.1 112-112 112S0 429.9 0 368L0 144zM554.9 399.4c-7.1 12.3-23.7 13.1-33.8 3.1L333.5 214.9c-10-10-9.3-26.7 3.1-33.8C360 167.7 387.1 160 416 160c88.4 0 160 71.6 160 160c0 28.9-7.7 56-21.1 79.4zm-59.5 59.5C472 472.3 444.9 480 416 480c-88.4 0-160-71.6-160-160c0-28.9 7.7-56 21.1-79.4c7.1-12.3 23.7-13.1 33.8-3.1L498.5 425.1c10 10 9.3 26.7-3.1 33.8z\"></path></svg>","lucro":"<svg stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"0\" viewBox=\"0 0 512 512\" aria-hidden=\"true\" height=\"1em\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M320 96L192 96 144.6 24.9C137.5 14.2 145.1 0 157.9 0L354.1 0c12.8 0 20.4 14.2 13.3 24.9L320 96zM192 128l128 0c3.8 2.5 8.1 5.3 13 8.4C389.7 172.7 512 250.9 512 416c0 53-43 96-96 96L96 512c-53 0-96-43-96-96C0 250.9 122.3 172.7 179 136.4c0 0 0 0 0 0s0 0 0 0c4.8-3.1 9.2-5.9 13-8.4zm84 88c0-11-9-20-20-20s-20 9-20 20l0 14c-7.6 1.7-15.2 4.4-22.2 8.5c-13.9 8.3-25.9 22.8-25.8 43.9c.1 20.3 12 33.1 24.7 40.7c11 6.6 24.7 10.8 35.6 14l1.7 .5c12.6 3.8 21.8 6.8 28 10.7c5.1 3.2 5.8 5.4 5.9 8.2c.1 5-1.8 8-5.9 10.5c-5 3.1-12.9 5-21.4 4.7c-11.1-.4-21.5-3.9-35.1-8.5c-2.3-.8-4.7-1.6-7.2-2.4c-10.5-3.5-21.8 2.2-25.3 12.6s2.2 21.8 12.6 25.3c1.9 .6 4 1.3 6.1 2.1c0 0 0 0 0 0s0 0 0 0c8.3 2.9 17.9 6.2 28.2 8.4l0 14.6c0 11 9 20 20 20s20-9 20-20l0-13.8c8-1.7 16-4.5 23.2-9c14.3-8.9 25.1-24.1 24.8-45c-.3-20.3-11.7-33.4-24.6-41.6c-11.5-7.2-25.9-11.6-37.1-15c0 0 0 0 0 0l-.7-.2c-12.8-3.9-21.9-6.7-28.3-10.5c-5.2-3.1-5.3-4.9-5.3-6.7c0-3.7 1.4-6.5 6.2-9.3c5.4-3.2 13.6-5.1 21.5-5c9.6 .1 20.2 2.2 31.2 5.2c10.7 2.8 21.6-3.5 24.5-14.2s-3.5-21.6-14.2-24.5c-6.5-1.7-13.7-3.4-21.1-4.7l0-13.9z\"></path></svg>","diesel":"<svg stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"0\" viewBox=\"0 0 512 512\" aria-hidden=\"true\" height=\"1em\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M32 64C32 28.7 60.7 0 96 0L256 0c35.3 0 64 28.7 64 64l0 192 8 0c48.6 0 88 39.4 88 88l0 32c0 13.3 10.7 24 24 24s24-10.7 24-24l0-154c-27.6-7.1-48-32.2-48-62l0-64L384 64c-8.8-8.8-8.8-23.2 0-32s23.2-8.8 32 0l77.3 77.3c12 12 18.7 28.3 18.7 45.3l0 13.5 0 24 0 32 0 152c0 39.8-32.2 72-72 72s-72-32.2-72-72l0-32c0-22.1-17.9-40-40-40l-8 0 0 144c17.7 0 32 14.3 32 32s-14.3 32-32 32L32 512c-17.7 0-32-14.3-32-32s14.3-32 32-32L32 64zM96 80l0 96c0 8.8 7.2 16 16 16l128 0c8.8 0 16-7.2 16-16l0-96c0-8.8-7.2-16-16-16L112 64c-8.8 0-16 7.2-16 16z\"></path></svg>","arrend":"<svg stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"0\" viewBox=\"0 0 384 512\" aria-hidden=\"true\" height=\"1em\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M64 0C28.7 0 0 28.7 0 64L0 448c0 35.3 28.7 64 64 64l256 0c35.3 0 64-28.7 64-64l0-288-128 0c-17.7 0-32-14.3-32-32L224 0 64 0zM256 0l0 128 128 0L256 0zM80 64l64 0c8.8 0 16 7.2 16 16s-7.2 16-16 16L80 96c-8.8 0-16-7.2-16-16s7.2-16 16-16zm0 64l64 0c8.8 0 16 7.2 16 16s-7.2 16-16 16l-64 0c-8.8 0-16-7.2-16-16s7.2-16 16-16zm54.2 253.8c-6.1 20.3-24.8 34.2-46 34.2L80 416c-8.8 0-16-7.2-16-16s7.2-16 16-16l8.2 0c7.1 0 13.3-4.6 15.3-11.4l14.9-49.5c3.4-11.3 13.8-19.1 25.6-19.1s22.2 7.7 25.6 19.1l11.6 38.6c7.4-6.2 16.8-9.7 26.8-9.7c15.9 0 30.4 9 37.5 23.2l4.4 8.8 54.1 0c8.8 0 16 7.2 16 16s-7.2 16-16 16l-64 0c-6.1 0-11.6-3.4-14.3-8.8l-8.8-17.7c-1.7-3.4-5.1-5.5-8.8-5.5s-7.2 2.1-8.8 5.5l-8.8 17.7c-2.9 5.9-9.2 9.4-15.7 8.8s-12.1-5.1-13.9-11.3L144 349l-9.8 32.8z\"></path></svg>","agro":"<svg stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"0\" viewBox=\"0 0 512 512\" aria-hidden=\"true\" height=\"1em\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M128 0l64 0c17.7 0 32 14.3 32 32l0 96L96 128l0-96c0-17.7 14.3-32 32-32zM0 256c0-53 43-96 96-96l128 0c53 0 96 43 96 96l0 208c0 26.5-21.5 48-48 48L48 512c-26.5 0-48-21.5-48-48L0 256zm240 80A80 80 0 1 0 80 336a80 80 0 1 0 160 0zM256 64a32 32 0 1 1 64 0 32 32 0 1 1 -64 0zM384 32a32 32 0 1 1 0 64 32 32 0 1 1 0-64zm64 32a32 32 0 1 1 64 0 32 32 0 1 1 -64 0zm32 64a32 32 0 1 1 0 64 32 32 0 1 1 0-64zM448 256a32 32 0 1 1 64 0 32 32 0 1 1 -64 0zM384 128a32 32 0 1 1 0 64 32 32 0 1 1 0-64z\"></path></svg>","adubo":"<svg stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"0\" viewBox=\"0 0 448 512\" aria-hidden=\"true\" height=\"1em\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M288 0L160 0 128 0C110.3 0 96 14.3 96 32s14.3 32 32 32l0 132.8c0 11.8-3.3 23.5-9.5 33.5L10.3 406.2C3.6 417.2 0 429.7 0 442.6C0 480.9 31.1 512 69.4 512l309.2 0c38.3 0 69.4-31.1 69.4-69.4c0-12.8-3.6-25.4-10.3-36.4L329.5 230.4c-6.2-10.1-9.5-21.7-9.5-33.5L320 64c17.7 0 32-14.3 32-32s-14.3-32-32-32L288 0zM192 196.8L192 64l64 0 0 132.8c0 23.7 6.6 46.9 19 67.1L309.5 320l-171 0L173 263.9c12.4-20.2 19-43.4 19-67.1z\"></path></svg>","semente":"<svg stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"0\" viewBox=\"0 0 512 512\" aria-hidden=\"true\" height=\"1em\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M512 32c0 113.6-84.6 207.5-194.2 222c-7.1-53.4-30.6-101.6-65.3-139.3C290.8 46.3 364 0 448 0l32 0c17.7 0 32 14.3 32 32zM0 96C0 78.3 14.3 64 32 64l32 0c123.7 0 224 100.3 224 224l0 32 0 160c0 17.7-14.3 32-32 32s-32-14.3-32-32l0-160C100.3 320 0 219.7 0 96z\"></path></svg>","outros":"<svg stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"0\" viewBox=\"0 0 448 512\" aria-hidden=\"true\" height=\"1em\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M8 256a56 56 0 1 1 112 0A56 56 0 1 1 8 256zm160 0a56 56 0 1 1 112 0 56 56 0 1 1 -112 0zm216-56a56 56 0 1 1 0 112 56 56 0 1 1 0-112z\"></path></svg>","casa":"<svg stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"0\" viewBox=\"0 0 576 512\" aria-hidden=\"true\" height=\"1em\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M575.8 255.5c0 18-15 32.1-32 32.1l-32 0 .7 160.2c0 2.7-.2 5.4-.5 8.1l0 16.2c0 22.1-17.9 40-40 40l-16 0c-1.1 0-2.2 0-3.3-.1c-1.4 .1-2.8 .1-4.2 .1L416 512l-24 0c-22.1 0-40-17.9-40-40l0-24 0-64c0-17.7-14.3-32-32-32l-64 0c-17.7 0-32 14.3-32 32l0 64 0 24c0 22.1-17.9 40-40 40l-24 0-31.9 0c-1.5 0-3-.1-4.5-.2c-1.2 .1-2.4 .2-3.6 .2l-16 0c-22.1 0-40-17.9-40-40l0-112c0-.9 0-1.9 .1-2.8l0-69.7-32 0c-18 0-32-14-32-32.1c0-9 3-17 10-24L266.4 8c7-7 15-8 22-8s15 2 21 7L564.8 231.5c8 7 12 15 11 24z\"></path></svg>","pen":"<svg stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"0\" viewBox=\"0 0 512 512\" aria-hidden=\"true\" height=\"1em\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M471.6 21.7c-21.9-21.9-57.3-21.9-79.2 0L362.3 51.7l97.9 97.9 30.1-30.1c21.9-21.9 21.9-57.3 0-79.2L471.6 21.7zm-299.2 220c-6.1 6.1-10.8 13.6-13.5 21.9l-29.6 88.8c-2.9 8.6-.6 18.1 5.8 24.6s15.9 8.7 24.6 5.8l88.8-29.6c8.2-2.7 15.7-7.4 21.9-13.5L437.7 172.3 339.7 74.3 172.4 241.7zM96 64C43 64 0 107 0 160L0 416c0 53 43 96 96 96l256 0c53 0 96-43 96-96l0-96c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 96c0 17.7-14.3 32-32 32L96 448c-17.7 0-32-14.3-32-32l0-256c0-17.7 14.3-32 32-32l96 0c17.7 0 32-14.3 32-32s-14.3-32-32-32L96 64z\"></path></svg>","cal":"<svg stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"0\" viewBox=\"0 0 448 512\" aria-hidden=\"true\" height=\"1em\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M128 0c17.7 0 32 14.3 32 32l0 32 128 0 0-32c0-17.7 14.3-32 32-32s32 14.3 32 32l0 32 48 0c26.5 0 48 21.5 48 48l0 48L0 160l0-48C0 85.5 21.5 64 48 64l48 0 0-32c0-17.7 14.3-32 32-32zM0 192l448 0 0 272c0 26.5-21.5 48-48 48L48 512c-26.5 0-48-21.5-48-48L0 192zm64 80l0 32c0 8.8 7.2 16 16 16l32 0c8.8 0 16-7.2 16-16l0-32c0-8.8-7.2-16-16-16l-32 0c-8.8 0-16 7.2-16 16zm128 0l0 32c0 8.8 7.2 16 16 16l32 0c8.8 0 16-7.2 16-16l0-32c0-8.8-7.2-16-16-16l-32 0c-8.8 0-16 7.2-16 16zm144-16c-8.8 0-16 7.2-16 16l0 32c0 8.8 7.2 16 16 16l32 0c8.8 0 16-7.2 16-16l0-32c0-8.8-7.2-16-16-16l-32 0zM64 400l0 32c0 8.8 7.2 16 16 16l32 0c8.8 0 16-7.2 16-16l0-32c0-8.8-7.2-16-16-16l-32 0c-8.8 0-16 7.2-16 16zm144-16c-8.8 0-16 7.2-16 16l0 32c0 8.8 7.2 16 16 16l32 0c8.8 0 16-7.2 16-16l0-32c0-8.8-7.2-16-16-16l-32 0zm112 16l0 32c0 8.8 7.2 16 16 16l32 0c8.8 0 16-7.2 16-16l0-32c0-8.8-7.2-16-16-16l-32 0c-8.8 0-16 7.2-16 16z\"></path></svg>","table":"<svg stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"0\" viewBox=\"0 0 512 512\" aria-hidden=\"true\" height=\"1em\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M64 32C28.7 32 0 60.7 0 96L0 416c0 35.3 28.7 64 64 64l384 0c35.3 0 64-28.7 64-64l0-320c0-35.3-28.7-64-64-64L64 32zm88 64l0 64-88 0 0-64 88 0zm56 0l88 0 0 64-88 0 0-64zm240 0l0 64-88 0 0-64 88 0zM64 224l88 0 0 64-88 0 0-64zm232 0l0 64-88 0 0-64 88 0zm64 0l88 0 0 64-88 0 0-64zM152 352l0 64-88 0 0-64 88 0zm56 0l88 0 0 64-88 0 0-64zm240 0l0 64-88 0 0-64 88 0z\"></path></svg>","chart":"<svg stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"0\" viewBox=\"0 0 512 512\" aria-hidden=\"true\" height=\"1em\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M32 32c17.7 0 32 14.3 32 32l0 336c0 8.8 7.2 16 16 16l400 0c17.7 0 32 14.3 32 32s-14.3 32-32 32L80 480c-44.2 0-80-35.8-80-80L0 64C0 46.3 14.3 32 32 32zM160 224c17.7 0 32 14.3 32 32l0 64c0 17.7-14.3 32-32 32s-32-14.3-32-32l0-64c0-17.7 14.3-32 32-32zm128-64l0 160c0 17.7-14.3 32-32 32s-32-14.3-32-32l0-160c0-17.7 14.3-32 32-32s32 14.3 32 32zm64 32c17.7 0 32 14.3 32 32l0 96c0 17.7-14.3 32-32 32s-32-14.3-32-32l0-96c0-17.7 14.3-32 32-32zM480 96l0 224c0 17.7-14.3 32-32 32s-32-14.3-32-32l0-224c0-17.7 14.3-32 32-32s32 14.3 32 32z\"></path></svg>","print":"<svg stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"0\" viewBox=\"0 0 512 512\" aria-hidden=\"true\" height=\"1em\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M128 0C92.7 0 64 28.7 64 64l0 96 64 0 0-96 226.7 0L384 93.3l0 66.7 64 0 0-66.7c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0L128 0zM384 352l0 32 0 64-256 0 0-64 0-16 0-16 256 0zm64 32l32 0c17.7 0 32-14.3 32-32l0-96c0-35.3-28.7-64-64-64L64 192c-35.3 0-64 28.7-64 64l0 96c0 17.7 14.3 32 32 32l32 0 0 64c0 35.3 28.7 64 64 64l256 0c35.3 0 64-28.7 64-64l0-64zM432 248a24 24 0 1 1 0 48 24 24 0 1 1 0-48z\"></path></svg>","trash":"<svg stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"0\" viewBox=\"0 0 448 512\" aria-hidden=\"true\" height=\"1em\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M135.2 17.7C140.6 6.8 151.7 0 163.8 0L284.2 0c12.1 0 23.2 6.8 28.6 17.7L320 32l96 0c17.7 0 32 14.3 32 32s-14.3 32-32 32L32 96C14.3 96 0 81.7 0 64S14.3 32 32 32l96 0 7.2-14.3zM32 128l384 0 0 320c0 35.3-28.7 64-64 64L96 512c-35.3 0-64-28.7-64-64l0-320zm96 64c-8.8 0-16 7.2-16 16l0 224c0 8.8 7.2 16 16 16s16-7.2 16-16l0-224c0-8.8-7.2-16-16-16zm96 0c-8.8 0-16 7.2-16 16l0 224c0 8.8 7.2 16 16 16s16-7.2 16-16l0-224c0-8.8-7.2-16-16-16zm96 0c-8.8 0-16 7.2-16 16l0 224c0 8.8 7.2 16 16 16s16-7.2 16-16l0-224c0-8.8-7.2-16-16-16z\"></path></svg>","left":"<svg stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"0\" viewBox=\"0 0 320 512\" aria-hidden=\"true\" height=\"1em\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M9.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l192 192c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L77.3 256 246.6 86.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-192 192z\"></path></svg>","right":"<svg stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"0\" viewBox=\"0 0 320 512\" aria-hidden=\"true\" height=\"1em\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M310.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-192 192c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L242.7 256 73.4 86.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l192 192z\"></path></svg>","down":"<svg stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"0\" viewBox=\"0 0 512 512\" aria-hidden=\"true\" height=\"1em\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M288 32c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 242.7-73.4-73.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3l128 128c12.5 12.5 32.8 12.5 45.3 0l128-128c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L288 274.7 288 32zM64 352c-35.3 0-64 28.7-64 64l0 32c0 35.3 28.7 64 64 64l384 0c35.3 0 64-28.7 64-64l0-32c0-35.3-28.7-64-64-64l-101.5 0-45.3 45.3c-25 25-65.5 25-90.5 0L165.5 352 64 352zm368 56a24 24 0 1 1 0 48 24 24 0 1 1 0-48z\"></path></svg>","up":"<svg stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"0\" viewBox=\"0 0 512 512\" aria-hidden=\"true\" height=\"1em\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M288 109.3L288 352c0 17.7-14.3 32-32 32s-32-14.3-32-32l0-242.7-73.4 73.4c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3l128-128c12.5-12.5 32.8-12.5 45.3 0l128 128c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L288 109.3zM64 352l128 0c0 35.3 28.7 64 64 64s64-28.7 64-64l128 0c35.3 0 64 28.7 64 64l0 32c0 35.3-28.7 64-64 64L64 512c-35.3 0-64-28.7-64-64l0-32c0-35.3 28.7-64 64-64zM432 456a24 24 0 1 0 0-48 24 24 0 1 0 0 48z\"></path></svg>","check":"<svg stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"0\" viewBox=\"0 0 512 512\" aria-hidden=\"true\" height=\"1em\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM369 209L241 337c-9.4 9.4-24.6 9.4-33.9 0l-64-64c-9.4-9.4-9.4-24.6 0-33.9s24.6-9.4 33.9 0l47 47L335 175c9.4-9.4 24.6-9.4 33.9 0s9.4 24.6 0 33.9z\"></path></svg>","cloud":"<svg stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"0\" viewBox=\"0 0 640 512\" aria-hidden=\"true\" height=\"1em\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M0 336c0 79.5 64.5 144 144 144l368 0c70.7 0 128-57.3 128-128c0-61.9-44-113.6-102.4-125.4c4.1-10.7 6.4-22.4 6.4-34.6c0-53-43-96-96-96c-19.7 0-38.1 6-53.3 16.2C367 64.2 315.3 32 256 32C167.6 32 96 103.6 96 192c0 2.7 .1 5.4 .2 8.1C40.2 219.8 0 273.2 0 336z\"></path></svg>","phone":"<svg stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"0\" viewBox=\"0 0 384 512\" aria-hidden=\"true\" height=\"1em\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M16 64C16 28.7 44.7 0 80 0L304 0c35.3 0 64 28.7 64 64l0 384c0 35.3-28.7 64-64 64L80 512c-35.3 0-64-28.7-64-64L16 64zM144 448c0 8.8 7.2 16 16 16l64 0c8.8 0 16-7.2 16-16s-7.2-16-16-16l-64 0c-8.8 0-16 7.2-16 16zM304 64L80 64l0 320 224 0 0-320z\"></path></svg>","warn":"<svg stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"0\" viewBox=\"0 0 512 512\" aria-hidden=\"true\" height=\"1em\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M256 32c14.2 0 27.3 7.5 34.5 19.8l216 368c7.3 12.4 7.3 27.7 .2 40.1S486.3 480 472 480L40 480c-14.3 0-27.6-7.7-34.7-20.1s-7-27.8 .2-40.1l216-368C228.7 39.5 241.8 32 256 32zm0 128c-13.3 0-24 10.7-24 24l0 112c0 13.3 10.7 24 24 24s24-10.7 24-24l0-112c0-13.3-10.7-24-24-24zm32 224a32 32 0 1 0 -64 0 32 32 0 1 0 64 0z\"></path></svg>","file":"<svg stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"0\" viewBox=\"0 0 512 512\" aria-hidden=\"true\" height=\"1em\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M0 64C0 28.7 28.7 0 64 0L224 0l0 128c0 17.7 14.3 32 32 32l128 0 0 144-208 0c-35.3 0-64 28.7-64 64l0 144-48 0c-35.3 0-64-28.7-64-64L0 64zm384 64l-128 0L256 0 384 128zM176 352l32 0c30.9 0 56 25.1 56 56s-25.1 56-56 56l-16 0 0 32c0 8.8-7.2 16-16 16s-16-7.2-16-16l0-48 0-80c0-8.8 7.2-16 16-16zm32 80c13.3 0 24-10.7 24-24s-10.7-24-24-24l-16 0 0 48 16 0zm96-80l32 0c26.5 0 48 21.5 48 48l0 64c0 26.5-21.5 48-48 48l-32 0c-8.8 0-16-7.2-16-16l0-128c0-8.8 7.2-16 16-16zm32 128c8.8 0 16-7.2 16-16l0-64c0-8.8-7.2-16-16-16l-16 0 0 96 16 0zm80-112c0-8.8 7.2-16 16-16l48 0c8.8 0 16 7.2 16 16s-7.2 16-16 16l-32 0 0 32 32 0c8.8 0 16 7.2 16 16s-7.2 16-16 16l-32 0 0 48c0 8.8-7.2 16-16 16s-16-7.2-16-16l0-64 0-64z\"></path></svg>","palette":"<svg stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"0\" viewBox=\"0 0 512 512\" aria-hidden=\"true\" height=\"1em\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M512 256c0 .9 0 1.8 0 2.7c-.4 36.5-33.6 61.3-70.1 61.3L344 320c-26.5 0-48 21.5-48 48c0 3.4 .4 6.7 1 9.9c2.1 10.2 6.5 20 10.8 29.9c6.1 13.8 12.1 27.5 12.1 42c0 31.8-21.6 60.7-53.4 62c-3.5 .1-7 .2-10.6 .2C114.6 512 0 397.4 0 256S114.6 0 256 0S512 114.6 512 256zM128 288a32 32 0 1 0 -64 0 32 32 0 1 0 64 0zm0-96a32 32 0 1 0 0-64 32 32 0 1 0 0 64zM288 96a32 32 0 1 0 -64 0 32 32 0 1 0 64 0zm96 96a32 32 0 1 0 0-64 32 32 0 1 0 0 64z\"></path></svg>","sun":"<svg stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"0\" viewBox=\"0 0 512 512\" aria-hidden=\"true\" height=\"1em\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M361.5 1.2c5 2.1 8.6 6.6 9.6 11.9L391 121l107.9 19.8c5.3 1 9.8 4.6 11.9 9.6s1.5 10.7-1.6 15.2L446.9 256l62.3 90.3c3.1 4.5 3.7 10.2 1.6 15.2s-6.6 8.6-11.9 9.6L391 391 371.1 498.9c-1 5.3-4.6 9.8-9.6 11.9s-10.7 1.5-15.2-1.6L256 446.9l-90.3 62.3c-4.5 3.1-10.2 3.7-15.2 1.6s-8.6-6.6-9.6-11.9L121 391 13.1 371.1c-5.3-1-9.8-4.6-11.9-9.6s-1.5-10.7 1.6-15.2L65.1 256 2.8 165.7c-3.1-4.5-3.7-10.2-1.6-15.2s6.6-8.6 11.9-9.6L121 121 140.9 13.1c1-5.3 4.6-9.8 9.6-11.9s10.7-1.5 15.2 1.6L256 65.1 346.3 2.8c4.5-3.1 10.2-3.7 15.2-1.6zM160 256a96 96 0 1 1 192 0 96 96 0 1 1 -192 0zm224 0a128 128 0 1 0 -256 0 128 128 0 1 0 256 0z\"></path></svg>","moon":"<svg stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"0\" viewBox=\"0 0 384 512\" aria-hidden=\"true\" height=\"1em\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M223.5 32C100 32 0 132.3 0 256S100 480 223.5 480c60.6 0 115.5-24.2 155.8-63.4c5-4.9 6.3-12.5 3.1-18.7s-10.1-9.7-17-8.5c-9.8 1.7-19.8 2.6-30.1 2.6c-96.9 0-175.5-78.8-175.5-176c0-65.8 36-123.1 89.3-153.3c6.1-3.5 9.2-10.5 7.7-17.3s-7.3-11.9-14.3-12.5c-6.3-.5-12.6-.8-19-.8z\"></path></svg>","auto":"<svg stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"0\" viewBox=\"0 0 512 512\" aria-hidden=\"true\" height=\"1em\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M448 256c0-106-86-192-192-192l0 384c106 0 192-86 192-192zM0 256a256 256 0 1 1 512 0A256 256 0 1 1 0 256z\"></path></svg>","star":"<svg stroke=\"currentColor\" fill=\"currentColor\" stroke-width=\"0\" viewBox=\"0 0 576 512\" aria-hidden=\"true\" height=\"1em\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M316.9 18C311.6 7 300.4 0 288.1 0s-23.4 7-28.8 18L195 150.3 51.4 171.5c-12 1.8-22 10.2-25.7 21.7s-.7 24.2 7.9 32.7L137.8 329 113.2 474.7c-2 12 3 24.2 12.9 31.3s23 8 33.8 2.3l128.3-68.5 128.3 68.5c10.8 5.7 23.9 4.9 33.8-2.3s14.9-19.3 12.9-31.3L438.5 329 542.7 225.9c8.6-8.5 11.7-21.2 7.9-32.7s-13.7-19.9-25.7-21.7L381.2 150.3 316.9 18z\"></path></svg>"};
+const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const MES3 = MESES.map(m => m.slice(0, 3));
+const ATIV = [
+  { id: 'gado', nome: 'Gado de corte', curto: 'Gado', titulo: 'GADO DE CORTE', icon: 'cow', rgb: [79, 57, 100], dark: [45, 35, 64], light: [236, 230, 244],
+    itens: [['Ração', 'racao'], ['Alimentos', 'alim'], ['Suplementos', 'supl'], ['Lucro', 'lucro']] },
+  { id: 'porco', nome: 'Porco de corte / Suinocultura', curto: 'Porcos', titulo: 'PORCO DE CORTE / SUINOCULTURA', icon: 'pig', rgb: [181, 46, 88], dark: [134, 30, 63], light: [248, 228, 236],
+    itens: [['Ração', 'racao'], ['Alimentos', 'alim'], ['Suplementos', 'supl'], ['Lucro', 'lucro']] },
+  { id: 'lavoura', nome: 'Lavoura', curto: 'Lavoura', titulo: 'LAVOURA', icon: 'wheat', rgb: [126, 98, 179], dark: [84, 62, 128], light: [238, 232, 248],
+    itens: [['Diesel', 'diesel'], ['Arrendamento', 'arrend'], ['Agrotóxicos', 'agro'], ['Lucro', 'lucro'], ['Adubos', 'adubo'], ['Sementes', 'semente'], ['Outros', 'outros']] },
+  { id: 'casa', nome: 'Despesas domésticas', curto: 'Casa', titulo: 'DESPESAS DOMÉSTICAS', icon: 'house', rgb: [168, 91, 142], dark: [118, 58, 99], light: [245, 230, 240],
+    itens: [['Despesas domésticas', 'casa']] },
+];
+const A = Object.fromEntries(ATIV.map(a => [a.id, a]));
+const isEntrada = item => item === 'Lucro';
+const VIEWS = [['anotar', 'Anotar', 'pen'], ['mes', 'Mês', 'cal'], ['ano', 'Ano', 'table'], ['resumo', 'Resumo', 'chart'], ['imprimir', 'Imprimir', 'print']];
+
+const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+const nfmt = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const R = v => brl.format(v || 0);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const diasNoMes = (y, m) => new Date(y, m + 1, 0).getDate();
+const hoje = new Date();
+const isoHoje = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+function parseValor(txt) {
+  let s = String(txt || '').replace(/[R$\s]/g, '');
+  if (!s) return NaN;
+  if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+  else if ((s.match(/\./g) || []).length > 1 || /\.\d{3}$/.test(s)) s = s.replace(/\./g, '');
+  const v = Number(s);
+  return Number.isFinite(v) ? Math.round(v * 100) / 100 : NaN;
+}
+const novoId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+/* ---------- armazenamento ---------- */
+function makeLocal() {
+  const K = 'caderneta-rural:'; const mem = {}; let ok = true;
+  const load = y => { try { const t = localStorage.getItem(K + y); return t ? JSON.parse(t) : (mem[y] || {}); } catch { ok = false; return mem[y] || {}; } };
+  const save = (y, m) => { mem[y] = m; try { localStorage.setItem(K + y, JSON.stringify(m)); } catch { ok = false; } };
+  let cb = null, yr = null;
+  return {
+    kind: 'local', get ok() { return ok; },
+    open(y, onData) { yr = y; cb = onData; onData(load(y)); return () => { cb = null; }; },
+    async write(y, map) { save(y, map); if (cb && y === yr) cb({ ...map }); },
+    async getYear(y) { return load(y); },
+    years() { const ys = []; try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith(K)) ys.push(Number(k.slice(K.length))); } } catch {} Object.keys(mem).forEach(y => ys.includes(+y) || ys.push(+y)); return ys; },
+  };
+}
+async function makeDb() {
+  if (!window.claude || !window.claude.use) return null;
+  const [db, user] = await Promise.all([window.claude.use('db'), window.claude.use('user')]);
+  if (!db || !user) return null;
+  let uid = null; try { uid = await user.id(); } catch {}
+  if (!uid) return null;
+  try { if ((await user.can('data.write')) === false) return null; } catch {}
+  const ref = y => db.doc(`data/users/${uid}/caderneta`).collection('anos').doc(String(y));
+  let chain = Promise.resolve();
+  return {
+    kind: 'db', ok: true,
+    open(y, onData, onState) {
+      const timer = setTimeout(() => onState && onState('slow'), 10000);
+      const un = ref(y).onSnapshot(s => {
+        if (!s.metadata.fromCache) { clearTimeout(timer); onState && onState('ok'); }
+        const d = s.exists ? s.data() : null;
+        onData(d && d.e ? JSON.parse(JSON.stringify(d.e)) : {});
+      }, err => { clearTimeout(timer); onState && onState('error', err); });
+      return () => { clearTimeout(timer); un(); };
+    },
+    write(y, map) { const p = chain.then(() => ref(y).set({ ano: y, e: map })); chain = p.catch(() => {}); return p; },
+    async getYear(y) { const s = await ref(y).get(); return s.exists && s.data().e ? JSON.parse(JSON.stringify(s.data().e)) : {}; },
+  };
+}
+
+/* ---------- estado ---------- */
+const S = { year: hoje.getFullYear(), view: 'anotar', mes: hoje.getMonth(), ativ: null, item: null, entries: {}, store: null, unsub: null, confirmDel: null, ready: false, msg: '' };
+
+/* exemplo (só para mostrar, nunca é salvo) */
+function exemplo(y) {
+  let seed = y * 7 + 3; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const e = {}; let n = 0;
+  const add = (m, d, a, i, v) => { e['ex' + (n++)] = { d: `${y}-${String(m + 1).padStart(2, '0')}-${String(Math.min(d, diasNoMes(y, m))).padStart(2, '0')}`, a, i, v: Math.round(v) }; };
+  const ate = y < hoje.getFullYear() ? 11 : y > hoje.getFullYear() ? -1 : hoje.getMonth();
+  for (let m = 0; m <= ate; m++) {
+    add(m, 5, 'gado', 'Ração', 380 + rnd() * 160); add(m, 20, 'gado', 'Ração', 300 + rnd() * 140);
+    add(m, 12, 'gado', 'Suplementos', 90 + rnd() * 60);
+    if (m % 2 === 0) add(m, 15, 'gado', 'Alimentos', 160 + rnd() * 120);
+    if (m === 3 || m === 6 || m === 9) add(m, 22, 'gado', 'Lucro', 4800 + rnd() * 1200);
+    add(m, 4, 'porco', 'Ração', 420 + rnd() * 200); add(m, 18, 'porco', 'Ração', 380 + rnd() * 180);
+    add(m, 9, 'porco', 'Suplementos', 60 + rnd() * 50);
+    if (m % 2 === 1) add(m, 25, 'porco', 'Lucro', 2300 + rnd() * 900);
+    add(m, 7, 'lavoura', 'Diesel', 250 + rnd() * 300);
+    if (m === 8 || m === 9) { add(m, 10, 'lavoura', 'Adubos', 4200 + rnd() * 2400); add(m, 14, 'lavoura', 'Sementes', 2500 + rnd() * 1200); }
+    if (m === 10 || m === 11 || m === 0) add(m, 16, 'lavoura', 'Agrotóxicos', 1800 + rnd() * 1300);
+    if (m === 3) add(m, 20, 'lavoura', 'Lucro', 54000 + rnd() * 8000);
+    if (m === 10) add(m, 25, 'lavoura', 'Lucro', 12500 + rnd() * 3000);
+    if (m === 4) add(m, 2, 'lavoura', 'Arrendamento', 6000);
+    if (m % 3 === 0) add(m, 27, 'lavoura', 'Outros', 150 + rnd() * 250);
+    add(m, 1, 'casa', 'Despesas domésticas', 1100 + rnd() * 300); add(m, 15, 'casa', 'Despesas domésticas', 900 + rnd() * 400);
+  }
+  return e;
+}
+const dados = () => { const real = Object.keys(S.entries).length > 0; return { real, e: real ? S.entries : exemplo(S.year) }; };
+
+/* soma: t[a][item][m][d] */
+function somar(e) {
+  const t = {};
+  for (const a of ATIV) { t[a.id] = {}; for (const [it] of a.itens) t[a.id][it] = Array.from({ length: 12 }, () => new Array(32).fill(0)); }
+  for (const x of Object.values(e)) {
+    if (!x || !x.d || !t[x.a] || !t[x.a][x.i]) continue;
+    const m = Number(x.d.slice(5, 7)) - 1, d = Number(x.d.slice(8, 10));
+    if (m < 0 || m > 11 || !d) continue;
+    t[x.a][x.i][m][d] += Number(x.v) || 0;
+  }
+  return t;
+}
+const sum = arr => arr.reduce((s, v) => s + v, 0);
+const mesTotal = (t, a, it, m) => sum(t[a][it][m]);
+function resAtiv(t, a, m) { // m = null -> ano
+  let ent = 0, sai = 0;
+  for (const [it] of A[a].itens) { const v = m === null ? sum(t[a][it].map(sum)) : mesTotal(t, a, it, m); if (isEntrada(it)) ent += v; else sai += v; }
+  return { ent, sai, res: ent - sai };
+}
+
+/* ---------- render ---------- */
+const $ = id => document.getElementById(id);
+function setStatus() {
+  const st = $('status');
+  if (!S.ready) { st.innerHTML = `${I.cloud}<span>Abrindo a caderneta…</span>`; return; }
+  if (S.store.kind === 'db') st.innerHTML = `${I.cloud}<span>${S.slow ? 'A conexão está lenta: as anotações podem estar desatualizadas.' : 'Anotações guardadas na sua conta. Abrem em qualquer aparelho.'}</span>`;
+  else st.innerHTML = `${I.phone}<span>${S.store.ok ? 'Anotações guardadas neste aparelho. Faça uma cópia de segurança na aba Imprimir.' : 'Este navegador não está guardando as anotações. Baixe a cópia de segurança antes de fechar.'}</span>`;
+}
+function renderTabs() {
+  $('tabs').innerHTML = VIEWS.map(([id, nome, ic]) => `<button class="tab" role="tab" id="tab-${id}" aria-selected="${S.view === id}" aria-controls="v-${id}" data-view="${id}">${I[ic]}<span>${nome}</span></button>`).join('');
+  for (const [id] of VIEWS) $('v-' + id).hidden = S.view !== id;
+}
+function banner(real) {
+  return real ? '' : `<div class="banner">${I.warn}<span>Este é um <u>exemplo</u> de como fica. Ainda não há anotações em ${S.year}: quando você anotar o primeiro valor na aba Anotar, os seus números aparecem aqui.</span></div>`;
+}
+
+function renderAnotar() {
+  const a = S.ativ ? A[S.ativ] : null;
+  const recentes = Object.entries(S.entries).sort((x, y) => (y[1].d + (y[1].t || '')).localeCompare(x[1].d + (x[1].t || ''))).slice(0, 12);
+  $('v-anotar').innerHTML = `
+  <div class="card">
+    <div class="step"><b>1</b>De onde é o dinheiro?</div>
+    <div class="ativs">${ATIV.map(x => `<button class="ativ t-${x.id}" data-ativ="${x.id}" aria-pressed="${S.ativ === x.id}"><span class="ic">${I[x.icon]}</span>${x.curto === 'Casa' ? 'Casa' : x.curto === 'Porcos' ? 'Porcos' : x.curto}</button>`).join('')}</div>
+  </div>
+  ${a ? `<div class="card t-${a.id}">
+    <div class="step"><b>2</b>O que foi?</div>
+    <div class="itens">${a.itens.map(([it, ic]) => `<button class="item t-${a.id} ${isEntrada(it) ? 'entrada' : ''}" data-item="${esc(it)}" aria-pressed="${S.item === it}"><span class="ic">${I[ic]}</span><span>${esc(it)}${isEntrada(it) ? '<small>dinheiro que entrou</small>' : '<small>gasto</small>'}</span></button>`).join('')}</div>
+  </div>` : ''}
+  ${a && S.item ? `<form class="card" id="fAnotar" autocomplete="off">
+    <div class="step"><b>3</b>Quando e quanto?</div>
+    <div class="fields">
+      <div class="field"><label for="fDia">Dia</label><input id="fDia" type="date" value="${S.dia || isoHoje()}" required></div>
+      <div class="field"><label for="fValor">Valor</label><div class="money"><span>R$</span><input id="fValor" inputmode="decimal" placeholder="0,00" required></div></div>
+      <div class="field wide"><label for="fNota">Observação (se quiser)</label><input id="fNota" maxlength="80" placeholder="Ex.: 3 sacos de ração"></div>
+    </div>
+    <button class="big" type="submit" id="bAnotar" ${S.ready ? '' : 'disabled'}>${I.check}Anotar ${isEntrada(S.item) ? 'entrada' : 'gasto'}</button>
+    <p class="msg" id="fMsg" role="status"></p>
+  </form>` : `<p class="hint">${a ? 'Toque no que foi para continuar.' : 'Toque numa das opções acima para começar.'}</p>`}
+  <div class="card">
+    <h2>Últimas anotações de ${S.year}</h2>
+    ${recentes.length ? `<div class="list">${recentes.map(([id, x]) => {
+      const at = A[x.a] || A.casa; const ic = (at.itens.find(i => i[0] === x.i) || [0, 'outros'])[1];
+      const [yy, mm, dd] = x.d.split('-');
+      return `<div class="row t-${at.id}"><span class="ic">${I[ic]}</span><div class="what"><b>${esc(x.i)}</b><span>${at.curto} · ${dd}/${mm}${x.n ? ' · ' + esc(x.n) : ''}</span></div>
+        <span class="val num ${isEntrada(x.i) ? 'in' : 'out'}">${isEntrada(x.i) ? '+' : '−'} ${R(x.v)}</span>
+        <button class="del" data-del="${id}" aria-label="Apagar ${esc(x.i)} de ${dd}/${mm}">${I.trash}</button>
+        ${S.confirmDel === id ? `<div class="confirm">Apagar esta anotação? <button class="yes" data-delyes="${id}">Sim, apagar</button><button class="no" data-delno>Não</button></div>` : ''}</div>`;
+    }).join('')}</div>` : `<p class="empty">Nenhuma anotação ainda em ${S.year}. A primeira que você fizer aparece aqui.</p>`}
+  </div>`;
+}
+
+function tabela(t, a, cols, valFn, totFn, extraHead) {
+  const head = `<tr><th>${a.id === 'casa' ? 'DESCRIÇÃO' : 'DESCRIÇÃO'}</th>${cols.map(c => `<th>${c.l}</th>`).join('')}<th>${extraHead}</th></tr>`;
+  const rows = a.itens.map(([it]) => {
+    const vals = cols.map(c => valFn(it, c.k)); const tt = sum(vals);
+    return `<tr><td>${esc(it)}</td>${vals.map(v => `<td class="num ${v ? '' : 'z'}">${v ? nfmt.format(v) : '·'}</td>`).join('')}<td class="num tt">${nfmt.format(tt)}</td></tr>`;
+  }).join('');
+  const resCols = cols.map(c => totFn(c.k));
+  const total = `<tr class="total"><td>${a.id === 'casa' ? 'TOTAL' : 'TOTAL / RESULTADO'}</td>${resCols.map(v => `<td class="num ${v < 0 ? 'neg' : ''}">${v ? nfmt.format(v) : '·'}</td>`).join('')}<td class="num ${sum(resCols) < 0 ? 'neg' : ''}">${nfmt.format(sum(resCols))}</td></tr>`;
+  return `<div class="scroll"><table><thead>${head}</thead><tbody>${rows}${total}</tbody></table></div>`;
+}
+function resultadoDia(t, a, m, d) { let r = 0; for (const [it] of a.itens) r += (a.id === 'casa' ? 1 : isEntrada(it) ? 1 : -1) * t[a.id][it][m][d]; return r; }
+function resultadoMes(t, a, m) { let r = 0; for (const [it] of a.itens) r += (a.id === 'casa' ? 1 : isEntrada(it) ? 1 : -1) * mesTotal(t, a.id, it, m); return r; }
+
+function headAtiv(a, label, valor) {
+  return `<div class="ahead"><span class="ic">${I[a.icon]}</span><div><h3>${a.nome}</h3></div><div class="res"><small>${label}</small><b class="num ${a.id === 'casa' ? '' : valor < 0 ? 'neg' : 'pos'}">${R(valor)}</b></div></div>`;
+}
+function renderMes() {
+  const { real, e } = dados(); const t = somar(e); const m = S.mes; const nd = diasNoMes(S.year, m);
+  const cols = Array.from({ length: nd }, (_, i) => ({ k: i + 1, l: String(i + 1) }));
+  $('v-mes').innerHTML = `
+  <div class="chips" role="group" aria-label="Mês">${MESES.map((n, i) => `<button class="chip" data-mes="${i}" aria-pressed="${i === m}">${n}</button>`).join('')}</div>
+  ${banner(real)}
+  ${ATIV.map(a => {
+    const r = a.id === 'casa' ? resultadoMes(t, a, m) : resAtiv(t, a.id, m).res;
+    return `<div class="card acard t-${a.id}">
+      ${headAtiv(a, a.id === 'casa' ? `Gastos de ${MESES[m].toLowerCase()}` : `Resultado de ${MESES[m].toLowerCase()}`, r)}
+      <div class="tots">${a.itens.map(([it]) => { const v = mesTotal(t, a.id, it, m); return `<div class="tot"><small>${esc(it)}</small><b class="num ${isEntrada(it) ? 'pos' : ''}">${R(v)}</b></div>`; }).join('')}</div>
+      <details><summary>Ver dia a dia</summary>${tabela(t, a, cols, (it, d) => t[a.id][it][m][d], d => resultadoDia(t, a, m, d), 'TOTAL DO MÊS')}</details>
+    </div>`;
+  }).join('')}`;
+}
+function renderAno() {
+  const { real, e } = dados(); const t = somar(e);
+  const cols = MES3.map((l, k) => ({ k, l }));
+  $('v-ano').innerHTML = `${banner(real)}
+  ${ATIV.map(a => {
+    const r = a.id === 'casa' ? sum(MESES.map((_, m) => resultadoMes(t, a, m))) : resAtiv(t, a.id, null).res;
+    return `<div class="card acard t-${a.id}">${headAtiv(a, a.id === 'casa' ? `Gastos em ${S.year}` : `Resultado de ${S.year}`, r)}
+      ${tabela(t, a, cols, (it, m) => mesTotal(t, a.id, it, m), m => resultadoMes(t, a, m), 'TOTAL ANUAL')}</div>`;
+  }).join('')}`;
+}
+function geral(t) {
+  const linhas = [
+    { a: A.casa, nome: 'Despesas domésticas', ent: 0, sai: sum(MESES.map((_, m) => resultadoMes(t, A.casa, m))) },
+    ...['lavoura', 'gado', 'porco'].map(id => { const r = resAtiv(t, id, null); return { a: A[id], nome: id === 'gado' ? 'Gado de corte' : id === 'porco' ? 'Suinocultura' : 'Lavoura', ent: r.ent, sai: r.sai }; }),
+  ];
+  const ent = sum(linhas.map(l => l.ent)), sai = sum(linhas.map(l => l.sai));
+  return { linhas, ent, sai, dif: ent - sai };
+}
+function renderResumo() {
+  const { real, e } = dados(); const t = somar(e); const g = geral(t);
+  const mens = MESES.map((_, m) => { let en = 0, sa = 0; for (const a of ATIV) for (const [it] of a.itens) { const v = mesTotal(t, a.id, it, m); if (a.id !== 'casa' && isEntrada(it)) en += v; else sa += v; } return { en, sa }; });
+  const mx = Math.max(1, ...mens.map(x => Math.max(x.en, x.sa)));
+  $('v-resumo').innerHTML = `${banner(real)}
+  <div class="kpis">
+    <div class="kpi"><small>Entrou (lucro)</small><b class="num pos">${R(g.ent)}</b></div>
+    <div class="kpi"><small>Saiu (despesas)</small><b class="num neg">${R(g.sai)}</b></div>
+    <div class="kpi main"><small>Diferença de ${S.year}</small><b class="num">${R(g.dif)}</b></div>
+  </div>
+  <div class="card geral">
+    <h2>Geral — resumo anual</h2>
+    <div class="scroll"><table><thead><tr><th>CATEGORIA</th><th>LUCRO (R$)</th><th>DESPESAS (R$)</th><th>RESULTADO / DIFERENÇA (R$)</th></tr></thead><tbody>
+      ${g.linhas.map(l => `<tr class="t-${l.a.id}"><td><span class="ic">${I[l.a.icon]}</span>${l.nome}</td><td class="num">${nfmt.format(l.ent)}</td><td class="num">${nfmt.format(l.sai)}</td><td class="num ${l.ent - l.sai < 0 ? 'neg' : 'pos'}">${nfmt.format(l.ent - l.sai)}</td></tr>`).join('')}
+      <tr class="total"><td>Diferença</td><td class="num">${nfmt.format(g.ent)}</td><td class="num">${nfmt.format(g.sai)}</td><td class="num ${g.dif < 0 ? 'neg' : 'pos'}">${nfmt.format(g.dif)}</td></tr>
+    </tbody></table></div>
+  </div>
+  <div class="card">
+    <h2>Mês a mês</h2>
+    <div class="legend"><span><i style="background:var(--pos)"></i>Entrou</span><span><i style="background:var(--neg)"></i>Saiu (inclui a casa)</span></div>
+    <div class="bars">${mens.map((x, m) => `<div class="bar" title="${MESES[m]}: entrou ${R(x.en)}, saiu ${R(x.sa)}"><div class="pair"><i class="e" style="height:${(x.en / mx) * 100}%"></i><i class="s" style="height:${(x.sa / mx) * 100}%"></i></div><small>${MES3[m]}</small></div>`).join('')}</div>
+  </div>`;
+}
+function renderImprimir() {
+  const real = Object.keys(S.entries).length > 0;
+  $('v-imprimir').innerHTML = `
+  <div class="card">
+    <h2>Folhas para imprimir</h2>
+    <p class="hint">Os arquivos saem em PDF, no mesmo modelo da caderneta de papel. Depois é só imprimir.</p>
+    <div class="prints">
+      <button class="pbtn" data-pdf="branco"><span class="ic">${I.file}</span><span><b>Caderneta em branco</b><span>As 40 folhas para preencher à mão: o ano todo e os 12 meses dia a dia.</span></span></button>
+      <button class="pbtn" data-pdf="ano"><span class="ic">${I.table}</span><span><b>Ano ${S.year} preenchido</b><span>${real ? 'Folhas de gado, porcos, lavoura e casa mês a mês, mais o resumo geral.' : 'Ainda sem anotações: sai com os dados de exemplo, marcados como fictícios.'}</span></span></button>
+    </div>
+    <div class="row2">
+      <label for="selMes"><b>Mês dia a dia:</b></label>
+      <select id="selMes">${MESES.map((n, i) => `<option value="${i}" ${i === S.mes ? 'selected' : ''}>${n}</option>`).join('')}</select>
+      <button class="big" style="min-height:48px;font-size:1rem;padding:0 18px" data-pdf="mes">${I.down}Gerar folhas do mês</button>
+    </div>
+    ${real ? '' : `<p class="hint">Enquanto não houver anotações em ${S.year}, as folhas preenchidas saem com os dados de exemplo e a marca “EXEMPLO · DADOS FICTÍCIOS” no topo.</p>`}
+    <p class="msg" id="pMsg" role="status"></p>
+  </div>
+  <div class="card">
+    <h2>Cópia de segurança</h2>
+    <p class="hint">Guarde um arquivo com todas as anotações de ${S.year}. Se trocar de celular ou limpar o navegador, é só trazer o arquivo de volta.</p>
+    <div class="row2">
+      <button class="big" style="min-height:52px;font-size:1rem;padding:0 18px" id="bExport">${I.down}Baixar cópia de ${S.year}</button>
+      <span class="big filebtn" style="min-height:52px;font-size:1rem;padding:0 18px;background:var(--brand-soft);color:var(--brand)">${I.up}Trazer cópia de volta<input type="file" id="fImport" accept=".json,application/json" aria-label="Trazer cópia de segurança"></span>
+    </div>
+    <p class="msg" id="bMsg" role="status"></p>
+  </div>`;
+}
+function render() {
+  renderTabs(); setStatus();
+  ({ anotar: renderAnotar, mes: renderMes, ano: renderAno, resumo: renderResumo, imprimir: renderImprimir })[S.view]();
+}
+
+/* ---------- ações ---------- */
+function abrirAno() {
+  if (S.unsub) S.unsub();
+  S.entries = {}; S.slow = false;
+  S.unsub = S.store.open(S.year, map => { S.entries = map || {}; if (S.view !== 'anotar' || !document.activeElement || !document.activeElement.closest('#fAnotar')) render(); else { setStatus(); } },
+    st => { S.slow = st === 'slow' || st === 'error'; setStatus(); });
+}
+async function gravar(map, okMsg) {
+  try { await S.store.write(S.year, map); return true; }
+  catch (err) {
+    if (S.store.kind === 'db') { // sem permissão na conta: passa a guardar neste aparelho
+      const local = makeLocal(); const atual = await local.getYear(S.year); await local.write(S.year, { ...atual, ...map });
+      S.store = local; abrirAno(); return true;
+    }
+    return false;
+  }
+}
+document.addEventListener('click', async ev => {
+  const b = ev.target.closest('button'); if (!b) return;
+  if (b.dataset.view) { S.view = b.dataset.view; try { history.replaceState(null, '', '#' + S.view); } catch { location.hash = S.view; } render(); window.scrollTo({ top: 0 }); return; }
+  if (b.dataset.ativ) { S.ativ = b.dataset.ativ; S.item = A[S.ativ].itens.length === 1 ? A[S.ativ].itens[0][0] : null; render(); return; }
+  if (b.dataset.item) { S.item = b.dataset.item; render(); setTimeout(() => { const v = $('fValor'); v && v.focus(); }, 30); return; }
+  if (b.dataset.mes) { S.mes = Number(b.dataset.mes); render(); return; }
+  if (b.dataset.del) { S.confirmDel = b.dataset.del; render(); return; }
+  if (b.hasAttribute('data-delno')) { S.confirmDel = null; render(); return; }
+  if (b.dataset.delyes) { const map = { ...S.entries }; delete map[b.dataset.delyes]; S.confirmDel = null; S.entries = map; render(); await gravar(map); return; }
+  if (b.dataset.pdf) { gerarPdf(b.dataset.pdf); return; }
+  if (b.id === 'yPrev' || b.id === 'yNext') { S.year += b.id === 'yPrev' ? -1 : 1; $('yLabel').textContent = S.year; S.confirmDel = null; if (S.store) abrirAno(); render(); return; }
+  if (b.id === 'bExport') { exportar(); return; }
+});
+document.addEventListener('change', ev => {
+  if (ev.target.id === 'selMes') S.mes = Number(ev.target.value);
+  if (ev.target.id === 'fDia') S.dia = ev.target.value;
+  if (ev.target.id === 'fImport') importar(ev.target.files && ev.target.files[0]);
+});
+document.addEventListener('submit', async ev => {
+  if (ev.target.id !== 'fAnotar') return;
+  ev.preventDefault();
+  const msg = $('fMsg'); const dia = $('fDia').value; const v = parseValor($('fValor').value); const nota = $('fNota').value.trim();
+  if (!dia) { msg.className = 'msg err'; msg.textContent = 'Escolha o dia.'; return; }
+  if (!(v > 0)) { msg.className = 'msg err'; msg.textContent = 'Digite o valor, por exemplo 350 ou 1.250,50.'; return; }
+  if (Number(dia.slice(0, 4)) !== S.year) { S.year = Number(dia.slice(0, 4)); $('yLabel').textContent = S.year; abrirAno(); }
+  S.dia = dia;
+  const id = novoId(); const entry = { d: dia, a: S.ativ, i: S.item, v, t: new Date().toISOString() }; if (nota) entry.n = nota;
+  const map = { ...S.entries, [id]: entry }; S.entries = map;
+  $('bAnotar').disabled = true;
+  const ok = await gravar(map);
+  const at = A[S.ativ];
+  render();
+  const m2 = $('fMsg'); if (m2) { m2.className = ok ? 'msg ok' : 'msg err'; m2.textContent = ok ? `Anotado: ${S.item} (${at.curto}), ${R(v)} no dia ${dia.slice(8, 10)}/${dia.slice(5, 7)}.` : 'Não foi possível guardar. Tente de novo.'; }
+});
+window.addEventListener('hashchange', () => { const h = location.hash.slice(1); if (VIEWS.some(v => v[0] === h)) { S.view = h; render(); } });
+
+/* ---------- arquivos ---------- */
+let _dl;
+async function downloads() { if (_dl !== undefined) return _dl; try { _dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null; } catch { _dl = null; } return _dl; }
+async function salvar(filename, data, msgEl) {
+  const dl = await downloads();
+  if (!dl) { msgEl.className = 'msg err'; msgEl.textContent = 'Este aparelho não permite baixar arquivos por aqui. Abra a caderneta no navegador do celular ou do computador.'; return false; }
+  try { await dl.save({ filename, data }); msgEl.className = 'msg ok'; msgEl.textContent = `Pronto: ${filename}`; return true; }
+  catch (err) { msgEl.className = 'msg err'; msgEl.textContent = err && err.code === 'declined' ? 'Download cancelado.' : 'Não foi possível baixar agora. Tente de novo em instantes.'; return false; }
+}
+async function exportar() {
+  const msg = $('bMsg');
+  const json = JSON.stringify({ app: 'caderneta-rural', versao: 1, ano: S.year, anotacoes: S.entries }, null, 1);
+  await salvar(`caderneta-rural-${S.year}.json`, json, msg);
+}
+async function importar(file) {
+  const msg = $('bMsg'); if (!file) return;
+  try {
+    const obj = JSON.parse(await file.text());
+    if (!obj || obj.app !== 'caderneta-rural' || typeof obj.anotacoes !== 'object') throw new Error('formato');
+    const ano = Number(obj.ano) || S.year;
+    const atual = ano === S.year ? S.entries : await S.store.getYear(ano);
+    const novo = { ...atual, ...obj.anotacoes };
+    const n = Object.keys(novo).length - Object.keys(atual).length;
+    await S.store.write(ano, novo);
+    if (ano !== S.year) { S.year = ano; $('yLabel').textContent = ano; abrirAno(); }
+    render();
+    const m2 = $('bMsg'); m2.className = 'msg ok'; m2.textContent = `Cópia de ${ano} trazida de volta: ${n} anotação(ões) nova(s).`;
+  } catch { msg.className = 'msg err'; msg.textContent = 'Esse arquivo não é uma cópia da Caderneta Rural.'; }
+}
+function carregarScript(src) { return new Promise((ok, no) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = no; document.head.appendChild(s); }); }
+let _pdfLib;
+async function pdfLib() {
+  if (_pdfLib) return _pdfLib;
+  await carregarScript('jspdf.umd.min.js');
+  await carregarScript('jspdf.plugin.autotable.min.js');
+  _pdfLib = window.jspdf.jsPDF; return _pdfLib;
+}
+const fmtCell = v => v ? nfmt.format(v) : '';
+let PDF_EXEMPLO = false;
+function cabecalho(doc, a, sub, mes) {
+  const W = doc.internal.pageSize.getWidth();
+  doc.setFillColor(...a.rgb); doc.roundedRect(12, 10, W - 24, 24, 4, 4, 'F');
+  doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.text('CADERNETA RURAL', 20, 17);
+  doc.setFontSize(18); doc.text(a.titulo, 20, 25);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.text(sub, 20, 30.5);
+  if (mes) { doc.setFillColor(255, 255, 255); doc.roundedRect(W - 70, 15, 52, 14, 3, 3, 'F'); doc.setTextColor(...a.dark); doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.text(mes, W - 44, 24.3, { align: 'center' }); }
+  if (PDF_EXEMPLO) { const x = mes ? W - 132 : W - 80; doc.setFillColor(255, 255, 255); doc.roundedRect(x, 16, 58, 12, 3, 3, 'F'); doc.setTextColor(...a.dark); doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.text('EXEMPLO', x + 29, 21.3, { align: 'center' }); doc.setFontSize(7); doc.text('DADOS FICTÍCIOS', x + 29, 25.6, { align: 'center' }); }
+}
+function tabelaPdf(doc, a, startY, head, body, rowH, fs) {
+  const W = doc.internal.pageSize.getWidth() - 24; const temTotal = /TOTAL/.test(head[head.length - 1]);
+  const nDias = head.length - 1 - (temTotal ? 1 : 0); const largura = (temTotal && nDias < 16 && nDias > 12 && head.length < 20) ? 22 : 24;
+  const resto = W - 38 - (temTotal ? largura : 0); const cols = { 0: { halign: 'left', fontStyle: 'bold', cellWidth: 38, textColor: a.dark } };
+  const cw = nDias === 12 ? resto / 12 : (W - 38) / 16;
+  for (let k = 1; k <= nDias; k++) cols[k] = { cellWidth: cw };
+  if (temTotal) cols[head.length - 1] = { cellWidth: nDias === 12 ? largura : W - 38 - cw * nDias, fontStyle: 'bold' };
+  doc.autoTable({ startY, head: [head], body, theme: 'grid', margin: { left: 12, right: 12 }, tableWidth: W,
+    styles: { font: 'helvetica', fontSize: fs, cellPadding: 1.2, minCellHeight: rowH, valign: 'middle', halign: 'right', lineColor: a.light.map(x => Math.max(0, x - 28)), lineWidth: .2, textColor: [40, 40, 40] },
+    headStyles: { fillColor: a.dark, textColor: 255, fontStyle: 'bold', halign: 'center', minCellHeight: 8 },
+    columnStyles: cols,
+    alternateRowStyles: { fillColor: a.light },
+    didParseCell: d => { if (d.section === 'body' && d.row.index === body.length - 1) { d.cell.styles.fillColor = a.light.map(x => Math.max(0, x - 18)); d.cell.styles.fontStyle = 'bold'; } if (d.section === 'head' && d.column.index === head.length - 1) d.cell.styles.fillColor = a.rgb; },
+  });
+  return doc.lastAutoTable.finalY;
+}
+async function gerarPdf(tipo) {
+  const msg = $('pMsg'); msg.className = 'msg'; msg.textContent = 'Preparando o PDF…';
+  if (tipo === 'branco') {
+    try { const blob = await (await fetch('Caderneta_Rural.pdf')).blob(); await salvar('Caderneta_Rural_em_branco.pdf', blob, msg); }
+    catch { msg.className = 'msg err'; msg.textContent = 'Não foi possível abrir a caderneta em branco agora.'; }
+    return;
+  }
+  let jsPDF; try { jsPDF = await pdfLib(); } catch { msg.className = 'msg err'; msg.textContent = 'Sem internet para montar o PDF. Tente de novo com conexão.'; return; }
+  const dd = dados(); PDF_EXEMPLO = !dd.real; const sufixo = dd.real ? '' : '_exemplo';
+  const t = somar(dd.e); const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  let primeira = true; const nova = () => { if (!primeira) doc.addPage(); primeira = false; };
+  if (tipo === 'ano') {
+    for (const a0 of ATIV) { const a = corPdf(a0);
+      nova(); cabecalho(doc, a, `CONTROLE MENSAL — ${S.year}`);
+      const body = a.itens.map(([it]) => { const vs = MESES.map((_, m) => mesTotal(t, a.id, it, m)); return [it, ...vs.map(fmtCell), nfmt.format(sum(vs))]; });
+      const rs = MESES.map((_, m) => resultadoMes(t, a, m)); body.push([a.id === 'casa' ? 'TOTAL' : 'TOTAL / RESULTADO', ...rs.map(fmtCell), nfmt.format(sum(rs))]);
+      tabelaPdf(doc, a, 42, ['DESCRIÇÃO', ...MESES, 'TOTAL ANUAL'], body, a.itens.length > 4 ? 16 : 24, 8);
+    }
+    const g = geral(t); const ger = corPdf({ id: 'geral', titulo: 'GERAL — RESUMO ANUAL', rgb: [79, 57, 100], dark: [45, 35, 64], light: [244, 241, 248] });
+    nova(); cabecalho(doc, ger, `Consolidação dos resultados e despesas da propriedade — ${S.year}`);
+    const body = g.linhas.map(l => [l.nome, nfmt.format(l.ent), nfmt.format(l.sai), nfmt.format(l.ent - l.sai)]); body.push(['Diferença', nfmt.format(g.ent), nfmt.format(g.sai), nfmt.format(g.dif)]);
+    doc.autoTable({ startY: 42, head: [['CATEGORIA', 'LUCRO (R$)', 'DESPESAS (R$)', 'RESULTADO / DIFERENÇA (R$)']], body, theme: 'grid', margin: { left: 12, right: 12 },
+      styles: { font: 'helvetica', fontSize: 12, minCellHeight: 24, valign: 'middle', halign: 'right', lineColor: ger.light.map(x => Math.max(0, x - 28)), lineWidth: .2 },
+      headStyles: { fillColor: ger.dark, textColor: 255, halign: 'left', minCellHeight: 10 }, columnStyles: { 0: { halign: 'left', fontStyle: 'bold', textColor: ger.dark, cellWidth: 70 } },
+      alternateRowStyles: { fillColor: ger.light }, didParseCell: d => { if (d.section === 'body' && d.row.index === body.length - 1) { d.cell.styles.fillColor = ger.light.map(x => Math.max(0, x - 20)); d.cell.styles.fontStyle = 'bold'; } } });
+    await salvar(`Caderneta_${S.year}_preenchida${sufixo}.pdf`, doc.output('blob'), msg);
+  } else {
+    const m = Number(($('selMes') || {}).value ?? S.mes); const nd = diasNoMes(S.year, m);
+    for (const a0 of ATIV) { const a = corPdf(a0);
+      nova(); cabecalho(doc, a, `CONTROLE DIÁRIO — ${MESES[m]} de ${S.year}`, MESES[m].toUpperCase());
+      const bloco = (de, ate, ultimo) => {
+        const dias = []; for (let d = de; d <= ate; d++) dias.push(d);
+        const head = [ultimo ? `DIAS ${de} A ${nd}` : `DIAS ${de} A ${ate}`, ...dias.map(String)]; if (ultimo) head.push('TOTAL DO MÊS');
+        const body = a.itens.map(([it]) => { const row = [it, ...dias.map(d => fmtCell(t[a.id][it][m][d]))]; if (ultimo) row.push(nfmt.format(mesTotal(t, a.id, it, m))); return row; });
+        const res = [a.id === 'casa' ? 'TOTAL' : 'TOTAL / RESULTADO', ...dias.map(d => fmtCell(resultadoDia(t, a, m, d)))]; if (ultimo) res.push(nfmt.format(resultadoMes(t, a, m)));
+        body.push(res); return [head, body];
+      };
+      const rowH = a.itens.length > 4 ? 7.5 : a.itens.length > 1 ? 11 : 16;
+      let [h, b] = bloco(1, 16, false); let y = tabelaPdf(doc, a, 40, h, b, rowH, 6.5);
+      [h, b] = bloco(17, nd, true); tabelaPdf(doc, a, y + 5, h, b, rowH, 6.5);
+    }
+    await salvar(`Caderneta_${MESES[m]}_${S.year}${sufixo}.pdf`, doc.output('blob'), msg);
+  }
+}
+
+/* ---------- temas ---------- */
+const TEMAS = [['auto', 'Automático', 'auto', 'linear-gradient(135deg,#F4F1F8 50%,#1A1424 50%)', '#4F3964'],
+  ['claro', 'Claro', 'sun', '#F4F1F8', '#4F3964'], ['escuro', 'Escuro', 'moon', '#241C31', '#C9B9DD'], ['amoled', 'AMOLED', 'star', '#000000', '#F08AAB']];
+const TEMA_KEY = 'cadernetaRuralTema';
+let tema = 'auto'; try { tema = localStorage.getItem(TEMA_KEY) || 'auto'; } catch {}
+/* paletas de cor: h = matiz da base, a = matiz do destaque, acts = matizes de gado, porcos, lavoura e casa */
+const CORES = [
+  { id: 'roxo', nome: 'Roxo e rosa', h: 271, s: 27, a: 342, as: 60, acts: [[271, 27], [342, 60], [262, 35], [320, 32]] },
+  { id: 'verde', nome: 'Verde e amarelo', h: 145, s: 32, a: 43, as: 88, aL: 46, acts: [[145, 38], [32, 55], [95, 42], [175, 42]] },
+  { id: 'azul', nome: 'Azul e laranja', h: 215, s: 40, a: 24, as: 85, acts: [[215, 45], [24, 75], [195, 55], [250, 35]] },
+  { id: 'vinho', nome: 'Vinho e dourado', h: 345, s: 40, a: 40, as: 80, aL: 42, acts: [[345, 45], [25, 55], [40, 60], [300, 25]] },
+  { id: 'terra', nome: 'Terra', h: 25, s: 35, a: 85, as: 45, acts: [[25, 45], [10, 50], [80, 40], [40, 30]] },
+  { id: 'grafite', nome: 'Grafite', h: 215, s: 12, a: 190, as: 70, acts: [[215, 15], [190, 55], [150, 30], [260, 15]] },
+];
+const COR_KEY = 'cadernetaRuralCor';
+let cor = 'roxo'; try { cor = localStorage.getItem(COR_KEY) || 'roxo'; } catch {}
+const hsl = (h, s, l) => `hsl(${h} ${s}% ${l}%)`;
+function hslRgb(h, s, l) { s /= 100; l /= 100; const k = n => (n + h / 30) % 12, a = s * Math.min(l, 1 - l); const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1)); return [f(0), f(8), f(4)].map(x => Math.round(x * 255)); }
+const NOMES_ATIV = ['gado', 'porco', 'lavoura', 'casa'];
+function modoEfetivo() {
+  if (tema !== 'auto') return tema;
+  const vt = document.documentElement.getAttribute('data-theme');
+  if (vt === 'dark') return 'escuro'; if (vt === 'light') return 'claro';
+  return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'escuro' : 'claro';
+}
+function tokensCor(c, modo) {
+  const t = {};
+  if (modo === 'claro') {
+    Object.assign(t, { '--bg': hsl(c.h, c.s + 5, 96), '--surface': '#FFFFFF', '--ink': hsl(c.h, c.s, 17), '--muted': hsl(c.h, Math.min(c.s, 14), 38), '--line': hsl(c.h, c.s, 88),
+      '--brand': hsl(c.h, c.s + 5, 30), '--brand-ink': '#FFFFFF', '--brand-soft': hsl(c.h, c.s + 10, 92),
+      '--accent': hsl(c.a, c.as, c.aL || 44), '--accent-ink': (c.aL || 44) > 44 ? hsl(c.h, c.s, 15) : '#FFFFFF',
+      '--warn-bg': hsl(c.a, c.as, 94), '--warn-ink': hsl(c.a, c.as, 28) });
+    c.acts.forEach(([h, s], i) => { t['--' + NOMES_ATIV[i]] = hsl(h, s, 36); t['--' + NOMES_ATIV[i] + '-l'] = hsl(h, s + 10, 93); });
+  } else {
+    const am = modo === 'amoled';
+    Object.assign(t, { '--bg': am ? '#000000' : hsl(c.h, c.s, 10), '--surface': hsl(c.h, c.s, am ? 5 : 15), '--ink': hsl(c.h, 30, 94), '--muted': hsl(c.h, 14, 72), '--line': hsl(c.h, c.s, am ? 15 : 24),
+      '--brand': hsl(c.h, Math.max(c.s, 30), 80), '--brand-ink': hsl(c.h, c.s, 12), '--brand-soft': hsl(c.h, c.s, am ? 10 : 22),
+      '--accent': hsl(c.a, c.as, 72), '--accent-ink': hsl(c.h, c.s, 12), '--warn-bg': hsl(c.a, 35, am ? 9 : 18), '--warn-ink': hsl(c.a, 80, 85) });
+    c.acts.forEach(([h, s], i) => { t['--' + NOMES_ATIV[i]] = hsl(h, Math.max(s, 35), 74); t['--' + NOMES_ATIV[i] + '-l'] = hsl(h, Math.min(s, 30), am ? 9 : 19); });
+  }
+  return t;
+}
+const CAMPOS_COR = ['--bg', '--surface', '--ink', '--muted', '--line', '--brand', '--brand-ink', '--brand-soft', '--accent', '--accent-ink', '--warn-bg', '--warn-ink', ...NOMES_ATIV.flatMap(n => ['--' + n, '--' + n + '-l'])];
+function aplicarTema() {
+  const root = document.documentElement;
+  if (tema === 'auto') root.removeAttribute('data-tema'); else root.setAttribute('data-tema', tema);
+  CAMPOS_COR.forEach(k => root.style.removeProperty(k));
+  const c = CORES.find(x => x.id === cor) || CORES[0];
+  if (c.id !== 'roxo') { const t = tokensCor(c, modoEfetivo()); for (const [k, v] of Object.entries(t)) root.style.setProperty(k, v); }
+  const sw = x => `<span class="dots"><i style="background:${hsl(x.h, x.s + 5, 30)}"></i><i style="background:${hsl(x.a, x.as, x.aL || 44)}"></i><i style="background:${hsl(x.acts[2][0], x.acts[2][1], 40)}"></i></span>`;
+  $('temaPanel').innerHTML = `<h3>Tema</h3><div class="tgrid">${TEMAS.map(([id, nome, ic, bg, fg]) => `<button class="tema" data-tema="${id}" aria-pressed="${tema === id}"><span class="sw" style="background:${bg};color:${fg}">${I[ic]}</span>${nome}</button>`).join('')}</div>
+    <h3>Cor</h3><div class="cgrid">${CORES.map(x => `<button class="cor" data-cor="${x.id}" aria-pressed="${cor === x.id}">${sw(x)}${x.nome}</button>`).join('')}</div>`;
+}
+function corPdf(a) {
+  const c = CORES.find(x => x.id === cor) || CORES[0];
+  if (c.id === 'roxo') return a;
+  const i = NOMES_ATIV.indexOf(a.id); const [h, s2] = i >= 0 ? c.acts[i] : [c.h, c.s + 5];
+  return { ...a, rgb: hslRgb(h, Math.max(s2, 25), i >= 0 ? 38 : 30), dark: hslRgb(h, Math.max(s2, 25), i >= 0 ? 26 : 20), light: hslRgb(h, s2 + 10, 94) };
+}
+try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => tema === 'auto' && aplicarTema()); } catch {}
+try { new MutationObserver(() => tema === 'auto' && aplicarTema()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] }); } catch {}
+document.addEventListener('click', ev => {
+  const b = ev.target.closest('button'); if (!b) return;
+  if (b.id === 'bTema') { const p = $('temaPanel'); p.hidden = !p.hidden; b.setAttribute('aria-expanded', String(!p.hidden)); }
+  if (b.dataset.tema) { tema = b.dataset.tema; try { localStorage.setItem(TEMA_KEY, tema); } catch {} aplicarTema(); }
+  if (b.dataset.cor) { cor = b.dataset.cor; try { localStorage.setItem(COR_KEY, cor); } catch {} aplicarTema(); }
+});
+
+/* ---------- início ---------- */
+$('bTema').innerHTML = I.palette; aplicarTema();
+$('logo').innerHTML = I.barn; $('yPrev').innerHTML = I.left; $('yNext').innerHTML = I.right; $('yLabel').textContent = S.year;
+{ const h = location.hash.slice(1); if (VIEWS.some(v => v[0] === h)) S.view = h; }
+render();
+(async () => {
+  let store = null;
+  try { store = await Promise.race([makeDb(), new Promise(r => setTimeout(() => r(null), 6000))]); } catch { store = null; }
+  S.store = store || makeLocal(); S.ready = true;
+  abrirAno(); render();
+})();
+</script>
+
+</body></html>

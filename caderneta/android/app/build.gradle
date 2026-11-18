@@ -1,0 +1,58 @@
+plugins {
+    id 'com.android.application'
+}
+
+// Assinatura fixa (opcional): se o GitHub tiver os segredos CADERNETA_KEYSTORE_B64 e CADERNETA_KEYSTORE_SENHA,
+// o APK sai sempre com a mesma chave e as atualizações instalam por cima sem perder as anotações.
+def chave = System.getenv('CADERNETA_KEYSTORE_ARQ')
+def senha = System.getenv('CADERNETA_KEYSTORE_SENHA')
+
+android {
+    namespace 'com.kimijoao.cadernetarural'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.kimijoao.cadernetarural'
+        minSdk 24
+        targetSdk 35
+        versionCode Integer.parseInt(System.getenv('GITHUB_RUN_NUMBER') ?: '1')
+        versionName '1.0.' + (System.getenv('GITHUB_RUN_NUMBER') ?: '1')
+    }
+    signingConfigs {
+        fixa {
+            if (chave && senha) {
+                storeFile file(chave)
+                storePassword senha
+                keyAlias 'caderneta'
+                keyPassword senha
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig (chave && senha) ? signingConfigs.fixa : signingConfigs.debug
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    lint {
+        abortOnError false
+    }
+    sourceSets.main.assets.srcDir layout.buildDirectory.dir('generated/www')
+}
+
+def copiarSite = tasks.register('copiarSite', Sync) {
+    from('../../www')
+    into layout.buildDirectory.dir('generated/www')
+}
+tasks.named('preBuild').configure {
+    dependsOn copiarSite
+}
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.12.1'
+    implementation 'androidx.core:core:1.13.1'
+}
