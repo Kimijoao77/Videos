@@ -1,0 +1,50 @@
+# Um vídeo avulso do YouTube que o João manda no chat: o Gemini assiste e descreve em detalhe
+# (ideias/youtube/avulso.py, no Engfy). O resultado vai para ideias/youtube/avulsos/<id>.md no Engfy (privado).
+name: Gemini assiste um vídeo
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "Link do vídeo no YouTube"
+        required: true
+      pergunta:
+        description: "Pergunta extra (opcional)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ideias-youtube
+  cancel-in-progress: false
+
+jobs:
+  assistir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: Kimijoao77/Engfy
+          token: ${{ secrets.ENGFY_TOKEN }}
+          sparse-checkout: ideias
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -q requests
+      - name: Gemini assiste
+        env:
+          GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
+          URL: ${{ inputs.url }}
+          PERGUNTA: ${{ inputs.pergunta }}
+        run: python ideias/youtube/avulso.py "$URL" "$PERGUNTA"
+      - name: Guardar no Engfy
+        run: |
+          git config user.name "Kimijoao77"
+          git config user.email "leclercjoao3@gmail.com"
+          git add ideias/youtube/avulsos ideias/youtube/cota.json 2>/dev/null || git add ideias/youtube/avulsos
+          git diff --cached --quiet && exit 0
+          git commit -q -m "Ideias: vídeo avulso assistido pelo Gemini"
+          for i in 1 2 3; do git push -q && exit 0; git pull -q --rebase; done
