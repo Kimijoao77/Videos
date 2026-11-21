@@ -176,13 +176,21 @@ jobs:
           dur=$(python -c "import json;print(json.load(open('voz/marcas.json'))['dur'])")
           python canal/lince/legendas.py mudo.mp4 zooms legendado.mp4 voz/tempos.json voz/marcas.json
           python canal/lince/trilha.py $dur voz/tempos.json trilha.wav 112 7 voz/marcas.json
+          # 21/11: no ritmo rápido (o padrão) a música fica mais alta e volta depressa entre as falas (som sem buracos)
+          ritmo=$(python -c "import json;print(json.load(open('voz/marcas.json')).get('ritmo','calmo'))")
+          if [ "$ritmo" = "rapido" ]; then duck="volume=0.5[m];[m][0:a]sidechaincompress=threshold=0.04:ratio=8:attack=10:release=90"
+          else duck="volume=0.32[m];[m][0:a]sidechaincompress=threshold=0.04:ratio=5:attack=15:release=350"; fi
           ffmpeg -v error -y -i voz/voz.wav -i trilha.wav -filter_complex \
-            "[1:a]volume=0.32[m];[m][0:a]sidechaincompress=threshold=0.04:ratio=5:attack=15:release=350[md];[0:a][md]amix=inputs=2:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=9[a]" \
+            "[1:a]$duck[md];[0:a][md]amix=inputs=2:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=9[a]" \
             -map "[a]" -ar 44100 audio.wav
           mkdir -p envio
           ffmpeg -v error -y -i legendado.mp4 -i audio.wav -map 0:v -map 1:a -c:v copy -c:a aac -b:a 192k -shortest -movflags +faststart envio/${{ inputs.nome }}.mp4
           cp voz/marcas.json envio/${{ inputs.nome }}-marcas.json
           ffprobe -v error -show_entries format=duration -of csv=p=0 envio/${{ inputs.nome }}.mp4
+      - name: Medir o ritmo (novidades a cada 10 s, imagem parada, buracos no som)
+        run: |
+          python canal/lince/medir_ritmo.py envio/${{ inputs.nome }}.mp4 | tee -a "$GITHUB_STEP_SUMMARY"
+          python canal/lince/medir_ritmo.py envio/${{ inputs.nome }}.mp4 --json > envio/${{ inputs.nome }}-ritmo.json
       - name: Mandar para a Release privada do canal
         run: |
           for i in 1 2 3; do gh release upload lince-lunar -R "$CANAL_REPO" envio/* --clobber && break; sleep 10; done
