@@ -1,0 +1,104 @@
+# Nexus: teste automático do app (22/11/2026, pedido do João: "teste automático antes de cada versão").
+# A cada 10 minutos confere se o app/www da main do Engfy mudou desde a última versão liberada. Se mudou, abre o app
+# num navegador (app/testes/fumaca.mjs), passa por todas as telas e procura erros. Passou: a versão vai para o branch
+# app-liberado do Engfy, de onde o celular baixa as atualizações (js/atualizacao.js, desde a 1.44.0). Não passou: a
+# versão não chega ao celular, e o resultado (com os erros) fica em progresso/app-teste.json do Engfy. As fotos de
+# todas as telas ficam nos artefatos da execução por 7 dias. Roda aqui porque o repositório é público (minutos livres).
+name: "Nexus: testar app"
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+    inputs:
+      forcar:
+        description: "Testar de novo mesmo se esta versão já foi testada (sim/não)"
+        required: false
+        default: "não"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nexus-teste
+  cancel-in-progress: false
+
+env:
+  APP_REPO: Kimijoao77/Engfy
+  GH_TOKEN: ${{ secrets.ENGFY_TOKEN }}
+
+jobs:
+  testar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Código do app (repositório Engfy)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.APP_REPO }}
+          token: ${{ secrets.ENGFY_TOKEN }}
+          sparse-checkout: app
+
+      - name: Precisa testar?
+        id: precisa
+        run: |
+          arvore=$(git rev-parse HEAD:app/www)
+          echo "arvore=$arvore" >> "$GITHUB_OUTPUT"
+          liberada=$(gh api "repos/$APP_REPO/contents/app?ref=app-liberado" --jq '.[] | select(.name=="www") | .sha' 2>/dev/null || true)
+          ultimo=$(gh api "repos/$APP_REPO/contents/progresso/app-teste.json" -H "Accept: application/vnd.github.raw+json" 2>/dev/null | jq -r '.arvore // empty' || true)
+          if [ "${{ inputs.forcar }}" = "sim" ]; then echo "fazer=1" >> "$GITHUB_OUTPUT"; echo "Testar de novo (pedido à mão)"; exit 0; fi
+          if [ "$arvore" = "$liberada" ]; then echo "fazer=0" >> "$GITHUB_OUTPUT"; echo "Esta versão já está liberada"; exit 0; fi
+          if [ "$arvore" = "$ultimo" ]; then echo "fazer=0" >> "$GITHUB_OUTPUT"; echo "Esta versão já foi testada e não passou (veja progresso/app-teste.json)"; exit 0; fi
+          echo "fazer=1" >> "$GITHUB_OUTPUT"; echo "Versão nova: testando"
+
+      - uses: actions/setup-node@v4
+        if: steps.precisa.outputs.fazer == '1'
+        with:
+          node-version: 22
+
+      - name: Navegador (Playwright + Chromium)
+        if: steps.precisa.outputs.fazer == '1'
+        working-directory: app/testes
+        run: |
+          npm init -y >/dev/null
+          npm i --no-save --no-audit --no-fund playwright@1.49.1
+          npx playwright install --with-deps chromium
+
+      - name: Abrir todas as telas
+        id: teste
+        if: steps.precisa.outputs.fazer == '1'
+        continue-on-error: true
+        run: node app/testes/fumaca.mjs fotos
+
+      - name: Fotos das telas
+        if: steps.precisa.outputs.fazer == '1'
+        uses: actions/upload-artifact@v4
+        with:
+          name: telas-${{ steps.precisa.outputs.arvore }}
+          path: fotos
+          retention-days: 7
+
+      - name: Resultado no Engfy (progresso/app-teste.json)
+        if: steps.precisa.outputs.fazer == '1'
+        run: |
+          jq --arg a "${{ steps.precisa.outputs.arvore }}" --arg c "$(git rev-parse HEAD)" --arg u "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '. + {arvore: $a, commit: $c, execucao: $u}' fotos/resultado.json > resultado.json
+          cat resultado.json
+          sha=$(gh api "repos/$APP_REPO/contents/progresso/app-teste.json" --jq .sha 2>/dev/null || true)
+          ok=$(jq -r .ok resultado.json); v=$(jq -r .versao resultado.json)
+          msg="Teste automático do Nexus $v: $([ "$ok" = true ] && echo passou || echo NÃO passou)"
+          args=(-X PUT "repos/$APP_REPO/contents/progresso/app-teste.json" -f message="$msg" -f content="$(base64 -w0 resultado.json)" -f branch=main)
+          [ -n "$sha" ] && args+=(-f sha="$sha")
+          gh api "${args[@]}" --jq .commit.sha || echo "não consegui gravar o resultado"
+
+      - name: Liberar para o celular (branch app-liberado)
+        if: steps.precisa.outputs.fazer == '1' && steps.teste.outcome == 'success'
+        run: |
+          git push --force origin "HEAD:refs/heads/app-liberado"
+          echo "Versão liberada: $(git rev-parse --short HEAD)"
+
+      - name: Não passou
+        if: steps.precisa.outputs.fazer == '1' && steps.teste.outcome != 'success'
+        run: |
+          echo "::error::O teste do app achou erros; esta versão não vai para o celular. Veja progresso/app-teste.json."
+          exit 1
