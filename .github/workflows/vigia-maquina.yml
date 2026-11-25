@@ -1,0 +1,112 @@
+# Vigia da máquina da Vultr (25/11/2026, pedido do João: "quero que seja automatizado"). A VPS "radar" (Tóquio) manda
+# um sinal de vida a cada 15 min em radar-hyperliquid/saida/maquina.json. Em 24/11 às 18:15 UTC ela parou de vez (nem
+# o conserto automático do atualizar.sh rodou), e religar dependia de alguém entrar no painel da Vultr.
+# Agora, de 15 em 15 minutos: se o sinal tem mais de 40 min, este fluxo pergunta à Vultr como a máquina está e
+#   - desligada  → liga;
+#   - ligada, mas calada há mais de 60 min → reinicia (no máximo 1 vez a cada 3 h, para não ficar em laço);
+#   - suspensa pela Vultr (cobrança) ou apagada → não tem como consertar daqui: o fluxo fica vermelho e diz o motivo.
+# A chave da Vultr fica só no segredo VULTR_API_KEY (o João cria uma vez no painel). Este repositório é público: o
+# registro mostra só o estado e o que foi feito; nunca o IP da máquina, valores da conta ou a chave.
+name: "Vigia da máquina (Vultr)"
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      reiniciar:
+        description: "Reiniciar a máquina agora mesmo se ela estiver dando sinal (teste)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vigia-maquina
+  cancel-in-progress: false
+
+jobs:
+  vigiar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      SINAL: https://raw.githubusercontent.com/Kimijoao77/radar-hyperliquid/main/saida/maquina.json
+      ROTULO: radar
+    steps:
+      - name: Lembrar o último reinício
+        uses: actions/cache/restore@v4
+        with:
+          path: vigia
+          key: vigia-maquina-${{ github.run_id }}
+          restore-keys: vigia-maquina-
+
+      - name: Conferir e consertar
+        id: c
+        env:
+          CHAVE: ${{ secrets.VULTR_API_KEY }}
+          FORCAR: ${{ inputs.reiniciar }}
+        run: |
+          set -u
+          mkdir -p vigia
+          agora=$(date +%s)
+          batida=$(curl -fsSL "$SINAL?t=$agora" | jq -r '.batida // 0' 2>/dev/null || echo 0)
+          idade=$(( agora - batida / 1000 ))
+          min=$(( idade / 60 ))
+          echo "último sinal da máquina: há ${min} min"
+          if [ "$min" -lt 40 ] && [ "$FORCAR" != "true" ]; then echo "tudo certo"; exit 0; fi
+
+          if [ -z "$CHAVE" ]; then
+            echo "::error::A máquina está calada há ${min} min e falta o segredo VULTR_API_KEY para ligar ou reiniciar sozinho."
+            exit 1
+          fi
+          api() { curl -sS -o resp.json -w '%{http_code}' -H "Authorization: Bearer $CHAVE" -H "Content-Type: application/json" "$@"; }
+
+          cod=$(api "https://api.vultr.com/v2/instances?label=$ROTULO&per_page=50")
+          if [ "$cod" != "200" ]; then
+            echo "::error::A Vultr recusou a consulta (HTTP $cod). Confira se a API está ligada e com 'Allow all IPv4' no Access Control."
+            exit 1
+          fi
+          n=$(jq '[.instances[] | select(.label == env.ROTULO)] | length' resp.json)
+          if [ "$n" -eq 0 ]; then
+            echo "::error::Não existe mais máquina chamada '$ROTULO' na conta (apagada ou com outro nome)."
+            exit 1
+          fi
+          id=$(jq -r '[.instances[] | select(.label == env.ROTULO)][0].id' resp.json)
+          status=$(jq -r '[.instances[] | select(.label == env.ROTULO)][0].status' resp.json)
+          energia=$(jq -r '[.instances[] | select(.label == env.ROTULO)][0].power_status' resp.json)
+          servidor=$(jq -r '[.instances[] | select(.label == env.ROTULO)][0].server_status' resp.json)
+          rm -f resp.json
+          echo "Vultr: status=$status, energia=$energia, servidor=$servidor"
+
+          if [ "$status" = "suspended" ]; then
+            echo "::error::A Vultr suspendeu a máquina (normalmente falta de crédito ou cobrança recusada). Só pagando no painel (Billing) ela volta; depois disso este vigia liga sozinho."
+            exit 1
+          fi
+          if [ "$status" != "active" ]; then
+            echo "a máquina está em '$status' (criando ou mudando de plano): espero a próxima rodada"; exit 0
+          fi
+
+          if [ "$energia" = "stopped" ]; then
+            cod=$(api -X POST "https://api.vultr.com/v2/instances/$id/start"); rm -f resp.json
+            if [ "$cod" = "204" ]; then echo "::notice::A máquina estava desligada: liguei. O sinal deve voltar em uns 15 min."; date +%s > vigia/ultimo; echo "mexeu=1" >> "$GITHUB_OUTPUT"; exit 0; fi
+            echo "::error::Pedi para ligar e a Vultr respondeu HTTP $cod."; exit 1
+          fi
+
+          # ligada, mas calada: reinicia, no máximo 1 vez a cada 3 h
+          ultimo=$(cat vigia/ultimo 2>/dev/null || true); ultimo=${ultimo:-0}
+          desde=$(( (agora - ultimo) / 60 ))
+          if [ "$FORCAR" != "true" ] && [ "$min" -lt 60 ]; then echo "calada há ${min} min: espero completar 60 antes de reiniciar"; exit 0; fi
+          if [ "$FORCAR" != "true" ] && [ "$desde" -lt 180 ]; then
+            echo "::warning::Ligada e calada há ${min} min; já mexi nela há ${desde} min, espero completar 3 h antes de reiniciar de novo."; exit 0
+          fi
+          cod=$(api -X POST "https://api.vultr.com/v2/instances/$id/reboot"); rm -f resp.json
+          if [ "$cod" = "204" ]; then echo "::notice::Ligada, mas calada há ${min} min: reiniciei."; date +%s > vigia/ultimo; echo "mexeu=1" >> "$GITHUB_OUTPUT"; exit 0; fi
+          echo "::error::Pedi para reiniciar e a Vultr respondeu HTTP $cod."; exit 1
+
+      - name: Guardar o último reinício
+        if: always() && steps.c.outputs.mexeu == '1'
+        uses: actions/cache/save@v4
+        with:
+          path: vigia
+          key: vigia-maquina-${{ github.run_id }}
