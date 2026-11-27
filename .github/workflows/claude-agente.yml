@@ -1,0 +1,96 @@
+# Claude pelo crédito da API (27/11/2026, pedido do João: gastar os US$ 100 do "API credit (Max)" até 8/12).
+# Roda uma tarefa de agente/tarefas/<tarefa>.md com o Agent SDK (o mesmo motor do Claude Code), dentro de uma cópia de
+# um repositório do João. A chave fica só no segredo ANTHROPIC_API_KEY. Trava de gasto: agente/rodar.mjs não roda se o
+# total em agente/gasto/ passar de US$ 95, e cada rodada tem o próprio limite.
+# ESTE REPOSITÓRIO É PÚBLICO: o registro mostra só a tarefa, o resultado e o custo. Nada do que o Claude lê ou
+# escreve aparece aqui (os repositórios de trabalho são privados).
+name: "Claude (crédito da API)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      tarefa:
+        description: "Nome do arquivo em agente/tarefas (sem .md)"
+        required: true
+        default: teste
+      repo:
+        description: "Repositório de trabalho (vazio = nenhum)"
+        default: Kimijoao77/Engfy
+      modelo:
+        description: "Modelo"
+        default: claude-opus-5-5
+      limite_usd:
+        description: "Limite de gasto desta rodada (US$)"
+        default: "3"
+      extra:
+        description: "Informação para a tarefa (ex.: hora da falha)"
+        default: ""
+  workflow_call:
+    inputs:
+      tarefa: { type: string, required: true }
+      repo: { type: string, default: Kimijoao77/Engfy }
+      modelo: { type: string, default: claude-opus-5-5 }
+      limite_usd: { type: string, default: "3" }
+      extra: { type: string, default: "" }
+    secrets:
+      ANTHROPIC_API_KEY: { required: true }
+      ENGFY_TOKEN: { required: false }
+
+permissions:
+  contents: write
+
+concurrency:
+  group: claude-agente-${{ inputs.tarefa }}
+  cancel-in-progress: false
+
+jobs:
+  rodar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copiar o repositório de trabalho
+        if: inputs.repo != ''
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.repo }}
+          token: ${{ secrets.ENGFY_TOKEN }}
+          path: trabalho
+          fetch-depth: 20
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Instalar o Agent SDK
+        working-directory: agente
+        run: npm install --no-audit --no-fund --loglevel=error >/dev/null && echo "instalado"
+
+      - name: Rodar a tarefa
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ secrets.ENGFY_TOKEN }}
+          MODELO: ${{ inputs.modelo }}
+          LIMITE_USD: ${{ inputs.limite_usd }}
+          TAREFA: ${{ inputs.tarefa }}
+          EXTRA: ${{ inputs.extra }}
+          TEM_REPO: ${{ inputs.repo }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then echo "::error::falta o segredo ANTHROPIC_API_KEY"; exit 1; fi
+          pasta=trabalho; [ -n "$TEM_REPO" ] || { mkdir -p vazio; pasta=vazio; }
+          export RESPOSTA="$RUNNER_TEMP/resposta.txt"
+          node agente/rodar.mjs "$TAREFA" "$pasta" "$EXTRA"
+
+      - name: Guardar o gasto
+        if: always()
+        run: |
+          git add agente/gasto/*.json 2>/dev/null || true
+          git diff --cached --quiet && { echo "nada a guardar"; exit 0; }
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "Gasto do Claude (${{ inputs.tarefa }})"
+          for i in 1 2 3 4 5; do
+            git pull -q --rebase origin main && git push -q origin HEAD:main && { echo "gasto guardado"; exit 0; }
+            sleep $((i * 3))
+          done
+          echo "::warning::não consegui guardar o gasto"
