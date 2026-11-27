@@ -68,6 +68,10 @@ jobs:
         with:
           node-version: 22
 
+      - name: Instalar o ffmpeg (Lince)
+        if: startsWith(inputs.tarefa, 'lince')
+        run: sudo apt-get update -qq >/dev/null && sudo apt-get install -y -qq ffmpeg >/dev/null && ffmpeg -version | head -1
+
       - name: Instalar o Agent SDK
         working-directory: agente
         run: npm install --no-audit --no-fund --loglevel=error >/dev/null && echo "instalado"
