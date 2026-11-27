@@ -72,5 +72,7 @@ anotar({ quando: new Date().toISOString(), tarefa, modelo: MODELO, usd: Math.rou
          resultado: ok ? "ok" : (fim ? (fim.is_error ? "erro" : fim.subtype) : "erro"), turnos: fim ? fim.num_turns : null, min: Math.round((Date.now() - inicio) / 6000) / 10 });
 console.log(`resultado: ${ok ? "ok" : "erro" + (fim ? " (" + fim.subtype + ")" : "")} | custo: US$ ${usd.toFixed(3)} | total: US$ ${(ja + usd).toFixed(2)}`);
 // a resposta final do Claude fica fora do registro público (arquivo temporário do runner, apagado no fim)
+// só as tarefas de teste (que respondem "ok"/"falhou", sem conteúdo privado) mostram a resposta no registro
+if (fim && fim.result && tarefa.endsWith("-teste")) console.log("resposta do teste:\n" + String(fim.result).slice(0, 1500));
 if (fim && fim.result && process.env.RESPOSTA) fs.writeFileSync(process.env.RESPOSTA, String(fim.result));
 process.exit(ok ? 0 : 1);
