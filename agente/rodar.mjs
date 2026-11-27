@@ -31,10 +31,10 @@ function anotar(linha) {
 
 const arq = path.join(AQUI, "tarefas", `${tarefa}.md`);
 if (!/^[a-z0-9-]+$/.test(tarefa || "") || !fs.existsSync(arq)) { console.error(`tarefa desconhecida: ${tarefa}`); process.exit(2); }
-if (new Date() > new Date("2026-12-08T12:31:00Z")) { console.log("o crédito venceu em 8/12 às 9h31: não rodo"); process.exit(0); }
+if (new Date() > new Date("2026-12-08T12:31:00Z")) { console.log("::warning::o crédito venceu em 8/12 às 9h31: não rodo"); process.exit(3); }
 const ja = gasto();
 console.log(`gasto até agora: US$ ${ja.toFixed(2)} de US$ ${TETO}`);
-if (ja + LIMITE > TETO + 0.001) { console.log("perto do teto: não rodo"); process.exit(0); }
+if (ja + LIMITE > TETO + 0.001) { console.log("::warning::perto do teto de gasto: não rodo"); process.exit(3); }
 
 // conferência da chave sem mostrar nada dela: só o formato e a resposta da API
 {

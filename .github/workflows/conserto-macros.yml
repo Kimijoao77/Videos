@@ -1,8 +1,10 @@
 # Conserto automático das macros do ping pong (17/11/2026, pedido do João: uma tentativa por falha, 5 minutos depois
 # dela). Quando uma macro falha, o Nexus manda o registro e o print para o Engfy e chama este fluxo com a hora da
-# falha. Ele espera completar 5 minutos desde a falha e dispara a tarefa agendada "Nexus: conserto automático das
-# macros" pela URL de disparo dela. A chave fica só no segredo CONSERTO_TOKEN (o João gera em claude.ai/code/routines,
-# na tarefa, Gatilho → API → Gerar token). Este repositório é público: o registro não mostra nada além do resultado.
+# falha. Ele espera completar 5 minutos desde a falha e chama o Claude.
+# Desde 27/11/2026 o Claude roda aqui mesmo, pelo crédito da API (fluxo "Claude (crédito da API)", tarefa
+# agente/tarefas/conserto-macros.md). Se isso falhar (crédito vencido em 8/12, teto de gasto ou erro), a reserva
+# dispara a tarefa agendada "Nexus: conserto automático das macros" como antes, pela URL de disparo dela (segredo
+# CONSERTO_TOKEN). Este repositório é público: o registro não mostra nada além do resultado.
 name: "Nexus: conserto das macros"
 
 on:
@@ -12,14 +14,15 @@ on:
         description: "Hora da falha (AAAA-MM-DDTHH:MM:SS, horário de Brasília)"
         required: true
 
-permissions: {}
+permissions:
+  contents: write
 
 concurrency:
   group: conserto-macros
   cancel-in-progress: false
 
 jobs:
-  disparar:
+  esperar:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -34,7 +37,25 @@ jobs:
           espera=$(( alvo - $(date +%s) ))
           if [ "$espera" -gt 600 ]; then espera=600; fi
           if [ "$espera" -gt 0 ]; then echo "esperando ${espera} s"; sleep "$espera"; fi
-      - name: Chamar o conserto do Claude
+
+  conserto:
+    needs: esperar
+    uses: ./.github/workflows/claude-agente.yml
+    with:
+      tarefa: conserto-macros
+      repo: Kimijoao77/Engfy
+      modelo: claude-opus-5-5
+      limite_usd: "3"
+      extra: "Uma macro falhou às ${{ inputs.quando }} (hora de Brasília)."
+    secrets: inherit
+
+  reserva:
+    needs: [esperar, conserto]
+    if: always() && needs.esperar.result == 'success' && needs.conserto.result != 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Chamar a tarefa agendada do Claude (reserva)
         env:
           TOKEN: ${{ secrets.CONSERTO_TOKEN }}
           QUANDO: ${{ inputs.quando }}
