@@ -79,6 +79,8 @@ jobs:
         run: |
           if [ -z "$ANTHROPIC_API_KEY" ]; then echo "::error::falta o segredo ANTHROPIC_API_KEY"; exit 1; fi
           pasta=trabalho; [ -n "$TEM_REPO" ] || { mkdir -p vazio; pasta=vazio; }
+          # o git do runner usa o mesmo token para clonar e enviar outros repositórios do João (ex.: radar-hyperliquid)
+          if [ -n "$GH_TOKEN" ]; then gh auth setup-git >/dev/null 2>&1 || true; fi
           export RESPOSTA="$RUNNER_TEMP/resposta.txt"
           node agente/rodar.mjs "$TAREFA" "$pasta" "$EXTRA"
 

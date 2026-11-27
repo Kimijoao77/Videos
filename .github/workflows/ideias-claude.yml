@@ -1,0 +1,23 @@
+# Buscador de ideias, leitura das 5h (27/11/2026: saiu da tarefa agendada do Claude, que gastava o plano, e passou a
+# rodar aqui pelo crédito da API até 8/12). Depois das 04:45 (o Gemini separa as mensagens do WhatsApp) e das 01:17
+# (o Gemini assiste os vídeos), o Claude dá o veredito. A instrução é agente/tarefas/ideias.md.
+# Repositório público: o registro mostra só o resultado e o custo.
+name: "Ideias: leitura das 5h (Claude)"
+
+on:
+  schedule:
+    - cron: "0 8 * * *"   # 05:00 em Brasília
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  ler:
+    uses: ./.github/workflows/claude-agente.yml
+    with:
+      tarefa: ideias
+      repo: Kimijoao77/Engfy
+      modelo: claude-opus-5-5
+      limite_usd: "3"
+    secrets: inherit
