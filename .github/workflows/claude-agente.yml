@@ -25,6 +25,9 @@ on:
       extra:
         description: "Informação para a tarefa (ex.: hora da falha)"
         default: ""
+      minutos:
+        description: "Tempo máximo da rodada (min)"
+        default: "90"
   workflow_call:
     inputs:
       tarefa: { type: string, required: true }
@@ -32,12 +35,14 @@ on:
       modelo: { type: string, default: claude-opus-5-5 }
       limite_usd: { type: string, default: "3" }
       extra: { type: string, default: "" }
+      minutos: { type: string, default: "90" }
     secrets:
       ANTHROPIC_API_KEY: { required: true }
       ENGFY_TOKEN: { required: false }
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: claude-agente-${{ inputs.tarefa }}
@@ -46,7 +51,7 @@ concurrency:
 jobs:
   rodar:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: ${{ fromJSON(inputs.minutos || '90') }}
     steps:
       - uses: actions/checkout@v4
 
@@ -71,6 +76,7 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GH_TOKEN: ${{ secrets.ENGFY_TOKEN }}
+          VIDEOS_TOKEN: ${{ github.token }}
           MODELO: ${{ inputs.modelo }}
           LIMITE_USD: ${{ inputs.limite_usd }}
           TAREFA: ${{ inputs.tarefa }}

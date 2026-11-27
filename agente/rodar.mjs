@@ -57,7 +57,7 @@ const inicio = Date.now();
 let fim = null, erro = false;
 try {
   for await (const m of query({ prompt, options: {
-    cwd: path.resolve(pasta), model: MODELO, maxBudgetUsd: LIMITE, maxTurns: Number(process.env.MAX_TURNOS || 120),
+    cwd: path.resolve(pasta), model: MODELO, maxBudgetUsd: LIMITE, maxTurns: Number(process.env.MAX_TURNOS || 400),
     permissionMode: "bypassPermissions", allowDangerouslySkipPermissions: true, settingSources: ["project"],
   } })) {
     if (m.type === "result") fim = m;

@@ -1,0 +1,25 @@
+# Lince Lunar: os Shorts do dia (27/11/2026, pedido do João: sai da tarefa agendada do Claude, que gastava o plano, e
+# passa a rodar aqui pelo crédito da API, com limite de US$ 2 por dia e o modelo Sonnet, mais barato). O Claude
+# escreve o roteiro e a cena, chama "Lince passo a passo", confere os quadros e agenda a postagem.
+# A instrução é agente/tarefas/lince.md. Repositório público: o registro mostra só o resultado e o custo.
+name: "Lince Lunar: Shorts do dia (Claude)"
+
+on:
+  schedule:
+    - cron: "38 6 * * *"   # 03:38 em Brasília
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  fazer:
+    uses: ./.github/workflows/claude-agente.yml
+    with:
+      tarefa: lince
+      repo: Kimijoao77/Engfy
+      modelo: claude-sonnet-5-5
+      limite_usd: "2"
+      minutos: "180"
+    secrets: inherit
